@@ -15,6 +15,7 @@ import { pool } from './config/database';
 import { transporter } from './config/smtp';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
+import adminRoutes from "./routes/adminRoutes";
 import { errorHandler } from './middleware/errorHandler';
 import { tokenService } from './services/tokenService';
 
@@ -74,7 +75,7 @@ class Server {
     // API routes
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/users', userRoutes);
-
+    this.app.use("/api/admin", adminRoutes);
     // 404 handler
     this.app.use(errorHandler.notFound.bind(errorHandler));
   }
