@@ -16,6 +16,36 @@ const router = Router();
 router.use(authMiddleware.authenticate.bind(authMiddleware));
 
 // GET /api/users/profile - Get user profile
+router.get(
+  "/",
+  authMiddleware.authenticate.bind(authMiddleware),
+  async (req: Request, res: Response) => {
+    try {
+      // ✅ Optional: only verified users can access
+      // if (!req.user?.verified) {
+      //   return res.status(403).json({ success: false, message: "Email verification required" });
+      // }
+
+      const result = await query(
+        `SELECT id, email, display_name, verified
+         FROM users
+         ORDER BY id DESC`
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: { users: result.rows },
+      });
+    } catch (error) {
+      console.error("Get users error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch users",
+      });
+    }
+  }
+);
+
 router.get('/profile', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
