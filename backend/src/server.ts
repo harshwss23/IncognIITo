@@ -6,8 +6,11 @@
 // - Registers routes
 // - Starts the server
 // - Handles graceful shutdown
+// - Manages WebRTC Signaling & Socket connections
 
 import express, { Application } from 'express';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
@@ -23,35 +26,45 @@ dotenv.config();
 
 class Server {
   public app: Application;
+  private server: http.Server;
+  private io: SocketIOServer;
   private port: number;
 
   constructor() {
     this.app = express();
     this.port = parseInt(process.env.PORT || '5000');
     
+    // Wrap the Express app in a standard HTTP server
+    this.server = http.createServer(this.app);
+    
+    // Initialize Socket.IO on top of the HTTP server
+    this.io = new SocketIOServer(this.server, {
+      cors: {
+        origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+      }
+    });
+    
     this.initializeMiddlewares();
     this.initializeRoutes();
     this.initializeErrorHandling();
+    this.initializeSockets(); 
   }
 
-  // Configure middleware (like Shopio's SecurityConfig)
+  // Configure middleware
   private initializeMiddlewares(): void {
-    // CORS configuration
     this.app.use(cors({
       origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-      credentials: true, // Allow cookies
+      credentials: true, 
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
       allowedHeaders: ['Content-Type', 'Authorization'],
     }));
 
-    // Body parsing middleware
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
-    
-    // Cookie parser
     this.app.use(cookieParser());
 
-    // Request logging (development)
     if (process.env.NODE_ENV === 'development') {
       this.app.use((req, res, next) => {
         console.log(`${req.method} ${req.path}`);
@@ -60,9 +73,8 @@ class Server {
     }
   }
 
-  // Register API routes (like Shopio's RestController mappings)
+  // Register API routes
   private initializeRoutes(): void {
-    // Health check endpoint
     this.app.get('/health', (req, res) => {
       res.status(200).json({
         success: true,
@@ -71,12 +83,56 @@ class Server {
       });
     });
 
-    // API routes
     this.app.use('/api/auth', authRoutes);
     this.app.use('/api/users', userRoutes);
 
-    // 404 handler
     this.app.use(errorHandler.notFound.bind(errorHandler));
+  }
+
+  // WebRTC Signaling Logic & Disconnections
+  private initializeSockets(): void {
+    this.io.on('connection', (socket) => {
+      console.log(`🔌 Socket Connected: ${socket.id}`);
+
+      // User joins a specific video room
+      socket.on('join_room', (roomID) => {
+        socket.join(roomID);
+        socket.to(roomID).emit('user_joined', socket.id);
+      });
+
+      // Relay WebRTC Offer
+      socket.on('offer', (data) => {
+        socket.to(data.roomID).emit('receive_offer', data);
+      });
+      socket.on('send_message', (data) => {
+        socket.to(data.roomID).emit('receive_message', data);
+      });
+      // Relay WebRTC Answer
+      socket.on('answer', (data) => {
+        socket.to(data.roomID).emit('receive_answer', data);
+      });
+      // NEW: Relay Camera UI Status
+      socket.on('camera_status', (data) => {
+        socket.to(data.roomID).emit('receive_camera_status', data);
+      });
+      // Relay ICE Candidates
+      socket.on('ice_candidate', (data) => {
+        socket.to(data.roomID).emit('receive_ice_candidate', data);
+      });
+
+      // Handle user leaving right before the socket actually drops
+      socket.on('disconnecting', () => {
+        socket.rooms.forEach((room) => {
+          if (room !== socket.id) {
+            socket.to(room).emit('peer_disconnected');
+          }
+        });
+      });
+
+      socket.on('disconnect', () => {
+        console.log(`❌ Socket Disconnected: ${socket.id}`);
+      });
+    });
   }
 
   // Error handling
@@ -86,15 +142,16 @@ class Server {
 
   // Start server
   public start(): void {
-    this.app.listen(this.port, () => {
+    // Listen on the HTTP server, NOT the Express app directly
+    this.server.listen(this.port, () => {
       console.log('🚀 IncognIITo Backend Server');
       console.log('================================');
       console.log(`📡 Server running on port ${this.port}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 API Base URL: http://localhost:${this.port}/api`);
+      console.log(`⚡ WebSocket Server Running`);
       console.log('================================');
       
-      // Test database connection
       pool.query('SELECT NOW()', (err: any) => {
         if (err) {
           console.error('❌ Database connection failed');
@@ -103,15 +160,13 @@ class Server {
         }
       });
 
-      // Schedule cleanup job (runs every hour like Shopio's CleanupScheduler)
       setInterval(() => {
         tokenService.cleanupExpiredSessions().catch(err => {
           console.error('Session cleanup error:', err);
         });
-      }, 60 * 60 * 1000); // 1 hour
+      }, 60 * 60 * 1000); 
     });
 
-    // Graceful shutdown
     process.on('SIGTERM', this.shutdown.bind(this));
     process.on('SIGINT', this.shutdown.bind(this));
   }
@@ -121,14 +176,11 @@ class Server {
     console.log('\nShutting down server...');
     
     try {
-      // Close database connections
+      this.io.close();
       await pool.end();
       console.log('Database connections closed');
-
-      // Close SMTP connection
       transporter.close();
       console.log('SMTP connection closed');
-
       process.exit(0);
     } catch (error) {
       console.error('Error during shutdown:', error);
@@ -137,7 +189,6 @@ class Server {
   }
 }
 
-// Create and start server
 const server = new Server();
 server.start();
 
