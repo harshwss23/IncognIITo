@@ -1,184 +1,228 @@
-import React, { useState } from 'react';
-import { Send, Video, MoreVertical, Paperclip, Smile, ArrowLeft, CheckCheck } from 'lucide-react';
-import { useThemeColors } from '@/app/hooks/useThemeColors';
-import { useTheme } from '@/app/contexts/ThemeContext';
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { socket } from "@/services/socket";
+import { Send, MessageSquare, ShieldCheck } from "lucide-react";
+import { useTheme } from "@/app/contexts/ThemeContext";
+
+type ChatMsg = {
+  id: string | number;
+  tempId?: string;
+  text: string;
+  senderId: string;
+  time: string;
+};
 
 export function FuturisticChatInterface() {
-  const colors = useThemeColors();
   const { theme } = useTheme();
-  const isDark = theme === 'dark';
-  const [message, setMessage] = useState('');
+  const isDark = theme === "dark";
 
-  const messages = [
-    { id: 1, type: 'incoming', text: 'Hey! How are you doing?', time: '10:23 AM' },
-    { id: 2, type: 'outgoing', text: 'Doing great! Just working on some projects', time: '10:24 AM' },
-    { id: 3, type: 'incoming', text: 'That sounds awesome! What kind of projects?', time: '10:24 AM' },
-    { id: 4, type: 'outgoing', text: 'Building some cool stuff', time: '10:25 AM' },
-    { id: 5, type: 'incoming', text: 'Wow, that\'s impressive! Can you tell me more about it?', time: '10:26 AM' },
-    { id: 6, type: 'outgoing', text: 'Sure! It\'s a project on analog electronics', time: '10:27 AM' },
-    { id: 7, type: 'incoming', text: 'I\'d love to hear more about the technical details', time: '10:28 AM' },
-    { id: 8, type: 'outgoing', text: 'Let me share some screenshots with you', time: '10:28 AM' },
-  ];
+  const [message, setMessage] = useState("");
+  const [myId, setMyId] = useState<string>(""); 
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [mutualFriends, setMutualFriends] = useState<any[]>([]);
+  const [activeFriend, setActiveFriend] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const safeStr = (v: any) => (v === null || v === undefined ? "" : String(v));
+  const formatTime = (d: Date) =>
+    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  // 1. Initialize Profile & Friends
+  useEffect(() => {
+    const init = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      try {
+        // Fetch Me
+        const meRes = await fetch("http://localhost:5000/api/users/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const meJson = await meRes.json();
+        const currentId = safeStr(meJson?.data?.user?.id);
+        setMyId(currentId);
+
+        // Fetch Friends
+        const fRes = await fetch("http://localhost:5000/api/requests/mutual", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const fJson = await fRes.json();
+        if (fRes.ok && fJson.success) {
+          const list = fJson.data.requests || [];
+          setMutualFriends(list);
+          if (list.length > 0) setActiveFriend(list[0]);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, []);
+
+  // 2. Identity Helper
+  const getFriendDetails = (f: any) => {
+    if (!f || !myId) return { name: "User", email: "" };
+    const amISender = safeStr(f.sender_id) === myId;
+    const rawName = amISender ? f.receiver_display_name : f.sender_display_name;
+    const email = amISender ? f.receiver_email : f.sender_email;
+
+    return {
+      name: safeStr(rawName).trim() || safeStr(email).split("@")[0] || "User",
+      email: safeStr(email)
+    };
+  };
+
+  const activeInfo = useMemo(() => getFriendDetails(activeFriend), [activeFriend, myId]);
+
+  // 3. Socket & History
+  useEffect(() => {
+    if (!activeFriend?.chat_id) return;
+
+    // Fetch History
+    const fetchHistory = async () => {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://localhost:5000/api/chats/${activeFriend.chat_id}/messages`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setMessages(json.data.messages.map((m: any) => ({
+          id: m.id,
+          text: safeStr(m.text || m.body),
+          senderId: safeStr(m.sender_id),
+          time: formatTime(new Date(m.created_at)),
+        })));
+      }
+    };
+
+    fetchHistory();
+    socket.emit("join_chat", { chatId: activeFriend.chat_id });
+
+    // Handle incoming messages
+    const handleNewMsg = (msg: any) => {
+      if (safeStr(msg.chatId) !== safeStr(activeFriend.chat_id)) return;
+
+      setMessages((prev) => {
+        // Double message prevention logic:
+        // 1. Check if ID exists (database ID)
+        // 2. Check if tempId matches (my optimistic message)
+        const isDuplicate = prev.some(m => 
+          String(m.id) === String(msg.id) || 
+          (msg.tempId && m.tempId === msg.tempId)
+        );
+
+        if (isDuplicate) {
+          // Update the optimistic message with the real DB ID
+          return prev.map(m => (m.tempId === msg.tempId) ? { ...m, id: msg.id, tempId: undefined } : m);
+        }
+
+        return [...prev, {
+          id: msg.id,
+          text: msg.text,
+          senderId: safeStr(msg.senderId),
+          time: msg.time
+        }];
+      });
+    };
+
+    socket.on("new_message", handleNewMsg);
+    return () => {
+      socket.off("new_message");
+      socket.emit("leave_chat", { chatId: activeFriend.chat_id });
+    };
+  }, [activeFriend?.chat_id, myId]);
+
+  // 4. Send Logic
+  const handleSendMessage = () => {
+    if (!message.trim() || !activeFriend?.chat_id) return;
+    const tId = `temp-${Date.now()}`;
+    
+    // Optimistic Update
+    const optimisticMsg: ChatMsg = {
+      id: tId,
+      tempId: tId,
+      text: message,
+      senderId: myId,
+      time: formatTime(new Date()),
+    };
+
+    setMessages(prev => [...prev, optimisticMsg]);
+    socket.emit("send_message", { 
+      chatId: activeFriend.chat_id, 
+      text: message, 
+      tempId: tId 
+    });
+    setMessage("");
+  };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-[#020617] text-blue-500">Initializing Neural Link...</div>;
 
   return (
-    // MAIN CONTAINER: Full Width & Height of the Desktop Frame
-    <div className={`w-full h-full flex flex-col relative transition-all duration-300
-        ${isDark 
-            ? 'bg-[#020617]' 
-            : 'bg-white'
-        }`}>
-
-        {/* --- HEADER --- */}
-        <div className={`h-24 px-10 flex items-center justify-between relative z-10 backdrop-blur-xl border-b transition-colors
-            ${isDark 
-                ? 'bg-slate-900/60 border-white/10' 
-                : 'bg-white/80 border-slate-100'
-            }`}>
-            
-            {/* Top Glow Line (Dark Mode Only) */}
-            <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent ${isDark ? 'opacity-100' : 'opacity-0'}`}></div>
-
-            <div className="flex items-center gap-6 flex-1">
-                {/* Back Button */}
-                <button className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-300 group
-                    ${isDark 
-                        ? 'bg-white/5 border-white/10 hover:border-cyan-500/50 text-white/70 hover:text-cyan-400' 
-                        : 'bg-slate-50 border-slate-200 hover:border-blue-400 text-slate-500 hover:text-blue-600'
-                    }`}>
-                    <ArrowLeft className="w-5 h-5" />
-                </button>
-
-                {/* User Info */}
-                <div className="flex items-center gap-5">
-                    <div className="relative">
-                        <div className={`w-14 h-14 rounded-full p-0.5
-                            ${isDark 
-                                ? 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-[0_0_20px_rgba(6,182,212,0.4)]' 
-                                : 'bg-gradient-to-br from-blue-500 to-cyan-400 shadow-lg shadow-blue-500/20'
-                            }`}>
-                            <div className={`w-full h-full rounded-full flex items-center justify-center font-bold text-sm
-                                ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'}`}>
-                                DS
-                            </div>
-                        </div>
-                        <div className={`absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 animate-pulse
-                            ${isDark ? 'border-[#020617]' : 'border-white'}`}></div>
-                    </div>
-                    
-                    <div>
-                        <h3 className={`font-bold text-xl ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                            DarkSignal
-                        </h3>
-                        <p className="text-green-500 text-xs font-bold tracking-wide flex items-center gap-1.5 mt-1">
-                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                            ONLINE
-                        </p>
-                    </div>
+    <div className={`flex h-screen w-full overflow-hidden ${isDark ? "bg-[#020617] text-slate-200" : "bg-white text-slate-900"}`}>
+      {/* Sidebar */}
+      <div className={`w-80 flex flex-col border-r ${isDark ? "border-white/5 bg-slate-900/40" : "border-slate-200 bg-slate-50"}`}>
+        <div className="p-6 border-b border-inherit font-bold text-lg flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-blue-500" /> Channels
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {mutualFriends.map((f) => {
+            const info = getFriendDetails(f);
+            const active = activeFriend?.chat_id === f.chat_id;
+            return (
+              <button key={f.id} onClick={() => setActiveFriend(f)} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${active ? "bg-blue-600 text-white shadow-lg" : "hover:bg-blue-500/10"}`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${active ? "bg-white/20" : "bg-blue-500/10 text-blue-500"}`}>{info.name[0]}</div>
+                <div className="text-left truncate">
+                  <p className="font-bold text-sm truncate">{info.name}</p>
+                  <p className="text-[10px] opacity-60 truncate">{info.email}</p>
                 </div>
-            </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-            {/* Header Actions (Call Button Removed) */}
-            <div className="flex items-center gap-4">
-                <button className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-300
-                    ${isDark 
-                        ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-cyan-400' 
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-blue-600'
-                    }`}>
-                    <Video className="w-5 h-5" />
-                </button>
-                
-                <button className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-300
-                    ${isDark 
-                        ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-cyan-400' 
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-blue-600'
-                    }`}>
-                    <MoreVertical className="w-5 h-5" />
-                </button>
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col">
+        <div className={`h-20 px-8 flex items-center justify-between border-b ${isDark ? "border-white/5" : "border-slate-200"}`}>
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">{activeInfo.name[0]}</div>
+            <div>
+              <h3 className="font-bold">{activeInfo.name}</h3>
+              <span className="text-[10px] text-emerald-500 font-bold tracking-widest animate-pulse">SECURE_LINK_ACTIVE</span>
             </div>
+          </div>
+          <ShieldCheck className="w-5 h-5 text-slate-500" />
         </div>
 
-        {/* --- MESSAGES AREA --- */}
-        <div className="flex-1 overflow-y-auto p-12 space-y-8 scrollbar-thin scrollbar-thumb-slate-700">
-            {messages.map((msg) => (
-                <div key={msg.id} className={`flex w-full ${msg.type === 'outgoing' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
-                    <div className={`max-w-[70%] xl:max-w-[60%] flex flex-col ${msg.type === 'outgoing' ? 'items-end' : 'items-start'}`}>
-                        
-                        <div className={`px-10 py-6 rounded-[2rem] text-lg leading-relaxed backdrop-blur-sm relative z-10
-                            ${msg.type === 'outgoing'
-                                ? `bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-tr-none ${isDark ? 'shadow-[0_0_25px_rgba(6,182,212,0.3)]' : 'shadow-lg shadow-blue-500/30'}`
-                                : isDark
-                                    ? 'bg-slate-800/80 border border-slate-700/50 text-slate-200 rounded-tl-none'
-                                    : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none shadow-sm'
-                            }
-                        `}>
-                            {msg.text}
-                        </div>
-
-                        <div className={`flex items-center gap-1.5 mt-2 px-2 text-sm font-medium
-                            ${msg.type === 'outgoing' 
-                                ? 'text-cyan-500' 
-                                : (isDark ? 'text-slate-500' : 'text-slate-400')
-                            }`}>
-                            <span>{msg.time}</span>
-                            {msg.type === 'outgoing' && <CheckCheck className="w-4 h-4" />}
-                        </div>
-                    </div>
+        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+          {messages.map((msg, i) => {
+            const isMe = msg.senderId === myId;
+            return (
+              <div key={msg.id || i} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[70%] flex flex-col ${isMe ? "items-end" : "items-start"}`}>
+                  <div className={`px-5 py-3 rounded-2xl text-sm shadow-sm ${isMe ? "bg-blue-600 text-white rounded-tr-none" : isDark ? "bg-slate-800" : "bg-slate-100 text-slate-800"}`}>
+                    {msg.text}
+                  </div>
+                  <span className="text-[10px] text-slate-500 mt-1">{msg.time}</span>
                 </div>
-            ))}
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
         </div>
 
-        {/* --- INPUT BAR --- */}
-        <div className={`h-32 px-10 flex items-center gap-6 relative z-10 backdrop-blur-xl border-t transition-colors
-            ${isDark 
-                ? 'bg-slate-900/60 border-white/10' 
-                : 'bg-white/80 border-slate-100'
-            }`}>
-            
-            {/* Bottom Glow Line (Dark Mode Only) */}
-            <div className={`absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent ${isDark ? 'opacity-100' : 'opacity-0'}`}></div>
-
-            <button className={`w-16 h-16 rounded-full border flex items-center justify-center transition-all flex-shrink-0
-                ${isDark 
-                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70 hover:text-cyan-400' 
-                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-blue-600'
-                }`}>
-                <Paperclip className="w-6 h-6" />
-            </button>
-
-            <div className="flex-1 relative">
-                <input
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    className={`w-full h-20 rounded-full px-10 pr-20 text-xl outline-none border transition-all
-                        ${isDark 
-                            ? 'bg-slate-800/50 border-slate-700/50 text-white placeholder-slate-500 focus:border-cyan-500/50 focus:bg-slate-800/80 focus:shadow-[0_0_20px_rgba(6,182,212,0.15)]' 
-                            : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-blue-400 focus:shadow-md'
-                        }`}
-                />
-                <button className={`absolute right-6 top-1/2 -translate-y-1/2 p-3 rounded-full transition-colors
-                    ${isDark ? 'text-slate-400 hover:text-cyan-400' : 'text-slate-400 hover:text-blue-600'}`}>
-                    <Smile className="w-7 h-7" />
-                </button>
-            </div>
-
-            <button className={`w-20 h-20 rounded-full flex items-center justify-center text-white transition-all transform hover:scale-105 active:scale-95 flex-shrink-0
-                ${isDark 
-                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 shadow-[0_0_30px_rgba(6,182,212,0.5)] hover:shadow-[0_0_45px_rgba(6,182,212,0.8)]' 
-                    : 'bg-slate-900 hover:bg-slate-800 shadow-xl shadow-slate-900/20'
-                }`}>
-                <Send className="w-8 h-8 ml-1" />
-            </button>
+        <div className="p-6">
+          <div className={`flex items-center gap-2 p-2 rounded-2xl border ${isDark ? "bg-slate-900 border-white/10" : "bg-slate-50 border-slate-200"}`}>
+            <input value={message} onChange={(e) => setMessage(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSendMessage()} placeholder="Type message..." className="flex-1 bg-transparent px-4 py-2 outline-none" />
+            <button onClick={handleSendMessage} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all"><Send className="w-5 h-5" /></button>
+          </div>
         </div>
-
-        {/* Ambient Glow Effects (Dark Mode Only) */}
-        {isDark && (
-            <>
-                <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[120px] pointer-events-none"></div>
-                <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none"></div>
-            </>
-        )}
+      </div>
     </div>
   );
 }

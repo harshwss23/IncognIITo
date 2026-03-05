@@ -19,6 +19,20 @@ import adminRoutes from "./routes/adminRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
 import { registerSocketHandlers } from "./socket/socket";
+<<<<<<< Updated upstream
+=======
+import express, { Application } from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
+import { pool } from './config/database';
+import { transporter } from './config/smtp';
+import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
+import adminRoutes from "./routes/adminRoutes";
+import { errorHandler } from './middleware/errorHandler';
+import { tokenService } from './services/tokenService';
+>>>>>>> Stashed changes
 
 // Load environment variables
 dotenv.config();
@@ -83,7 +97,10 @@ class Server {
       });
     });
 
+<<<<<<< Updated upstream
     // API routes
+=======
+>>>>>>> Stashed changes
     this.app.use("/api/auth", authRoutes);
     this.app.use("/api/users", userRoutes);
     this.app.use("/api/requests", requestRoutes);
