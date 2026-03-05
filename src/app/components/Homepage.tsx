@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Sparkles,
   Users,
   MessageSquareText,
   Video,
@@ -17,12 +17,75 @@ export function HomePageScreen() {
   const colors = useThemeColors();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState("home"); // home | requests | chats | match | profile
 
+  // ✅ profile state
+  const [user, setUser] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  // ✅ Fetch Profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setProfileLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setUser(null);
+          setProfileLoading(false);
+          return;
+        }
+
+        const res = await fetch("http://localhost:5000/api/users/profile", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok || !json.success) {
+          console.error("Profile fetch failed:", res.status, json);
+          setUser(null);
+          setProfileLoading(false);
+          return;
+        }
+
+        setUser(json.data?.user || null);
+      } catch (err) {
+        console.error("Profile fetch error:", err);
+        setUser(null);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  const displayName = useMemo(() => {
+    if (!user) return "User";
+    const dn = (user.display_name || user.displayName || "").trim();
+    if (dn) return dn;
+    const email = (user.email || "").trim();
+    if (email.includes("@")) return email.split("@")[0];
+    return email || "User";
+  }, [user]);
+
+  const avatarLetter = useMemo(() => {
+    return (displayName?.charAt(0) || "U").toUpperCase();
+  }, [displayName]);
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    window.location.href = "/login";
+  };
+
   const navItems = [
-    { id: "requests", label: "Connection Requests", icon: Users, count: 3 },
-    { id: "chats", label: "Active Chats", icon: MessageSquareText, count: 2 },
+    { id: "requests", label: "Connection Requests", icon: Users, count: 0 },
+    { id: "chats", label: "Active Chats", icon: MessageSquareText, count: 0 },
+    { id: "people", label: "Active Users", icon: Users, count: 0 }, // ✅ redirects to /active-users
     { id: "match", label: "Start Matching", icon: Video, count: 0 },
     { id: "profile", label: "Profile", icon: User, count: 0 },
   ];
@@ -54,7 +117,7 @@ export function HomePageScreen() {
       className={`w-full h-full flex overflow-hidden transition-colors duration-500
       ${isDark ? "bg-slate-950" : "bg-slate-50"}`}
     >
-      {/* --- LEFT SIDEBAR (same theme as your dashboard) --- */}
+      {/* --- LEFT SIDEBAR --- */}
       <div
         className={`w-80 flex flex-col border-r z-20 transition-colors
           ${isDark ? "bg-slate-900 border-white/10" : "bg-white border-slate-200"}`}
@@ -73,7 +136,18 @@ export function HomePageScreen() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                if (item.id === "people") {
+                  navigate("/active-users");
+                } if (item.id === "requests") {
+                  navigate("/requests");
+                } if (item.id === "chats") {
+                  navigate("/chat");
+                }
+                else {
+                  setActiveTab(item.id);
+                }
+              }}
               className={`w-full flex items-center justify-between px-4 py-4 rounded-xl transition-all duration-300 group
                 ${
                   activeTab === item.id
@@ -101,30 +175,36 @@ export function HomePageScreen() {
         {/* User snippet */}
         <div className={`p-6 border-t ${isDark ? "border-white/10" : "border-slate-200"}`}>
           <div
-            className={`p-4 rounded-2xl flex items-center gap-3 cursor-pointer transition-colors
+            className={`p-4 rounded-2xl flex items-center gap-3 transition-colors
               ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-slate-100 hover:bg-slate-200"}`}
           >
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-              S
+              {profileLoading ? "…" : avatarLetter}
             </div>
+
             <div className="flex-1 overflow-hidden">
-              <p className={`font-bold text-sm truncate ${isDark ? "text-white" : "text-slate-900"}`}>Shadow404</p>
-              <p className="text-xs text-blue-500 font-medium">★ 4.8 Rating</p>
+              <p className={`font-bold text-sm truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                {profileLoading ? "Loading..." : displayName}
+              </p>
+              <p className="text-xs text-blue-500 font-medium">Verified IITK</p>
             </div>
-            <LogOut className={`w-4 h-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
+
+            <button onClick={logout} title="Logout" className="p-1">
+              <LogOut className={`w-4 h-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
+            </button>
           </div>
         </div>
       </div>
 
       {/* --- RIGHT MAJOR CONTENT --- */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Background glow (same style) */}
+        {/* Background glow */}
         <div
           className={`absolute top-0 right-0 w-[650px] h-[650px] rounded-full blur-[110px] opacity-20 pointer-events-none transition-colors
             ${isDark ? "bg-blue-600/20" : "bg-blue-200/50"}`}
         />
 
-        {/* Header (same style as your dashboard) */}
+        {/* Header */}
         <div
           className={`h-24 px-10 flex items-center justify-between z-10 border-b backdrop-blur-sm
             ${isDark ? "bg-slate-900/50 border-white/10" : "bg-white/60 border-slate-200"}`}
@@ -137,14 +217,6 @@ export function HomePageScreen() {
               {activeTab === "home" ? "Quick overview of the platform." : "Understand this section and proceed."}
             </p>
           </div>
-
-          {/* <button className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-3 text-white font-bold text-sm shadow-lg shadow-blue-500/30 transition-all hover:scale-105 active:scale-95">
-            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
-            <div className="relative flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              <span>Explore</span>
-            </div>
-          </button> */}
         </div>
 
         {/* Main content area */}
@@ -169,7 +241,7 @@ export function HomePageScreen() {
               {desc}
             </p>
 
-            {/* Home: Feature cards | Other tabs: small guide */}
+            {/* HOME */}
             {activeTab === "home" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
                 <FeatureCard
@@ -198,6 +270,7 @@ export function HomePageScreen() {
                 />
               </div>
             ) : (
+              // OTHER TABS placeholder (you’ll implement later)
               <div className="mt-8 space-y-4">
                 <MiniStep isDark={isDark} n="01" t="Read the details" d="Understand what this section controls." />
                 <MiniStep isDark={isDark} n="02" t="Take action" d="Accept/decline, open chats, or join queue." />
