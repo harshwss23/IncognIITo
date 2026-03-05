@@ -1,6 +1,5 @@
 // FILE: src/server.ts
 
-<<<<<<< HEAD
 import express, { Application } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -15,23 +14,12 @@ import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import requestRoutes from "./routes/requestRoutes";
+import adminRoutes from "./routes/adminRoutes";
+
 import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
 
 import { registerSocketHandlers } from "./socket/socket";
-=======
-import express, { Application } from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import cookieParser from 'cookie-parser';
-import { pool } from './config/database';
-import { transporter } from './config/smtp';
-import authRoutes from './routes/authRoutes';
-import userRoutes from './routes/userRoutes';
-import adminRoutes from "./routes/adminRoutes";
-import { errorHandler } from './middleware/errorHandler';
-import { tokenService } from './services/tokenService';
->>>>>>> cffb6144901abfe9f4ab85ef8545283c9eb94b2b
 
 // Load environment variables
 dotenv.config();
@@ -40,7 +28,6 @@ class Server {
   public app: Application;
   private port: number;
 
-  // ✅ new: http server + io
   private httpServer: http.Server;
   public io: SocketIOServer;
 
@@ -52,7 +39,7 @@ class Server {
     this.initializeRoutes();
     this.initializeErrorHandling();
 
-    //  Create HTTP server from express app
+    // Create HTTP server
     this.httpServer = http.createServer(this.app);
 
     // Socket.IO
@@ -63,7 +50,6 @@ class Server {
       },
     });
 
-    // ✅ Register socket handlers
     registerSocketHandlers(this.io);
   }
 
@@ -98,19 +84,13 @@ class Server {
       });
     });
 
-<<<<<<< HEAD
+    // API routes
     this.app.use("/api/auth", authRoutes);
     this.app.use("/api/users", userRoutes);
     this.app.use("/api/requests", requestRoutes);
     this.app.use("/api/chats", chatRoutes);
-
-=======
-    // API routes
-    this.app.use('/api/auth', authRoutes);
-    this.app.use('/api/users', userRoutes);
     this.app.use("/api/admin", adminRoutes);
-    // 404 handler
->>>>>>> cffb6144901abfe9f4ab85ef8545283c9eb94b2b
+
     this.app.use(errorHandler.notFound.bind(errorHandler));
   }
 
@@ -119,7 +99,6 @@ class Server {
   }
 
   public start(): void {
-    // ✅ IMPORTANT: listen with httpServer (not app.listen)
     this.httpServer.listen(this.port, () => {
       console.log("🚀 IncognIITo Backend Server");
       console.log("================================");
@@ -149,7 +128,6 @@ class Server {
     console.log("\nShutting down server...");
 
     try {
-      // ✅ close sockets + http server
       this.io.close();
       this.httpServer.close();
 
