@@ -19,20 +19,6 @@ import adminRoutes from "./routes/adminRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
 import { registerSocketHandlers } from "./socket/socket";
-<<<<<<< Updated upstream
-=======
-import express, { Application } from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import cookieParser from 'cookie-parser';
-import { pool } from './config/database';
-import { transporter } from './config/smtp';
-import authRoutes from './routes/authRoutes';
-import userRoutes from './routes/userRoutes';
-import adminRoutes from "./routes/adminRoutes";
-import { errorHandler } from './middleware/errorHandler';
-import { tokenService } from './services/tokenService';
->>>>>>> Stashed changes
 
 // Load environment variables
 dotenv.config();
@@ -97,10 +83,7 @@ class Server {
       });
     });
 
-<<<<<<< Updated upstream
     // API routes
-=======
->>>>>>> Stashed changes
     this.app.use("/api/auth", authRoutes);
     this.app.use("/api/users", userRoutes);
     this.app.use("/api/requests", requestRoutes);
@@ -165,7 +148,7 @@ class Server {
 
   public start(): void {
     // Listen on the HTTP server, NOT the Express app directly
-    this.httpServer.listen(this.port, () => {
+    this.httpServer.listen(this.port, async () => {
       console.log("🚀 IncognIITo Backend Server");
       console.log("================================");
       console.log(`📡 Server running on port ${this.port}`);
@@ -178,6 +161,30 @@ class Server {
         if (err) console.error("❌ Database connection failed");
         else console.log("✅ Database connected");
       });
+
+      // Auto-run admin migrations so is_admin + reports table exist on every environment
+      // To set someone as admin run "UPDATE users SET is_admin = TRUE WHERE email = 'someone@iitk.ac.in';""
+      try {
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE`);
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS reports (
+            id            SERIAL PRIMARY KEY,
+            reporter_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            target_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            reason        VARCHAR(255) NOT NULL,
+            description   TEXT,
+            status        VARCHAR(20) NOT NULL DEFAULT 'Pending'
+                          CHECK (status IN ('Pending', 'Resolved', 'Dismissed')),
+            admin_note    TEXT,
+            resolved_by   INTEGER REFERENCES users(id),
+            created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at    TIMESTAMP NOT NULL DEFAULT NOW()
+          )
+        `);
+        console.log("✅ Admin migrations applied");
+      } catch (migrationErr) {
+        console.error("⚠️ Admin migration warning:", migrationErr);
+      }
 
       setInterval(() => {
         tokenService.cleanupExpiredSessions().catch((err) => {
