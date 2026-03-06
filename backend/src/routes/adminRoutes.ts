@@ -1,48 +1,63 @@
 /**
- * Phase 1 - Admin Dashboard Mock API Endpoints
+ * Phase 2 - Admin Dashboard API Endpoints (DB-backed)
  *
- * Implemented by:
- * Krish Vijay Tiwari
- *Abeer Gupta
- * Purpose:
+ * Implemented by: Abeer Gupta, Krish Vijay Tiwari
+  * Purpose:
  * Provide backend API routes required by the Admin dashboard
  * so that the frontend team can integrate with them.
- *
- * These currently return mock data and will be replaced with
- * real database/session logic in Phase 2.
+ * Mock data replace with real DB logic
+ * All routes require JWT auth + admin privileges.
  */
 
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
+import { authMiddleware } from "../middleware/authMiddleware";
+import { adminController } from "../controllers/adminController";
+import { query } from "../config/database";
 
 const router = Router();
 
-/*
- GET /api/admin/users
- Returns list of fake/mock users for the dashboard
-*/
-router.get("/users", (_req: Request, res: Response) => {
-  const mockUsers = [
-    { id: 1, userId: "Krish Vijay Tiwari",  email: "student01@iitk.ac.in", rating: 5.0, status: "active" },
-    { id: 2, userId: "Harsh Shekhwat",  email: "student01@iitk.ac.in", rating: 1.0, status: "flagged" },
-    { id: 3, userId: "Joel Arora",  email: "student02@iitk.ac.in", rating: 0.0, status: "flagged" },
-    { id: 4, userId: "Krish Bansal", email: "student03@iitk.ac.in", rating: 0.1, status: "flagged" },
-  ];
+// Admin guard — runs after authenticate, checks users.is_admin
+async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await query(
+      `SELECT is_admin FROM users WHERE id = $1`,
+      [req.user!.userId]
+    );
 
-  res.json(mockUsers);
-});
+    if (result.rows.length === 0 || !result.rows[0].is_admin) {
+      res.status(403).json({ success: false, message: "Admin access required" });
+      return;
+    }
 
-/*
- GET /api/admin/reports
- Returns list of fake/mock reports for the dashboard
-*/
-router.get("/reports", (_req: Request, res: Response) => {
-  const mockReports = [
-    { id: 1, reportId: "R-1024", targetUser: "Reported: Joel Arora",   reason: "Online Harassment",          status: "Pending" },
-    { id: 2, reportId: "R-1025", targetUser: "Reported: Krish Bansal",   reason: "Inappropriate Video", status: "Resolved" },
-    { id: 3, reportId: "R-1026", targetUser: "Reported: Harsh Shekhwat",  reason: "Inappropriate Behaviour",            status: "Dismissed" },
-  ];
+    next();
+  } catch (error) {
+    console.error("Admin guard error:", error);
+    res.status(500).json({ success: false, message: "Authorization check failed" });
+  }
+}
 
-  res.json(mockReports);
-});
+// Protect every route: JWT first, then admin check
+router.use(
+  authMiddleware.authenticate.bind(authMiddleware),
+  requireAdmin
+);
+
+// GET    /api/admin/users              — list users (?search=)
+router.get("/users", adminController.getUsers.bind(adminController));
+
+// GET    /api/admin/reports            — list reports (?status=Pending)
+router.get("/reports", adminController.getReports.bind(adminController));
+
+// PATCH  /api/admin/reports/:id        — resolve / dismiss a report
+router.patch("/reports/:id", adminController.updateReport.bind(adminController));
+
+// POST   /api/admin/users/:id/ban      — ban a user
+router.post("/users/:id/ban", adminController.banUser.bind(adminController));
+
+// POST   /api/admin/users/:id/unban    — unban a user
+router.post("/users/:id/unban", adminController.unbanUser.bind(adminController));
+
+// GET    /api/admin/stats              — dashboard summary counts
+router.get("/stats", adminController.getStats.bind(adminController));
 
 export default router;

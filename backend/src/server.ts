@@ -1,6 +1,5 @@
 // FILE: src/server.ts
 
-<<<<<<< HEAD
 import express, { Application } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -15,58 +14,44 @@ import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import requestRoutes from "./routes/requestRoutes";
+import adminRoutes from "./routes/adminRoutes";
+
 import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
-
 import { registerSocketHandlers } from "./socket/socket";
-=======
-import express, { Application } from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import cookieParser from 'cookie-parser';
-import { pool } from './config/database';
-import { transporter } from './config/smtp';
-import authRoutes from './routes/authRoutes';
-import userRoutes from './routes/userRoutes';
-import adminRoutes from "./routes/adminRoutes";
-import { errorHandler } from './middleware/errorHandler';
-import { tokenService } from './services/tokenService';
->>>>>>> cffb6144901abfe9f4ab85ef8545283c9eb94b2b
 
 // Load environment variables
 dotenv.config();
 
 class Server {
   public app: Application;
-  private port: number;
-
-  // ✅ new: http server + io
   private httpServer: http.Server;
   public io: SocketIOServer;
+  private port: number;
 
   constructor() {
     this.app = express();
     this.port = parseInt(process.env.PORT || "5000", 10);
 
-    this.initializeMiddlewares();
-    this.initializeRoutes();
-    this.initializeErrorHandling();
-
-    //  Create HTTP server from express app
+    // Create HTTP server from express app
     this.httpServer = http.createServer(this.app);
 
-    // Socket.IO
+    // Initialize Socket.IO on top of the HTTP server
     this.io = new SocketIOServer(this.httpServer, {
       cors: {
         origin: process.env.FRONTEND_URL || "http://localhost:5173",
         credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
       },
     });
 
-    // ✅ Register socket handlers
-    registerSocketHandlers(this.io);
+    this.initializeMiddlewares();
+    this.initializeRoutes();
+    this.initializeErrorHandling();
+    this.initializeSockets();
   }
 
+  // Configure middleware
   private initializeMiddlewares(): void {
     this.app.use(
       cors({
@@ -98,20 +83,63 @@ class Server {
       });
     });
 
-<<<<<<< HEAD
+    // API routes
     this.app.use("/api/auth", authRoutes);
     this.app.use("/api/users", userRoutes);
     this.app.use("/api/requests", requestRoutes);
     this.app.use("/api/chats", chatRoutes);
-
-=======
-    // API routes
-    this.app.use('/api/auth', authRoutes);
-    this.app.use('/api/users', userRoutes);
     this.app.use("/api/admin", adminRoutes);
+
     // 404 handler
->>>>>>> cffb6144901abfe9f4ab85ef8545283c9eb94b2b
     this.app.use(errorHandler.notFound.bind(errorHandler));
+  }
+
+  // WebRTC Signaling Logic & Disconnections
+  private initializeSockets(): void {
+    // Keep existing socket handler registration (auth + chat handlers etc.)
+    registerSocketHandlers(this.io);
+
+    // Keep WebRTC signaling logic unchanged
+    this.io.on("connection", (socket) => {
+      console.log(`🔌 Socket Connected: ${socket.id}`);
+
+      socket.on("join_room", (roomID) => {
+        socket.join(roomID);
+        socket.to(roomID).emit("user_joined", socket.id);
+      });
+
+      socket.on("offer", (data) => {
+        socket.to(data.roomID).emit("receive_offer", data);
+      });
+
+      socket.on("send_message", (data) => {
+        socket.to(data.roomID).emit("receive_message", data);
+      });
+
+      socket.on("answer", (data) => {
+        socket.to(data.roomID).emit("receive_answer", data);
+      });
+
+      socket.on("camera_status", (data) => {
+        socket.to(data.roomID).emit("receive_camera_status", data);
+      });
+
+      socket.on("ice_candidate", (data) => {
+        socket.to(data.roomID).emit("receive_ice_candidate", data);
+      });
+
+      socket.on("disconnecting", () => {
+        socket.rooms.forEach((room) => {
+          if (room !== socket.id) {
+            socket.to(room).emit("peer_disconnected");
+          }
+        });
+      });
+
+      socket.on("disconnect", () => {
+        console.log(`❌ Socket Disconnected: ${socket.id}`);
+      });
+    });
   }
 
   private initializeErrorHandling(): void {
@@ -119,8 +147,8 @@ class Server {
   }
 
   public start(): void {
-    // ✅ IMPORTANT: listen with httpServer (not app.listen)
-    this.httpServer.listen(this.port, () => {
+    // Listen on the HTTP server, NOT the Express app directly
+    this.httpServer.listen(this.port, async () => {
       console.log("🚀 IncognIITo Backend Server");
       console.log("================================");
       console.log(`📡 Server running on port ${this.port}`);
@@ -133,6 +161,30 @@ class Server {
         if (err) console.error("❌ Database connection failed");
         else console.log("✅ Database connected");
       });
+
+      // Auto-run admin migrations so is_admin + reports table exist on every environment
+      // To set someone as admin run "UPDATE users SET is_admin = TRUE WHERE email = 'someone@iitk.ac.in';""
+      try {
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE`);
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS reports (
+            id            SERIAL PRIMARY KEY,
+            reporter_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            target_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            reason        VARCHAR(255) NOT NULL,
+            description   TEXT,
+            status        VARCHAR(20) NOT NULL DEFAULT 'Pending'
+                          CHECK (status IN ('Pending', 'Resolved', 'Dismissed')),
+            admin_note    TEXT,
+            resolved_by   INTEGER REFERENCES users(id),
+            created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at    TIMESTAMP NOT NULL DEFAULT NOW()
+          )
+        `);
+        console.log("✅ Admin migrations applied");
+      } catch (migrationErr) {
+        console.error("⚠️ Admin migration warning:", migrationErr);
+      }
 
       setInterval(() => {
         tokenService.cleanupExpiredSessions().catch((err) => {
@@ -149,7 +201,7 @@ class Server {
     console.log("\nShutting down server...");
 
     try {
-      // ✅ close sockets + http server
+      // close sockets + http server
       this.io.close();
       this.httpServer.close();
 
