@@ -24,11 +24,12 @@ export class AdminController {
                END                                 AS status
         FROM users u
         LEFT JOIN user_profiles p ON u.id = p.user_id
+        WHERE COALESCE(u.is_admin, FALSE) = FALSE
       `;
       const params: any[] = [];
 
       if (search) {
-        sql += ` WHERE u.display_name ILIKE $1 OR u.email ILIKE $1`;
+        sql += ` AND (u.display_name ILIKE $1 OR u.email ILIKE $1)`;
         params.push(`%${search}%`);
       }
 
