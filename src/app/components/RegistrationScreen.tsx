@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Lock, Sparkles, ArrowRight, Check, ShieldCheck, Globe, UserPlus } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import { buildApiUrl } from '@/services/config';
 
 export function RegistrationScreen() {
   const colors = useThemeColors();
@@ -25,7 +26,7 @@ export function RegistrationScreen() {
             setError('');
             setLoading(true);
             try {
-                const res = await fetch('http://localhost:5050/api/auth/request-otp', {
+                const res = await fetch(buildApiUrl('/api/auth/request-otp'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
@@ -54,7 +55,7 @@ export function RegistrationScreen() {
             setError('');
             setLoading(true);
             try {
-                const res = await fetch('http://localhost:5050/api/auth/verify-otp', {
+                const res = await fetch(buildApiUrl('/api/auth/verify-otp'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, otp, password })
@@ -66,7 +67,7 @@ export function RegistrationScreen() {
                     const success = data === true || data?.success === true || data?.verified === true || data?.status === 'ok';
                     if (success) {
                         // Redirect to login page on success
-                        window.location.href = 'http://localhost:5173/login';
+                        window.location.assign('/login');
                         return;
                     }
                     setError(data?.message || 'Verification failed.');

@@ -1,8 +1,9 @@
 import { io } from "socket.io-client";
+import { socketUrl } from "@/services/config";
 
-const token = localStorage.getItem("token");
-
-export const socket = io("http://localhost:5000", {
-  auth: { token },
+export const socket = io(socketUrl, {
+  auth: (callback) => {
+    callback({ token: localStorage.getItem("token") });
+  },
   transports: ["websocket"],
 });

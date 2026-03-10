@@ -12,8 +12,9 @@ import {
 } from 'lucide-react'
 import { useThemeColors } from '@/app/hooks/useThemeColors'
 import { useTheme } from '@/app/contexts/ThemeContext'
+import { socketUrl } from '@/services/config'
 
-const SOCKET_SERVER_URL = 'http://localhost:5000'
+const SOCKET_SERVER_URL = socketUrl
 const ROOM_ID = 'incogniito-test-room'
 
 export function LiveInteractionRoom() {

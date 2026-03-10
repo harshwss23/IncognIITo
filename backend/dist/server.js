@@ -1,5 +1,4 @@
 "use strict";
-// FILE: src/server.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -20,33 +19,32 @@ const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
 const errorHandler_1 = require("./middleware/errorHandler");
 const tokenService_1 = require("./services/tokenService");
 const socket_1 = require("./socket/socket");
-// Load environment variables
 dotenv_1.default.config();
 async function ensureAdminSchema() {
     try {
-        const isAdminColumnResult = await database_1.pool.query(`SELECT EXISTS (
+        const columnResult = await database_1.pool.query(`SELECT EXISTS (
          SELECT 1
          FROM information_schema.columns
          WHERE table_schema = 'public'
            AND table_name = 'users'
            AND column_name = 'is_admin'
        ) AS exists`);
-        if (!isAdminColumnResult.rows[0]?.exists) {
+        if (!columnResult.rows[0]?.exists) {
             await database_1.pool.query(`ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE`);
         }
         await database_1.pool.query(`
       CREATE TABLE IF NOT EXISTS reports (
-        id            SERIAL PRIMARY KEY,
-        reporter_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        target_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        reason        VARCHAR(255) NOT NULL,
-        description   TEXT,
-        status        VARCHAR(20) NOT NULL DEFAULT 'Pending'
-                      CHECK (status IN ('Pending', 'Resolved', 'Dismissed')),
-        admin_note    TEXT,
-        resolved_by   INTEGER REFERENCES users(id),
-        created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at    TIMESTAMP NOT NULL DEFAULT NOW()
+        id SERIAL PRIMARY KEY,
+        reporter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        target_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        reason VARCHAR(255) NOT NULL,
+        description TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'Pending'
+          CHECK (status IN ('Pending', 'Resolved', 'Dismissed')),
+        admin_note TEXT,
+        resolved_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `);
         console.log("✅ Admin schema verified");
@@ -54,7 +52,7 @@ async function ensureAdminSchema() {
     catch (error) {
         const pgError = error;
         if (pgError.code === "42501") {
-            console.warn("⚠️ Skipping admin schema migration because the database user does not own the existing tables. Run schema.sql as the application user or a database owner to enable admin features.");
+            console.warn("⚠️ Skipping admin schema migration because the database user does not own existing tables. Apply schema.sql as a local superuser to complete setup.");
             return;
         }
         console.error("⚠️ Admin schema check failed:", error);
@@ -64,9 +62,7 @@ class Server {
     constructor() {
         this.app = (0, express_1.default)();
         this.port = parseInt(process.env.PORT || "5000", 10);
-        // Create HTTP server from express app
         this.httpServer = http_1.default.createServer(this.app);
-        // Initialize Socket.IO on top of the HTTP server
         this.io = new socket_io_1.Server(this.httpServer, {
             cors: {
                 origin: process.env.FRONTEND_URL || "http://localhost:5173",
@@ -79,7 +75,6 @@ class Server {
         this.initializeErrorHandling();
         this.initializeSockets();
     }
-    // Configure middleware
     initializeMiddlewares() {
         this.app.use((0, cors_1.default)({
             origin: process.env.FRONTEND_URL || "http://localhost:5173",
@@ -105,20 +100,15 @@ class Server {
                 timestamp: new Date().toISOString(),
             });
         });
-        // API routes
         this.app.use("/api/auth", authRoutes_1.default);
         this.app.use("/api/users", userRoutes_1.default);
         this.app.use("/api/requests", requestRoutes_1.default);
         this.app.use("/api/chats", chatRoutes_1.default);
         this.app.use("/api/admin", adminRoutes_1.default);
-        // 404 handler
         this.app.use(errorHandler_1.errorHandler.notFound.bind(errorHandler_1.errorHandler));
     }
-    // WebRTC Signaling Logic & Disconnections
     initializeSockets() {
-        // Keep existing socket handler registration (auth + chat handlers etc.)
         (0, socket_1.registerSocketHandlers)(this.io);
-        // Keep WebRTC signaling logic unchanged
         this.io.on("connection", (socket) => {
             console.log(`🔌 Socket Connected: ${socket.id}`);
             socket.on("join_room", (roomID) => {
@@ -156,7 +146,6 @@ class Server {
         this.app.use(errorHandler_1.errorHandler.handle.bind(errorHandler_1.errorHandler));
     }
     start() {
-        // Listen on the HTTP server, NOT the Express app directly
         this.httpServer.listen(this.port, async () => {
             console.log("🚀 IncognIITo Backend Server");
             console.log("================================");
@@ -166,10 +155,11 @@ class Server {
             console.log(`🧩 Socket URL: http://localhost:${this.port}`);
             console.log("================================");
             database_1.pool.query("SELECT NOW()", (err) => {
-                if (err)
+                if (err) {
                     console.error("❌ Database connection failed");
-                else
-                    console.log("✅ Database connected");
+                    return;
+                }
+                console.log("✅ Database connected");
             });
             await ensureAdminSchema();
             setInterval(() => {
@@ -184,7 +174,6 @@ class Server {
     async shutdown() {
         console.log("\nShutting down server...");
         try {
-            // close sockets + http server
             this.io.close();
             this.httpServer.close();
             await database_1.pool.end();

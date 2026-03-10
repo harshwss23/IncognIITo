@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MessageCircle, MessageSquare, User, Check, Shield } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
+import { buildApiUrl } from '@/services/config';
 
 export function ChatRequestsDashboard() {
   const colors = useThemeColors();
@@ -15,7 +16,7 @@ export function ChatRequestsDashboard() {
     try {
       setLoading(true);
 
-      const res = await fetch("http://localhost:5000/api/requests/incoming", {
+      const res = await fetch(buildApiUrl('/api/requests/incoming'), {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -44,7 +45,7 @@ export function ChatRequestsDashboard() {
 // ✅ ACCEPT REQUEST
   const handleAccept = async (id) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/requests/${id}/accept`, {
+      const res = await fetch(buildApiUrl(`/api/requests/${id}/accept`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json", // Good practice to include
@@ -72,7 +73,7 @@ export function ChatRequestsDashboard() {
   // ✅ REJECT REQUEST
   const handleReject = async (id) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/requests/${id}/reject`, {
+      const res = await fetch(buildApiUrl(`/api/requests/${id}/reject`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

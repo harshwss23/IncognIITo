@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Search, UserPlus } from "lucide-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
+import { buildApiUrl } from "@/services/config";
 
 export function ActiveUsersScreen() {
   const { theme } = useTheme();
@@ -17,7 +18,7 @@ export function ActiveUsersScreen() {
     const fetchProfile = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:5000/api/users/profile", {
+        const res = await fetch(buildApiUrl("/api/users/profile"), {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -36,7 +37,7 @@ export function ActiveUsersScreen() {
       try {
         const token = localStorage.getItem("token");
 
-        const res = await fetch("http://localhost:5000/api/users", {
+        const res = await fetch(buildApiUrl("/api/users"), {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -71,7 +72,7 @@ export function ActiveUsersScreen() {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch("http://localhost:5000/api/requests/send", {
+      const res = await fetch(buildApiUrl("/api/requests/send"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
