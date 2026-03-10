@@ -1,39 +1,30 @@
 -- ============================================
--- IncognIITo Database Schema (Idempotent)
--- Run from project root:
--- psql -U postgres -f schema.sql
+-- IncognIITo Database Schema
+-- Pure SQL - Works on Linux, Mac, Windows
 -- ============================================
 
-\set ON_ERROR_STOP on
+-- STEP 1: Run this as postgres superuser to create DB and user
+-- psql -U postgres -f setup_database.sql
 
--- Create DB only if missing
-SELECT 'CREATE DATABASE incogniito_db'
-WHERE NOT EXISTS (
-    SELECT 1 FROM pg_database WHERE datname = 'incogniito_db'
-)\gexec
-
--- Create role only if missing
-SELECT 'CREATE USER incogniito_user WITH ENCRYPTED PASSWORD ''CS253_69_7'''
-WHERE NOT EXISTS (
-    SELECT 1 FROM pg_roles WHERE rolname = 'incogniito_user'
-)\gexec
-
--- Ensure password stays in sync for local setup
-ALTER USER incogniito_user WITH ENCRYPTED PASSWORD 'CS253_69_7';
-
--- Base database privileges
+CREATE DATABASE incogniito_db;
+CREATE USER incogniito_user WITH ENCRYPTED PASSWORD 'CS253_69_7';
 GRANT ALL PRIVILEGES ON DATABASE incogniito_db TO incogniito_user;
 
--- Connect to target database for schema/table setup
-\connect incogniito_db
+-- STEP 2: Connect to the database
+-- \c incogniito_db
 
--- Schema + future object privileges
-GRANT USAGE, CREATE ON SCHEMA public TO incogniito_user;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO incogniito_user;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO incogniito_user;
+-- Grant schema privileges
+GRANT ALL ON SCHEMA public TO incogniito_user;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO incogniito_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO incogniito_user;
+
+-- ============================================
+-- STEP 3: Run this as incogniito_user to create tables
+-- psql -U incogniito_user -d incogniito_db -f schema.sql
+-- ============================================
 
 -- USERS TABLE (no created_at/updated_at columns)
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -41,11 +32,11 @@ CREATE TABLE IF NOT EXISTS users (
     verified BOOLEAN DEFAULT FALSE
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_verified ON users(verified);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_verified ON users(verified);
 
 -- VERIFICATION TOKENS TABLE
-CREATE TABLE IF NOT EXISTS verification_tokens (
+CREATE TABLE verification_tokens (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token VARCHAR(255) UNIQUE NOT NULL,
@@ -55,12 +46,12 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
     used BOOLEAN DEFAULT FALSE
 );
 
-CREATE INDEX IF NOT EXISTS idx_verification_tokens_token ON verification_tokens(token);
-CREATE INDEX IF NOT EXISTS idx_verification_tokens_user_id ON verification_tokens(user_id);
-CREATE INDEX IF NOT EXISTS idx_verification_tokens_expires_at ON verification_tokens(expires_at);
+CREATE INDEX idx_verification_tokens_token ON verification_tokens(token);
+CREATE INDEX idx_verification_tokens_user_id ON verification_tokens(user_id);
+CREATE INDEX idx_verification_tokens_expires_at ON verification_tokens(expires_at);
 
 -- SESSIONS TABLE
-CREATE TABLE IF NOT EXISTS sessions (
+CREATE TABLE sessions (
     id SERIAL PRIMARY KEY,
     session_id VARCHAR(255) UNIQUE NOT NULL,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -69,12 +60,12 @@ CREATE TABLE IF NOT EXISTS sessions (
     last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_sessions_session_id ON sessions(session_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+CREATE INDEX idx_sessions_session_id ON sessions(session_id);
+CREATE INDEX idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
 
 -- USER PROFILES TABLE
-CREATE TABLE IF NOT EXISTS user_profiles (
+CREATE TABLE user_profiles (
     id SERIAL PRIMARY KEY,
     user_id INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     interests TEXT[] DEFAULT '{}',
@@ -87,7 +78,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
+CREATE INDEX idx_user_profiles_user_id ON user_profiles(user_id);
 
 -- ============================================
 -- TRIGGERS AND FUNCTIONS
@@ -103,7 +94,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Apply trigger ONLY to user_profiles (users table has no updated_at)
-DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
 CREATE TRIGGER update_user_profiles_updated_at
     BEFORE UPDATE ON user_profiles
     FOR EACH ROW
@@ -119,7 +109,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS auto_create_profile ON users;
 CREATE TRIGGER auto_create_profile
     AFTER INSERT ON users
     FOR EACH ROW
@@ -134,11 +123,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Existing object grants (safe on reruns)
-GRANT ALL ON SCHEMA public TO incogniito_user;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO incogniito_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO incogniito_user;
-
 -- Cleanup expired sessions
 CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
 RETURNS void AS $$
@@ -148,6 +132,122 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- NEW POSTGRESQL SCHEMA ADDED
+
+-- ============================================
+-- TABLE 1: matchmaking_queue
+-- Who is waiting to be matched RIGHT NOW
+-- ============================================
+CREATE TABLE matchmaking_queue (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'waiting' CHECK (status IN ('waiting', 'matched', 'expired')),
+    preferred_interests TEXT[] DEFAULT '{}',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_queue_status ON matchmaking_queue(status);
+CREATE INDEX idx_queue_joined_at ON matchmaking_queue(joined_at);
+
+-- ============================================
+-- TABLE 2: matchmaking_sessions
+-- Permanent record of every pair ever matched
+-- ============================================
+CREATE TABLE matchmaking_sessions (
+    id SERIAL PRIMARY KEY,
+    user1_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user2_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    match_score DECIMAL(5,2) DEFAULT 0,
+    session_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    session_end TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+    room_id VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT no_self_match CHECK (user1_id != user2_id)
+);
+
+CREATE INDEX idx_sessions_status ON matchmaking_sessions(status);
+CREATE INDEX idx_sessions_room_id ON matchmaking_sessions(room_id);
+CREATE INDEX idx_sessions_user1 ON matchmaking_sessions(user1_id);
+CREATE INDEX idx_sessions_user2 ON matchmaking_sessions(user2_id);
+
+-- ============================================
+-- TABLE 3: user_blocks
+-- Prevent re-matching with blocked users
+-- ============================================
+CREATE TABLE user_blocks (
+    id SERIAL PRIMARY KEY,
+    blocker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    blocked_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT no_self_block CHECK (blocker_id != blocked_id),
+    UNIQUE(blocker_id, blocked_id)
+);
+
+CREATE INDEX idx_blocks_blocker ON user_blocks(blocker_id);
+CREATE INDEX idx_blocks_blocked ON user_blocks(blocked_id);
+
+
+-- ===========================================
+--     CHAT REQUEEST TABBLE
+CREATE TABLE connection_requests (
+  id BIGSERIAL PRIMARY KEY,
+
+  sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  receiver_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  status TEXT NOT NULL DEFAULT 'PENDING'
+    CHECK (status IN ('PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED')),
+
+  message TEXT NULL,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  responded_at TIMESTAMPTZ NULL
+);
+
+CREATE UNIQUE INDEX uniq_pending_request
+ON connection_requests (sender_id, receiver_id)
+WHERE status = 'PENDING';
+
+
+ALTER TABLE connection_requests
+ADD CONSTRAINT no_self_request CHECK (sender_id <> receiver_id);
+
+
+--==============================================
+-- CHATS
+CREATE TABLE chats (
+  id BIGSERIAL PRIMARY KEY,
+
+  user1_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user2_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+
+  CONSTRAINT no_self_chat CHECK (user1_id <> user2_id)
+);
+
+CREATE UNIQUE INDEX unique_chat_pair
+ON chats (
+  LEAST(user1_id, user2_id),
+  GREATEST(user1_id, user2_id)
+);
+
+
+CREATE TABLE messages (
+  id BIGSERIAL PRIMARY KEY,
+
+  chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+  sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_messages_chat_time 
+ON messages(chat_id, created_at DESC);
 -- ============================================
 -- VERIFICATION QUERIES
 -- ============================================
