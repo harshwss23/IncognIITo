@@ -102,24 +102,62 @@ router.put("/profile", async (req: Request, res: Response) => {
 GET /api/users/connection-requests
 Mock endpoint for dashboard
 */
-router.get("/connection-requests", (_req: Request, res: Response) => {
+// GET /api/users/connection-requests
+router.get("/connection-requests", async (_req: Request, res: Response) => {
+  try {
 
-  res.json({
-    success: true,
-    data: [
+    const requests = [
       {
-        id: "req1",
-        fromUser: "Anonymous 421",
-        interests: ["AI", "Startups"]
+        id: 1,
+        userId: "MaskedSoul",
+        matchScore: 95,
+        sharedTags: ["CS253", "Anime", "Competitive Programming"]
       },
       {
-        id: "req2",
-        fromUser: "Anonymous 317",
-        interests: ["Competitive Programming"]
+        id: 2,
+        userId: "PixelShade",
+        matchScore: 88,
+        sharedTags: ["Machine Learning", "Photography", "Cricket"]
+      },
+      {
+        id: 3,
+        userId: "ShadowKey",
+        matchScore: 92,
+        sharedTags: ["Game Dev", "CS251", "Music Production"]
+      },
+      {
+        id: 4,
+        userId: "DarkSignal",
+        matchScore: 85,
+        sharedTags: ["Robotics", "Physics", "Chess"]
+      },
+      {
+        id: 5,
+        userId: "SilentUser",
+        matchScore: 90,
+        sharedTags: ["Web Dev", "Startup Ideas", "Basketball"]
+      },
+      {
+        id: 6,
+        userId: "IncognitoX",
+        matchScore: 87,
+        sharedTags: ["AI Ethics", "Philosophy", "Debate"]
       }
-    ]
-  });
+    ];
 
+    res.json({
+      success: true,
+      data: requests
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch connection requests"
+    });
+
+  }
 });
 
 

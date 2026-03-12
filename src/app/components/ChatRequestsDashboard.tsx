@@ -1,18 +1,32 @@
-import React from 'react';
+import React, { useState, useEffect }  from 'react';
 import { MessageCircle, MessageSquare, User, Sparkles, Check, X, Shield, Bell } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 
 export function ChatRequestsDashboard() {
   const colors = useThemeColors();
-  
-  const connectionRequests = [
-    { id: 1, userId: 'MaskedSoul', matchScore: 95, sharedTags: ['CS253', 'Anime', 'Competitive Programming'] },
-    { id: 2, userId: 'PixelShade', matchScore: 88, sharedTags: ['Machine Learning', 'Photography', 'Cricket'] },
-    { id: 3, userId: 'ShadowKey', matchScore: 92, sharedTags: ['Game Dev', 'CS251', 'Music Production'] },
-    { id: 4, userId: 'DarkSignal', matchScore: 85, sharedTags: ['Robotics', 'Physics', 'Chess'] },
-    { id: 5, userId: 'SilentUser', matchScore: 90, sharedTags: ['Web Dev', 'Startup Ideas', 'Basketball'] },
-    { id: 6, userId: 'IncognitoX', matchScore: 87, sharedTags: ['AI Ethics', 'Philosophy', 'Debate'] },
-  ];
+  const [connectionRequests, setConnectionRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/users/connection-requests", {
+      credentials: "include"
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setConnectionRequests(data.data);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to load requests", err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return <div className="p-8 text-lg">Loading requests...</div>;
+  }
 
   return (
     // MAIN CONTAINER: w-full h-full
