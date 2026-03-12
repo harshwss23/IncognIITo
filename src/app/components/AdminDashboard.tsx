@@ -1,48 +1,143 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, AlertTriangle, User, Ban, Search, LogOut } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import { ApiError, clearAuthTokens, fetchJsonWithAuth } from '@/services/auth';
+
+// Shape of each user returned by the backend
+interface BackendUser {
+  id: number;
+  userId: string;
+  email: string;
+  rating: number;
+  status: string;
+}
+
+// Shape of each report returned by the backend
+interface BackendReport {
+  id: number;
+  reportId: string;
+  targetUser: string;
+  reason: string;
+  status: string;
+}
+
+interface AdminUsersResponse extends Array<BackendUser> {}
+interface AdminReportsResponse extends Array<BackendReport> {}
 
 export function AdminDashboard() {
   const colors = useThemeColors();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  
+
   const [activeTab, setActiveTab] = useState<'users' | 'reports'>('users');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Data: Users
-  const allUsers = [
-    { col1: 'MaskedSoul', col2: 'student01@iitk.ac.in', col3: 4.8, status: 'active' },
-    { col1: 'PixelShade', col2: 'student02@iitk.ac.in', col3: 3.2, status: 'flagged' },
-    { col1: 'ShadowKey', col2: 'student03@iitk.ac.in', col3: 4.5, status: 'active' },
-    { col1: 'DarkSignal', col2: 'student04@iitk.ac.in', col3: 4.9, status: 'active' },
-    { col1: 'SilentUser', col2: 'student05@iitk.ac.in', col3: 4.6, status: 'active' },
-    { col1: 'IncognitoX', col2: 'student06@iitk.ac.in', col3: 4.7, status: 'active' },
-    { col1: 'Shadow404', col2: 'student07@iitk.ac.in', col3: 4.3, status: 'active' },
-    { col1: 'Sam Wilder', col2: 'student08@iitk.ac.in', col3: 4.8, status: 'active' },
-  ];
+  // Users fetched from backend
+  const [users, setUsers] = useState<BackendUser[]>([]);
+  const [reports, setReports] = useState<BackendReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Data: Reports (Mapped to match User column structure for perfect alignment)
- const allReports = [
-  { col1: 'R-1024', col2: 'Reported: Alex Rowan',   col3: 'Harassment',           status: 'Pending' },
-  { col1: 'R-1025', col2: 'Reported: Jamie Vale',   col3: 'Inappropriate Video',  status: 'Resolved' },
-  { col1: 'R-1026', col2: 'Reported: Morgan Reed',  col3: 'Spamming',             status: 'Dismissed' },
-  { col1: 'R-1027', col2: 'Reported: Riley Ash',    col3: 'Hate Speech',          status: 'Pending' },
-  { col1: 'R-1028', col2: 'Reported: Taylor Knox',  col3: 'Fake Profile',         status: 'Resolved' },
-  { col1: 'R-1029', col2: 'Reported: Jordan Quinn', col3: 'Abusive Language',     status: 'Pending' },
-  { col1: 'R-1030', col2: 'Reported: Casey Lane',   col3: 'Bot Activity',         status: 'Pending' },
-  { col1: 'R-1031', col2: 'Reported: Avery Stone',  col3: 'Scam Link',            status: 'Resolved' },
-];
+  const handleAuthFailure = (status: number) => {
+    if (status !== 401) {
+      return;
+    }
 
+    clearAuthTokens();
+    window.location.assign('/login');
+  };
 
-  // Dynamic Data Selection
-  const currentData = activeTab === 'users' ? allUsers : allReports;
-  
-  // Dynamic Headers
-  const headers = activeTab === 'users' 
+  // Fetch users + reports from backend on mount
+  useEffect(() => {
+    setLoading(true);
+
+    Promise.all([
+      fetchJsonWithAuth<AdminUsersResponse>('/api/admin/users'),
+      fetchJsonWithAuth<AdminReportsResponse>('/api/admin/reports'),
+    ])
+      .then(([usersData, reportsData]) => {
+        setUsers(usersData);
+        setReports(reportsData);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to load data:', err);
+
+        if (err instanceof ApiError) {
+          handleAuthFailure(err.status);
+          setError(err.message || 'Failed to load data');
+        } else {
+          setError('Failed to load data');
+        }
+
+        setLoading(false);
+      });
+  }, []);
+
+  // Ban or unban a user
+  const handleToggleBan = async (userId: number, currentStatus: string) => {
+    const action = currentStatus === 'banned' ? 'unban' : 'ban';
+    if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+
+    try {
+      await fetchJsonWithAuth(`/api/admin/users/${userId}/${action}`, {
+        method: 'POST',
+      });
+
+      // Update local state immediately
+      setUsers((prev) =>
+        prev.map((u) => u.id === userId ? { ...u, status: action === 'ban' ? 'banned' : 'active' } : u)
+      );
+    } catch (err: unknown) {
+      console.error(`${action} error:`, err);
+
+      if (err instanceof ApiError) {
+        handleAuthFailure(err.status);
+        setError(err.message || `Failed to ${action} user`);
+      } else {
+        setError(`Failed to ${action} user`);
+      }
+    }
+  };
+
+  // Map backend users into the col1/col2/col3 shape the table expects
+  const allUsers = users.map((u) => ({
+    id: u.id,
+    col1: u.userId,
+    col2: u.email,
+    col3: u.rating,
+    status: u.status,
+  }));
+
+  // Map backend reports into the col1/col2/col3 shape the table expects
+  const allReports = reports.map((r) => ({
+    id: r.id,
+    col1: r.reportId,
+    col2: r.targetUser,
+    col3: r.reason,
+    status: r.status,
+  }));
+
+  // Filter based on search
+  const filteredUsers = allUsers.filter(
+    (u) =>
+      u.col1.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.col2.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredReports = allReports.filter(
+    (r) =>
+      r.col1.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.col2.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const currentData = activeTab === 'users' ? filteredUsers : filteredReports;
+
+  const headers = activeTab === 'users'
     ? ['User ID', 'IITK Email', 'Reputation', 'Status', 'Actions']
     : ['Report ID', 'Target User', 'Reason', 'Status', 'Actions'];
+
+  const pendingCount = allReports.filter((r) => r.status === 'Pending').length;
 
   return (
     // MAIN CONTAINER: Full Width & Height
@@ -138,9 +233,11 @@ export function AdminDashboard() {
           >
             <AlertTriangle className="w-4 h-4" />
             <span>Pending Reports</span>
-            <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center text-white shadow-[0_0_15px_rgba(239,68,68,0.8)]">
-              5
-            </span>
+            {pendingCount > 0 && (
+              <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center text-white shadow-[0_0_15px_rgba(239,68,68,0.8)]">
+                {pendingCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -163,6 +260,21 @@ export function AdminDashboard() {
 
       {/* --- TABLE CONTENT --- */}
       <div className="flex-1 overflow-auto">
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className={`text-lg font-semibold ${isDark ? 'text-white/60' : 'text-slate-400'}`}>Loading data...</div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-red-500 font-semibold text-lg">{error}</div>
+          </div>
+        ) : currentData.length === 0 ? (
+          <div className="flex items-center justify-center h-64">
+            <div className={`text-lg font-semibold ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+              No {activeTab === 'users' ? 'users' : 'reports'} found.
+            </div>
+          </div>
+        ) : (
         <table className="w-full">
           <thead className={`sticky top-0 z-10 ${isDark ? 'bg-[#1E293B] border-b border-blue-500/20' : 'bg-slate-50 border-b border-slate-200'}`}>
             <tr>
@@ -227,12 +339,18 @@ export function AdminDashboard() {
                   </span>
                 </td>
 
-                {/* Column 5: Action (PRESERVED EXACTLY AS REQUESTED) */}
+                {/* Column 5: Action (PRESERVED EXACTLY AS REQUESTED) Added ban/unban button*/}
                 <td className="px-8 py-5">
                   <div className="flex items-center justify-start">
-                    <button className="group/btn px-5 py-2.5 rounded-xl bg-transparent border-2 border-red-500/60 text-red-400 text-sm font-bold hover:bg-red-500/10 hover:border-red-500 hover:text-red-300 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] transition-all duration-300 hover:scale-[1.05] active:scale-[0.95] flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleBan(item.id, item.status)}
+                      className={`group/btn px-5 py-2.5 rounded-xl bg-transparent border-2 text-sm font-bold transition-all duration-300 hover:scale-[1.05] active:scale-[0.95] flex items-center gap-2 ${
+                        item.status === 'banned'
+                          ? 'border-green-500/60 text-green-400 hover:bg-green-500/10 hover:border-green-500 hover:text-green-300'
+                          : 'border-red-500/60 text-red-400 hover:bg-red-500/10 hover:border-red-500 hover:text-red-300 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)]'
+                      }`}>
                       <Ban className="w-4 h-4" />
-                      <span>Block User</span>
+                      <span>{item.status === 'banned' ? 'Unban User' : 'Block User'}</span>
                     </button>
                   </div>
                 </td>
@@ -241,6 +359,7 @@ export function AdminDashboard() {
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   );
