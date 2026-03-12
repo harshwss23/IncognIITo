@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, AlertTriangle, User, Ban, Search, LogOut } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import { ApiError, clearAuthTokens, fetchJsonWithAuth } from '@/services/auth';
 
 // Shape of each user returned by the backend
 interface BackendUser {
@@ -21,6 +22,9 @@ interface BackendReport {
   status: string;
 }
 
+interface AdminUsersResponse extends Array<BackendUser> {}
+interface AdminReportsResponse extends Array<BackendReport> {}
+
 export function AdminDashboard() {
   const colors = useThemeColors();
   const { theme } = useTheme();
@@ -35,32 +39,38 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const handleAuthFailure = (status: number) => {
+    if (status !== 401) {
+      return;
+    }
+
+    clearAuthTokens();
+    window.location.assign('/login');
+  };
+
   // Fetch users + reports from backend on mount
   useEffect(() => {
     setLoading(true);
-    const token = localStorage.getItem('token');
-    const headers: HeadersInit = token
-      ? { Authorization: `Bearer ${token}` }
-      : {};
 
     Promise.all([
-      fetch('http://localhost:5000/api/admin/users', { headers }).then((res) => {
-        if (!res.ok) throw new Error(`Users fetch failed (${res.status})`);
-        return res.json();
-      }),
-      fetch('http://localhost:5000/api/admin/reports', { headers }).then((res) => {
-        if (!res.ok) throw new Error(`Reports fetch failed (${res.status})`);
-        return res.json();
-      }),
+      fetchJsonWithAuth<AdminUsersResponse>('/api/admin/users'),
+      fetchJsonWithAuth<AdminReportsResponse>('/api/admin/reports'),
     ])
       .then(([usersData, reportsData]) => {
         setUsers(usersData);
         setReports(reportsData);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error('Failed to load data:', err);
-        setError(err.message || 'Failed to load data');
+
+        if (err instanceof ApiError) {
+          handleAuthFailure(err.status);
+          setError(err.message || 'Failed to load data');
+        } else {
+          setError('Failed to load data');
+        }
+
         setLoading(false);
       });
   }, []);
@@ -71,20 +81,23 @@ export function AdminDashboard() {
     if (!confirm(`Are you sure you want to ${action} this user?`)) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/admin/users/${userId}/${action}`, {
+      await fetchJsonWithAuth(`/api/admin/users/${userId}/${action}`, {
         method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error(`Failed to ${action} user`);
 
       // Update local state immediately
       setUsers((prev) =>
         prev.map((u) => u.id === userId ? { ...u, status: action === 'ban' ? 'banned' : 'active' } : u)
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`${action} error:`, err);
-      setError(err.message);
+
+      if (err instanceof ApiError) {
+        handleAuthFailure(err.status);
+        setError(err.message || `Failed to ${action} user`);
+      } else {
+        setError(`Failed to ${action} user`);
+      }
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { socket } from "@/services/socket";
 import { Send, MessageSquare, ShieldCheck } from "lucide-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
+import { buildApiUrl } from "@/services/config";
 
 type ChatMsg = {
   id: string | number;
@@ -36,7 +37,7 @@ export function FuturisticChatInterface() {
 
       try {
         // Fetch Me
-        const meRes = await fetch("http://localhost:5000/api/users/profile", {
+        const meRes = await fetch(buildApiUrl("/api/users/profile"), {
           headers: { Authorization: `Bearer ${token}` },
         });
         const meJson = await meRes.json();
@@ -44,7 +45,7 @@ export function FuturisticChatInterface() {
         setMyId(currentId);
 
         // Fetch Friends
-        const fRes = await fetch("http://localhost:5000/api/requests/mutual", {
+        const fRes = await fetch(buildApiUrl("/api/requests/mutual"), {
           headers: { Authorization: `Bearer ${token}` },
         });
         const fJson = await fRes.json();
@@ -82,7 +83,7 @@ export function FuturisticChatInterface() {
     // Fetch History
     const fetchHistory = async () => {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/chats/${activeFriend.chat_id}/messages`, {
+      const res = await fetch(buildApiUrl(`/api/chats/${activeFriend.chat_id}/messages`), {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();

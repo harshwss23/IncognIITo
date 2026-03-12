@@ -1,1 +1,7 @@
 node_modules/
+backend/.env
+Work Distribution.pdf
+schema.sql
+.vscode/
+backend/.vscode/
+backend/node_modules/

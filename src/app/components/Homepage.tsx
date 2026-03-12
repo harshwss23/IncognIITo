@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useThemeColors } from "@/app/hooks/useThemeColors";
 import { useTheme } from "@/app/contexts/ThemeContext";
+import { buildApiUrl } from "@/services/config";
 
 export function HomePageScreen() {
   const colors = useThemeColors();
@@ -37,7 +38,7 @@ export function HomePageScreen() {
           return;
         }
 
-        const res = await fetch("http://localhost:5000/api/users/profile", {
+        const res = await fetch(buildApiUrl("/api/users/profile"), {
           method: "GET",
           headers: { Authorization: `Bearer ${token}` },
         });

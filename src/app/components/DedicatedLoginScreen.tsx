@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Lock, Mail, LogIn, KeyRound, ArrowRight, ShieldCheck, Globe } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import { buildApiUrl } from '@/services/config';
+import { setAuthTokens } from '@/services/auth';
 
 export function DedicatedLoginScreen() {
     const navigate = useNavigate();
@@ -15,29 +17,28 @@ export function DedicatedLoginScreen() {
   const isDark = theme === 'dark';
 
     // Login handler
-const handleLogin = async () => {
-    if (!email || !password) {
-        setError('Email and password are required.');
-        return;
-    }
-
-    setError('');
-    setLoading(true);
-
-    try {
-        const res = await fetch('http://localhost:5000/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
+    const handleLogin = async () => {
+        if (!email || !password) {
+            setError('Email and password are required.');
+            return;
+        }
+        setError('');
+        setLoading(true);
+        try {
+            const res = await fetch(buildApiUrl('/api/auth/login'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
 
         const data = await res.json().catch(() => null);
 
         if (res.ok) {
+            const refreshToken = data?.data?.refreshToken || data?.refreshToken || null;
 
             // 🔥 Extract token safely
             const token =
-                data?.data?.accessToken
+                data?.data?.accessToken ||
                 data?.token ||
                 data?.data?.token;
 
@@ -47,11 +48,10 @@ const handleLogin = async () => {
                 return;
             }
 
-            // ✅ STORE TOKEN HERE
-            localStorage.setItem("token", token);
+            setAuthTokens({ accessToken: token, refreshToken });
 
             // Redirect AFTER storing token
-            window.location.href = 'http://localhost:5173/homepage';
+            navigate('/homepage');
             return;
         } else {
             setError(data?.message || 'Login failed.');
