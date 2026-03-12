@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Shield, AlertTriangle, User, Ban, Search, LogOut } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import { ApiError, clearAuthTokens, fetchJsonWithAuth } from '@/services/auth';
 
 // Shape of each user returned by the backend
 interface BackendUser {
@@ -21,6 +22,9 @@ interface BackendReport {
   status: string;
 }
 
+interface AdminUsersResponse extends Array<BackendUser> {}
+interface AdminReportsResponse extends Array<BackendReport> {}
+
 export function AdminDashboard() {
   const colors = useThemeColors();
   const { theme } = useTheme();
@@ -35,30 +39,67 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Fetch fake users + reports from backend on mount
+  const handleAuthFailure = (status: number) => {
+    if (status !== 401) {
+      return;
+    }
+
+    clearAuthTokens();
+    window.location.assign('/login');
+  };
+
+  // Fetch users + reports from backend on mount
   useEffect(() => {
     setLoading(true);
+
     Promise.all([
-      fetch('http://localhost:5000/api/admin/users').then((res) => {
-        if (!res.ok) throw new Error(`Users fetch failed (${res.status})`);
-        return res.json();
-      }),
-      fetch('http://localhost:5000/api/admin/reports').then((res) => {
-        if (!res.ok) throw new Error(`Reports fetch failed (${res.status})`);
-        return res.json();
-      }),
+      fetchJsonWithAuth<AdminUsersResponse>('/api/admin/users'),
+      fetchJsonWithAuth<AdminReportsResponse>('/api/admin/reports'),
     ])
       .then(([usersData, reportsData]) => {
         setUsers(usersData);
         setReports(reportsData);
         setLoading(false);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error('Failed to load data:', err);
-        setError(err.message || 'Failed to load data');
+
+        if (err instanceof ApiError) {
+          handleAuthFailure(err.status);
+          setError(err.message || 'Failed to load data');
+        } else {
+          setError('Failed to load data');
+        }
+
         setLoading(false);
       });
   }, []);
+
+  // Ban or unban a user
+  const handleToggleBan = async (userId: number, currentStatus: string) => {
+    const action = currentStatus === 'banned' ? 'unban' : 'ban';
+    if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+
+    try {
+      await fetchJsonWithAuth(`/api/admin/users/${userId}/${action}`, {
+        method: 'POST',
+      });
+
+      // Update local state immediately
+      setUsers((prev) =>
+        prev.map((u) => u.id === userId ? { ...u, status: action === 'ban' ? 'banned' : 'active' } : u)
+      );
+    } catch (err: unknown) {
+      console.error(`${action} error:`, err);
+
+      if (err instanceof ApiError) {
+        handleAuthFailure(err.status);
+        setError(err.message || `Failed to ${action} user`);
+      } else {
+        setError(`Failed to ${action} user`);
+      }
+    }
+  };
 
   // Map backend users into the col1/col2/col3 shape the table expects
   const allUsers = users.map((u) => ({
@@ -298,13 +339,18 @@ export function AdminDashboard() {
                   </span>
                 </td>
 
-                {/* Column 5: Action (PRESERVED EXACTLY AS REQUESTED) */}
+                {/* Column 5: Action (PRESERVED EXACTLY AS REQUESTED) Added ban/unban button*/}
                 <td className="px-8 py-5">
                   <div className="flex items-center justify-start">
                     <button
-                      className="group/btn px-5 py-2.5 rounded-xl bg-transparent border-2 border-red-500/60 text-red-400 text-sm font-bold hover:bg-red-500/10 hover:border-red-500 hover:text-red-300 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] transition-all duration-300 hover:scale-[1.05] active:scale-[0.95] flex items-center gap-2">
+                      onClick={() => handleToggleBan(item.id, item.status)}
+                      className={`group/btn px-5 py-2.5 rounded-xl bg-transparent border-2 text-sm font-bold transition-all duration-300 hover:scale-[1.05] active:scale-[0.95] flex items-center gap-2 ${
+                        item.status === 'banned'
+                          ? 'border-green-500/60 text-green-400 hover:bg-green-500/10 hover:border-green-500 hover:text-green-300'
+                          : 'border-red-500/60 text-red-400 hover:bg-red-500/10 hover:border-red-500 hover:text-red-300 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)]'
+                      }`}>
                       <Ban className="w-4 h-4" />
-                      <span>Block User</span>
+                      <span>{item.status === 'banned' ? 'Unban User' : 'Block User'}</span>
                     </button>
                   </div>
                 </td>

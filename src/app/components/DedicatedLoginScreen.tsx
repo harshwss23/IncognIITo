@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from "react-router-dom";
 import { Lock, Mail, LogIn, KeyRound, ArrowRight, ShieldCheck, Globe } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import { buildApiUrl } from '@/services/config';
+import { setAuthTokens } from '@/services/auth';
 
 export function DedicatedLoginScreen() {
+    const navigate = useNavigate();
   const colors = useThemeColors();
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
@@ -21,30 +25,43 @@ export function DedicatedLoginScreen() {
         setError('');
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:5000/api/auth/login', {
+            const res = await fetch(buildApiUrl('/api/auth/login'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
 
-            const data = await res.json().catch(() => null);
+        const data = await res.json().catch(() => null);
 
-            if (res.ok) {
-                const success = data === true || data?.success === true || data?.token || data?.accessToken;
-                if (success) {
-                    window.location.href = 'http://localhost:5173/homepage';
-                    return;
-                }
-                setError(data?.message || 'Login failed.');
-            } else {
-                setError(data?.message || 'Login failed.');
+        if (res.ok) {
+            const refreshToken = data?.data?.refreshToken || data?.refreshToken || null;
+
+            // 🔥 Extract token safely
+            const token =
+                data?.data?.accessToken ||
+                data?.token ||
+                data?.data?.token;
+
+            if (!token) {
+                setError('Authentication token not received.');
+                setLoading(false);
+                return;
             }
-        } catch (err) {
-            setError('Network error. Could not login.');
-        } finally {
-            setLoading(false);
+
+            setAuthTokens({ accessToken: token, refreshToken });
+
+            // Redirect AFTER storing token
+            navigate('/homepage');
+            return;
+        } else {
+            setError(data?.message || 'Login failed.');
         }
-    };
+    } catch (err) {
+        setError('Network error. Could not login.');
+    } finally {
+        setLoading(false);
+    }
+};
 
   return (
     // MAIN CONTAINER: Full Screen Split Layout
@@ -189,7 +206,7 @@ export function DedicatedLoginScreen() {
 
             {/* Footer */}
             <p className={`text-center text-sm ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-                New here? <button className="text-blue-500 font-bold hover:underline">Create an account</button>
+                New here? <button className="text-blue-500 font-bold hover:underline"  onClick={() => navigate("/register")} >Create an account</button>
             </p>
 
         </div>

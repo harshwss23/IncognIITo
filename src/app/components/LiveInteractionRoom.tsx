@@ -1,216 +1,463 @@
-import React, { useState } from 'react';
-import { Video, Mic, MicOff, VideoOff, Eye, EyeOff, Send, MoreVertical, Settings, Shield, PhoneOff, Smile } from 'lucide-react';
-import { useThemeColors } from '@/app/hooks/useThemeColors';
-import { useTheme } from '@/app/contexts/ThemeContext';
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import io, { Socket } from 'socket.io-client'
+import {
+  Video,
+  Mic,
+  MicOff,
+  VideoOff,
+  Send,
+  Settings,
+  Shield,
+  PhoneOff,
+} from 'lucide-react'
+import { useThemeColors } from '@/app/hooks/useThemeColors'
+import { useTheme } from '@/app/contexts/ThemeContext'
+import { socketUrl } from '@/services/config'
+
+const SOCKET_SERVER_URL = socketUrl
+const ROOM_ID = 'incogniito-test-room'
 
 export function LiveInteractionRoom() {
-  const colors = useThemeColors();
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  const colors = useThemeColors()
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
 
-  const [videoRevealed, setVideoRevealed] = useState(false);
-  const [micOn, setMicOn] = useState(true);
-  const [cameraOn, setCameraOn] = useState(true);
-  const [blurred, setBlurred] = useState(false);
-  const [msgInput, setMsgInput] = useState('');
+  /* ---------------- REFS ---------------- */
 
-  const messages = [
-    { id: 1, sender: 'them', text: 'Hey! Nice to meet you', time: '10:23' },
-    { id: 2, sender: 'me', text: 'Hi there! How are you?', time: '10:24' },
-    { id: 3, sender: 'them', text: 'Good! What are you studying?', time: '10:24' },
-    { id: 4, sender: 'me', text: 'Computer Science, you?', time: '10:25' },
-  ];
+  const socketRef = useRef<Socket | null>(null)
+  const peerRef = useRef<RTCPeerConnection | null>(null)
+
+  const localVideoRef = useRef<HTMLVideoElement>(null)
+  const remoteVideoRef = useRef<HTMLVideoElement>(null)
+
+  const localStreamRef = useRef<MediaStream | null>(null)
+  const remoteStreamRef = useRef<MediaStream | null>(null)
+
+  const iceQueueRef = useRef<RTCIceCandidateInit[]>([])
+  const initializedRef = useRef(false)
+  
+  // FIX 1: Track the latest state to avoid stale closures in socket events
+  const cameraOnRef = useRef(false) 
+
+  /* ---------------- STATE ---------------- */
+
+  const [micOn, setMicOn] = useState(false)
+  const [cameraOn, setCameraOn] = useState(false)
+  const [remoteCameraOn, setRemoteCameraOn] = useState(false)
+  const [remoteConnected, setRemoteConnected] = useState(false)
+
+  const [msgInput, setMsgInput] = useState('')
+  const [chatMessages, setChatMessages] = useState<any[]>([
+    {
+      id: 1,
+      sender: 'them',
+      text: 'Connection established. Say hi!',
+      time: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    },
+  ])
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages])
+
+  /* ---------------- PEER ---------------- */
+
+  const createPeer = useCallback(() => {
+    const peer = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+    })
+
+    peerRef.current = peer
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        peer.addTrack(track, localStreamRef.current!)
+      })
+    }
+
+    peer.ontrack = (event) => {
+      remoteStreamRef.current = event.streams[0]
+      // FIX 4: Prevent double-assignment stutter (ontrack fires for both audio & video)
+      if (
+        remoteVideoRef.current &&
+        remoteVideoRef.current.srcObject !== event.streams[0]
+      ) {
+        remoteVideoRef.current.srcObject = event.streams[0]
+      }
+      setRemoteConnected(true)
+    }
+
+    peer.onicecandidate = (event) => {
+      if (event.candidate && socketRef.current) {
+        socketRef.current.emit('ice_candidate', {
+          roomID: ROOM_ID,
+          candidate: event.candidate,
+        })
+      }
+    }
+
+    peer.onconnectionstatechange = () => {
+      if (
+        peer.connectionState === 'disconnected' ||
+        peer.connectionState === 'failed'
+      ) {
+        cleanupPeer()
+      }
+    }
+
+    return peer
+  }, [])
+
+  /* ---------------- CLEANUP ---------------- */
+
+  const cleanupPeer = () => {
+    if (peerRef.current) {
+      peerRef.current.close()
+      peerRef.current = null
+    }
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null
+    }
+
+    remoteStreamRef.current = null
+    setRemoteConnected(false)
+    setRemoteCameraOn(false)
+  }
+
+  const fullCleanup = () => {
+    cleanupPeer()
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop())
+      localStreamRef.current = null
+    }
+
+    if (socketRef.current) {
+      socketRef.current.disconnect()
+      socketRef.current = null
+    }
+  }
+
+  /* ---------------- INIT ---------------- */
+
+  useEffect(() => {
+    if (initializedRef.current) return
+    initializedRef.current = true
+
+    const init = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        })
+
+        stream.getTracks().forEach((track) => (track.enabled = false))
+        localStreamRef.current = stream
+
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream
+        }
+
+        const socket = io(SOCKET_SERVER_URL, {
+          transports: ['websocket'],
+        })
+
+        socketRef.current = socket
+
+        socket.on('connect', () => {
+          socket.emit('join_room', ROOM_ID)
+        })
+
+        socket.on('user_joined', async () => {
+          // Sync camera state with new arrival
+          socket.emit('camera_status', { roomID: ROOM_ID, isOn: cameraOnRef.current })
+
+          const peer = createPeer()
+          const offer = await peer.createOffer()
+          await peer.setLocalDescription(offer)
+          socket.emit('offer', { roomID: ROOM_ID, offer })
+        })
+
+        socket.on('receive_offer', async ({ offer }) => {
+          // Sync camera state back to the caller
+          socket.emit('camera_status', { roomID: ROOM_ID, isOn: cameraOnRef.current })
+
+          const peer = createPeer()
+          await peer.setRemoteDescription(offer)
+
+          // FIX 2: Drain the ICE queue for the callee!
+          iceQueueRef.current.forEach(async (candidate) => {
+            try {
+              await peer.addIceCandidate(candidate)
+            } catch (e) { console.error(e) }
+          })
+          iceQueueRef.current = []
+
+          const answer = await peer.createAnswer()
+          await peer.setLocalDescription(answer)
+          socket.emit('answer', { roomID: ROOM_ID, answer })
+        })
+
+        socket.on('receive_answer', async ({ answer }) => {
+          if (!peerRef.current) return
+          await peerRef.current.setRemoteDescription(answer)
+
+          iceQueueRef.current.forEach(async (candidate) => {
+            try {
+              await peerRef.current?.addIceCandidate(candidate)
+            } catch (e) { console.error(e) }
+          })
+          iceQueueRef.current = []
+        })
+
+        socket.on('receive_ice_candidate', async ({ candidate }) => {
+          if (!peerRef.current) return
+
+          if (peerRef.current.remoteDescription) {
+            try {
+              await peerRef.current.addIceCandidate(candidate)
+            } catch (e) { console.error(e) }
+          } else {
+            iceQueueRef.current.push(candidate)
+          }
+        })
+
+        socket.on('receive_camera_status', ({ isOn }) => {
+          setRemoteCameraOn(isOn)
+        })
+
+        socket.on('receive_message', (msg) => {
+          setChatMessages((prev) => [...prev, { ...msg, sender: 'them' }])
+        })
+
+        socket.on('peer_disconnected', () => {
+          cleanupPeer()
+        })
+      } catch (err) {
+        alert('Camera/Microphone permission required.')
+      }
+    }
+
+    init()
+
+    return () => {
+      fullCleanup()
+    }
+  }, [createPeer])
+
+  /* ---------------- CONTROLS ---------------- */
+
+  const toggleMic = () => {
+    if (!localStreamRef.current) return
+    const track = localStreamRef.current.getAudioTracks()[0]
+    if (!track) return
+    const newState = !micOn
+    track.enabled = newState
+    setMicOn(newState)
+  }
+
+  const toggleCamera = () => {
+    if (!localStreamRef.current || !socketRef.current) return
+    const track = localStreamRef.current.getVideoTracks()[0]
+    if (!track) return
+
+    const newState = !cameraOn
+    track.enabled = newState
+    setCameraOn(newState)
+    cameraOnRef.current = newState // Keep the ref synced
+
+    socketRef.current.emit('camera_status', {
+      roomID: ROOM_ID,
+      isOn: newState,
+    })
+  }
+
+  const sendMessage = () => {
+    if (!msgInput.trim() || !socketRef.current) return
+
+    const message = {
+      id: Date.now(),
+      text: msgInput,
+      time: new Date().toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      roomID: ROOM_ID,
+    }
+
+    setChatMessages((prev) => [...prev, { ...message, sender: 'me' }])
+    socketRef.current.emit('send_message', message)
+    setMsgInput('')
+  }
+
+  const endCall = () => {
+    socketRef.current?.emit('leave_room', ROOM_ID)
+    fullCleanup()
+    alert('Session ended.')
+  }
+
+  /* ---------------- UI ---------------- */
 
   return (
-    // MAIN CONTAINER: w-full h-full
-    <div className={`w-full h-full flex flex-col overflow-hidden transition-colors duration-500 
-      ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
-      
-      {/* --- HEADER --- */}
-      <div className={`h-16 flex items-center justify-between px-6 border-b z-20
-        ${isDark ? 'bg-slate-900/80 border-white/10' : 'bg-white border-slate-200'}`}>
-        
+    <div
+      className={`w-full h-full flex flex-col transition-colors duration-500 ${
+        isDark ? 'bg-slate-950' : 'bg-slate-50'
+      }`}
+    >
+      {/* HEADER */}
+      <div
+        className={`h-16 flex items-center justify-between px-6 border-b ${
+          isDark
+            ? 'bg-slate-900/80 border-white/10'
+            : 'bg-white border-slate-200'
+        }`}
+      >
         <div className="flex items-center gap-4">
-            <div className={`p-2 rounded-lg ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}>
-                <Shield className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-            </div>
-            <div>
-                <h3 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>Live Session : LunarGhost</h3>
-                
-            </div>
+          <div
+            className={`p-2 rounded-lg ${
+              isDark ? 'bg-white/5' : 'bg-slate-100'
+            }`}
+          >
+            <Shield
+              className={`w-5 h-5 ${
+                isDark ? 'text-blue-400' : 'text-blue-600'
+              }`}
+            />
+          </div>
+          <h3
+            className={`font-bold text-sm ${
+              isDark ? 'text-white' : 'text-slate-900'
+            }`}
+          >
+            Live Session : LunarGhost
+          </h3>
         </div>
 
         <div className="flex items-center gap-2">
-           <button className={`p-2 rounded-full transition-colors ${isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-slate-100 text-slate-600'}`}>
-                <Settings className="w-5 h-5" />
-           </button>
-           <div className={`px-3 py-1 rounded-full text-xs font-bold border
-               ${isDark ? 'bg-white/5 border-white/10 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>
-               00:14:23
-           </div>
+          <button
+            className={`p-2 rounded-full ${
+              isDark
+                ? 'hover:bg-white/10 text-white'
+                : 'hover:bg-slate-100 text-slate-600'
+            }`}
+          >
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
-      {/* --- MAIN CONTENT (Split View) --- */}
+      {/* MAIN */}
       <div className="flex-1 flex overflow-hidden">
-        
-        {/* LEFT: Video Stage (Always Dark for Focus) */}
+        {/* VIDEO SIDE */}
         <div className="flex-[0.75] bg-black relative flex items-center justify-center p-6">
-            
-            {/* Main Partner Video */}
-            <div className="relative w-full h-full max-h-[700px] bg-slate-900 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-                
-                {/* Placeholder / Blurred State */}
-                <div className={`absolute inset-0 flex items-center justify-center transition-all duration-700
-                    ${videoRevealed ? 'bg-slate-900' : 'bg-gradient-to-br from-slate-800 to-slate-950'}`}>
-                    
-                    {!videoRevealed ? (
-                        <div className="text-center z-10">
-                            <div className="mb-8 relative group cursor-pointer" onClick={() => setVideoRevealed(true)}>
-                                <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity rounded-full"></div>
-                                <div className="relative w-24 h-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-md group-hover:scale-110 transition-transform duration-300">
-                                    <Eye className="w-10 h-10 text-white opacity-70 group-hover:opacity-100" />
-                                </div>
-                            </div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Partner Video Hidden</h2>
-                            <p className="text-slate-400 max-w-md mx-auto">
-                                Click the icon above to reveal the video feed. Your identity remains anonymous until you choose to share details.
-                            </p>
-                        </div>
-                    ) : (
-                         <div className="flex flex-col items-center justify-center h-full text-slate-600">
-                            <Video className="w-20 h-20 mb-4 opacity-20 animate-pulse" />
-                            <p className="text-sm font-mono">RECEIVING VIDEO STREAM...</p>
-                         </div>
-                    )}
-                </div>
+          <div className="relative w-full h-full bg-slate-900 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
 
-                {/* Tags on Video */}
-                <div className="absolute top-4 left-4 flex gap-2">
-                    <span className="px-2 py-1 bg-black/50 backdrop-blur-md rounded-md text-[10px] text-white font-bold tracking-wider">
-                        LunarGhost
-                    </span>
-                    <span className="px-2 py-1 bg-red-500/80 backdrop-blur-md rounded-md text-[10px] text-white font-bold tracking-wider flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span> LIVE
-                    </span>
-                </div>
+            {!remoteConnected && (
+              <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+                WAITING FOR PEER...
+              </div>
+            )}
 
-            </div>
+            {/* FIX 3: Added background color (bg-slate-900) and z-10 so it actually covers the video block */}
+            {remoteConnected && !remoteCameraOn && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900 text-slate-400 z-10">
+                PARTNER CAMERA OFF
+              </div>
+            )}
+          </div>
 
-            {/* PIP (Self View) */}
-            <div className="absolute bottom-10 right-10 w-64 h-40 bg-slate-800 rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl group cursor-move">
-                <div className={`w-full h-full flex items-center justify-center bg-slate-900 relative
-                    ${blurred ? 'backdrop-blur-xl' : ''}`}>
-                    
-                    {!cameraOn ? (
-                        <div className="flex flex-col items-center gap-2 text-slate-500">
-                            <VideoOff className="w-8 h-8" />
-                            <span className="text-xs font-bold uppercase">Camera Off</span>
-                        </div>
-                    ) : (
-                        <div className="w-full h-full relative">
-                             {/* Mock Camera Feed Gradient */}
-                             <div className={`absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-800 ${blurred && 'blur-xl'}`}></div>
-                             <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 rounded text-[10px] text-white font-bold">YOU</div>
-                        </div>
-                    )}
-
-                    {/* Hover Controls for PIP */}
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setBlurred(!blurred)} className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors">
-                            {blurred ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
+          {/* SELF PIP */}
+          <div className="absolute bottom-10 right-10 w-64 h-40 bg-slate-800 rounded-xl overflow-hidden border-2 z-20 border-white/10">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            {!cameraOn && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900 text-slate-400 text-xs">
+                Camera Off
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* RIGHT: Chat & Controls (Adaptive Theme) */}
-        <div className={`flex-[0.25] flex flex-col border-l z-10
-            ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
-            
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-inherit">
-                {messages.map((msg) => (
-                    <div key={msg.id} className={`flex flex-col ${msg.sender === 'me' ? 'items-end' : 'items-start'}`}>
-                        <div className={`max-w-[90%] px-4 py-3 rounded-2xl text-sm
-                            ${msg.sender === 'me' 
-                                ? 'bg-blue-600 text-white rounded-tr-none' 
-                                : isDark 
-                                    ? 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700' 
-                                    : 'bg-slate-100 text-slate-800 rounded-tl-none border border-slate-200'
-                            }`}>
-                            {msg.text}
-                        </div>
-                        <span className={`text-[10px] mt-1 px-1 opacity-50 ${isDark ? 'text-white' : 'text-slate-500'}`}>
-                            {msg.time}
-                        </span>
-                    </div>
-                ))}
-            </div>
-
-            {/* Input Area */}
-            <div className={`p-4 border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-                <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all
-                    ${isDark ? 'bg-slate-950 border-slate-800 focus-within:border-blue-500' : 'bg-slate-50 border-slate-200 focus-within:border-blue-400'}`}>
-                    <input 
-                        type="text" 
-                        value={msgInput}
-                        onChange={(e) => setMsgInput(e.target.value)}
-                        placeholder="Type a message..." 
-                        className={`bg-transparent flex-1 outline-none text-sm font-medium
-                            ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`}
-                    />
-                    <button className={`${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-blue-600'}`}>
-                        <Smile className="w-5 h-5" />
-                    </button>
-                    <button className={`${isDark ? 'text-blue-500 hover:text-blue-400' : 'text-blue-600 hover:text-blue-500'}`}>
-                        <Send className="w-5 h-5" />
-                    </button>
+        {/* CHAT SIDE */}
+        <div
+          className={`flex-[0.25] flex flex-col border-l ${
+            isDark
+              ? 'bg-slate-900 border-white/10'
+              : 'bg-white border-slate-200'
+          }`}
+        >
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {chatMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${
+                  msg.sender === 'me'
+                    ? 'justify-end'
+                    : 'justify-start'
+                }`}
+              >
+                <div
+                  className={`px-4 py-2 rounded-2xl text-sm ${
+                    msg.sender === 'me'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-200 text-black'
+                  }`}
+                >
+                  {msg.text}
                 </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="p-4 border-t">
+            <div className="flex items-center gap-2">
+              <input
+                value={msgInput}
+                onChange={(e) => setMsgInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                placeholder="Type a message..."
+                className="flex-1 px-3 py-2 border rounded-lg text-black"
+              />
+              <button onClick={sendMessage} className="text-blue-500">
+                <Send />
+              </button>
             </div>
-
+          </div>
         </div>
-
       </div>
 
-      {/* --- BOTTOM CONTROLS BAR --- */}
-      <div className={`h-24 flex items-center justify-center gap-6 border-t z-20
-        ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
-        
-        {/* Mic */}
-        <button onClick={() => setMicOn(!micOn)} className={`p-4 rounded-full border-2 transition-all duration-300
-            ${micOn 
-                ? (isDark ? 'bg-white/10 border-white/5 text-white hover:bg-white/20' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200') 
-                : 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/30'}`}>
-            {micOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+      {/* CONTROLS */}
+      <div className="h-20 flex items-center justify-center gap-6 border-t">
+        <button onClick={toggleMic} className="p-4 rounded-full bg-slate-200 dark:bg-slate-800">
+          {micOn ? <Mic /> : <MicOff />}
         </button>
 
-        {/* Camera */}
-        <button onClick={() => setCameraOn(!cameraOn)} className={`p-4 rounded-full border-2 transition-all duration-300
-            ${cameraOn 
-                ? (isDark ? 'bg-white/10 border-white/5 text-white hover:bg-white/20' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200') 
-                : 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/30'}`}>
-            {cameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+        <button onClick={toggleCamera} className="p-4 rounded-full bg-slate-200 dark:bg-slate-800">
+          {cameraOn ? <Video /> : <VideoOff />}
         </button>
 
-        {/* End Call */}
-        <button className="px-8 py-4 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold tracking-wide shadow-xl shadow-red-600/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3">
-            <PhoneOff className="w-5 h-5" />
-            <span>End Session</span>
+        <button onClick={endCall} className="p-4 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30">
+          <PhoneOff />
         </button>
-
-        {/* Blur Toggle */}
-        <button onClick={() => setBlurred(!blurred)} className={`p-4 rounded-full border-2 transition-all duration-300
-            ${blurred 
-                ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/30' 
-                : (isDark ? 'bg-white/10 border-white/5 text-white hover:bg-white/20' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200')}`}>
-            {blurred ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
-        </button>
-        
       </div>
-
     </div>
-  );
+  )
 }

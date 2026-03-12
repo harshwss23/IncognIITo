@@ -139,7 +139,11 @@ export class AuthController {
 
       // Find user
       const userResult = await query(
-        'SELECT id, email, password_hash, verified, display_name FROM users WHERE email = $1',
+        `SELECT u.id, u.email, u.password_hash, u.verified, u.display_name,
+                COALESCE(p.is_banned, FALSE) AS is_banned
+         FROM users u
+         LEFT JOIN user_profiles p ON u.id = p.user_id
+         WHERE u.email = $1`,
         [sanitizedEmail]
       );
 
@@ -152,6 +156,15 @@ export class AuthController {
       }
 
       const user = userResult.rows[0];
+
+      // Check if banned
+      if (user.is_banned) {
+        res.status(403).json({
+          success: false,
+          message: 'Your account has been banned. Contact admin for support.',
+        });
+        return;
+      }
 
       // Check if verified (from Shopio's logic)
       if (!user.verified) {
