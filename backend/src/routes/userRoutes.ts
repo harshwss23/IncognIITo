@@ -5,21 +5,48 @@
 // - Manages user settings
 // - All routes are protected (require authentication)
 
-
-import { Router, Request, Response } from "express";
-import { authMiddleware } from "../middleware/authMiddleware";
-import { query } from "../config/database";
+import { Router } from 'express';
+import { authMiddleware } from '../middleware/authMiddleware';
+import { query } from '../config/database';
+import { Request, Response } from 'express';
 
 const router = Router();
 
-// All routes require authentication
+// All user routes require authentication
 router.use(authMiddleware.authenticate.bind(authMiddleware));
 
-/*
-GET /api/users/profile
-Returns logged in user's profile
-*/
-router.get("/profile", async (req: Request, res: Response) => {
+// GET /api/users/profile - Get user profile
+router.get(
+  "/",
+  authMiddleware.authenticate.bind(authMiddleware),
+  async (req: Request, res: Response) => {
+    try {
+      // ✅ Optional: only verified users can access
+      // if (!req.user?.verified) {
+      //   return res.status(403).json({ success: false, message: "Email verification required" });
+      // }
+
+      const result = await query(
+        `SELECT id, email, display_name, verified
+         FROM users
+         ORDER BY id DESC`
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: { users: result.rows },
+      });
+    } catch (error) {
+      console.error("Get users error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch users",
+      });
+    }
+  }
+);
+
+router.get('/profile', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
 
@@ -33,169 +60,81 @@ router.get("/profile", async (req: Request, res: Response) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
-        message: "User not found"
+        message: 'User not found',
       });
+      return;
     }
 
     res.status(200).json({
       success: true,
-      data: result.rows[0]
+      data: { user: result.rows[0] },
     });
-
   } catch (error) {
-    console.error("Profile fetch error:", error);
-
+    console.error('Get profile error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch profile"
+      message: 'Failed to get profile',
     });
   }
 });
 
-
-/*
-PUT /api/users/profile
-Update profile
-*/
-router.put("/profile", async (req: Request, res: Response) => {
+// PUT /api/users/profile - Update user profile
+router.put('/profile', async (req: Request, res: Response) => {
   try {
-
     const userId = req.user!.userId;
     const { displayName, interests, avatarUrl } = req.body;
 
-    if (displayName) {
+    // Update user table
+    if (displayName !== undefined) {
       await query(
-        "UPDATE users SET display_name = $1 WHERE id = $2",
+        'UPDATE users SET display_name = $1 WHERE id = $2',
         [displayName, userId]
       );
     }
 
+    // Update user_profiles table
     await query(
-      `UPDATE user_profiles
+      `UPDATE user_profiles 
        SET interests = COALESCE($1, interests),
            avatar_url = COALESCE($2, avatar_url)
        WHERE user_id = $3`,
       [interests, avatarUrl, userId]
     );
 
-    res.json({
+    res.status(200).json({
       success: true,
-      message: "Profile updated"
+      message: 'Profile updated successfully',
     });
-
   } catch (error) {
-
-    console.error(error);
-
+    console.error('Update profile error:', error);
     res.status(500).json({
       success: false,
-      message: "Profile update failed"
+      message: 'Failed to update profile',
     });
-
   }
 });
 
-
-/*
-GET /api/users/connection-requests
-Mock endpoint for dashboard
-*/
-// GET /api/users/connection-requests
-router.get("/connection-requests", async (_req: Request, res: Response) => {
+// DELETE /api/users/account - Delete user account
+router.delete('/account', async (req: Request, res: Response) => {
   try {
+    const userId = req.user!.userId;
 
-    const requests = [
-      {
-        id: 1,
-        userId: "MaskedSoul",
-        matchScore: 95,
-        sharedTags: ["CS253", "Anime", "Competitive Programming"]
-      },
-      {
-        id: 2,
-        userId: "PixelShade",
-        matchScore: 88,
-        sharedTags: ["Machine Learning", "Photography", "Cricket"]
-      },
-      {
-        id: 3,
-        userId: "ShadowKey",
-        matchScore: 92,
-        sharedTags: ["Game Dev", "CS251", "Music Production"]
-      },
-      {
-        id: 4,
-        userId: "DarkSignal",
-        matchScore: 85,
-        sharedTags: ["Robotics", "Physics", "Chess"]
-      },
-      {
-        id: 5,
-        userId: "SilentUser",
-        matchScore: 90,
-        sharedTags: ["Web Dev", "Startup Ideas", "Basketball"]
-      },
-      {
-        id: 6,
-        userId: "IncognitoX",
-        matchScore: 87,
-        sharedTags: ["AI Ethics", "Philosophy", "Debate"]
-      }
-    ];
+    // Delete user (cascades to user_profiles, sessions, etc.)
+    await query('DELETE FROM users WHERE id = $1', [userId]);
 
-    res.json({
+    res.status(200).json({
       success: true,
-      data: requests
+      message: 'Account deleted successfully',
     });
-
   } catch (error) {
-
+    console.error('Delete account error:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch connection requests"
+      message: 'Failed to delete account',
     });
-
   }
-});
-
-
-/*
-GET /api/users/active-chats
-Mock endpoint
-*/
-router.get("/active-chats", (_req: Request, res: Response) => {
-
-  res.json({
-    success: true,
-    data: [
-      {
-        chatId: "chat1",
-        user: "Anonymous 512",
-        lastMessage: "That sounds interesting!",
-        timestamp: "2 min ago"
-      }
-    ]
-  });
-
-});
-
-
-/*
-POST /api/users/start-matching
-Adds user to queue
-*/
-router.post("/start-matching", (req: Request, res: Response) => {
-
-  const userId = req.user!.userId;
-
-  res.json({
-    success: true,
-    message: "User added to matchmaking queue",
-    userId
-  });
-
 });
 
 export default router;

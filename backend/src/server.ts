@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-// FILE: src/server.ts
-
-=======
->>>>>>> upstream/main
 import express, { Application } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -10,11 +5,6 @@ import cookieParser from "cookie-parser";
 import http from "http";
 import { Server as SocketIOServer } from "socket.io";
 
-<<<<<<< HEAD
-import { pool } from "./config/database";
-import { transporter } from "./config/smtp";
-
-=======
 <<<<<<< HEAD
 import express, { Application } from 'express';
 import http from 'http';
@@ -34,24 +24,15 @@ import { queueService } from './services/queueService';
 =======
 import { pool } from "./config/database";
 import { transporter } from "./config/smtp";
->>>>>>> upstream/main
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import requestRoutes from "./routes/requestRoutes";
 import adminRoutes from "./routes/adminRoutes";
-<<<<<<< HEAD
-
-import { errorHandler } from "./middleware/errorHandler";
-import { tokenService } from "./services/tokenService";
-
-import { registerSocketHandlers } from "./socket/socket";
-=======
 import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
 import { registerSocketHandlers } from "./socket/socket";
 >>>>>>> main
->>>>>>> upstream/main
 
 dotenv.config();
 
@@ -108,11 +89,6 @@ async function ensureAdminSchema(): Promise<void> {
 
 class Server {
   public app: Application;
-<<<<<<< HEAD
-  private port: number;
-
-=======
->>>>>>> upstream/main
   private httpServer: http.Server;
   public io: SocketIOServer;
   private port: number;
@@ -125,16 +101,8 @@ class Server {
 <<<<<<< HEAD
     this.port = parseInt(process.env.PORT || '5000');
 
-<<<<<<< HEAD
-    this.initializeMiddlewares();
-    this.initializeRoutes();
-    this.initializeErrorHandling();
-
-    // Create HTTP server
-=======
     // Create HTTP server manually so socket.io can attach to it
     // WHY: socket.io needs access to the raw http.Server, not just Express app
->>>>>>> upstream/main
     this.httpServer = http.createServer(this.app);
 
     // Initialize socket.io with CORS (same origin as Express)
@@ -146,9 +114,6 @@ class Server {
       },
     });
 
-<<<<<<< HEAD
-    registerSocketHandlers(this.io);
-=======
     // Pass socket.io instance to matching service so it can emit events
     this.matchingService = new MatchingService(this.io);
 
@@ -170,7 +135,6 @@ class Server {
     this.initializeSocketHandlers();
     this.initializeErrorHandling();
     this.initializeSockets();
->>>>>>> upstream/main
   }
 
   private initializeMiddlewares(): void {
@@ -204,9 +168,6 @@ class Server {
       });
     });
 
-<<<<<<< HEAD
-    // API routes
-=======
 <<<<<<< HEAD
     // API routes
     this.app.use('/api/auth', authRoutes);
@@ -244,16 +205,11 @@ class Server {
           console.error(`Cleanup error for user ${userId}:`, err);
         }
 =======
->>>>>>> upstream/main
     this.app.use("/api/auth", authRoutes);
     this.app.use("/api/users", userRoutes);
     this.app.use("/api/requests", requestRoutes);
     this.app.use("/api/chats", chatRoutes);
     this.app.use("/api/admin", adminRoutes);
-<<<<<<< HEAD
-
-=======
->>>>>>> upstream/main
     this.app.use(errorHandler.notFound.bind(errorHandler));
   }
 
@@ -313,9 +269,6 @@ class Server {
 
   public start(): void {
 <<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> upstream/main
     this.httpServer.listen(this.port, () => {
       console.log('IncognIITo Backend Server');
       console.log('================================');
