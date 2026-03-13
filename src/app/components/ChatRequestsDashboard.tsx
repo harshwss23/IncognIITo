@@ -1,100 +1,33 @@
-import React, { useEffect, useState } from 'react';
-import { MessageCircle, MessageSquare, User, Check, Shield } from 'lucide-react';
+import React, { useState, useEffect }  from 'react';
+import { MessageCircle, MessageSquare, User, Sparkles, Check, X, Shield, Bell } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { buildApiUrl } from '@/services/config';
 
 export function ChatRequestsDashboard() {
   const colors = useThemeColors();
-
-  const [connectionRequests, setConnectionRequests] = useState([]);
+  const [connectionRequests, setConnectionRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const token = localStorage.getItem("token");
-
-  // ✅ FETCH REQUESTS FROM API
-  const fetchRequests = async () => {
-    try {
-      setLoading(true);
-
-      const res = await fetch(buildApiUrl('/api/requests/incoming'), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const json = await res.json();
-
-      if (res.ok && json.success) {
-        setConnectionRequests(json.data.requests || []);
-      } else {
-        setConnectionRequests([]);
-      }
-
-    } catch (err) {
-      console.error("Fetch requests error:", err);
-      setConnectionRequests([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchRequests();
+    fetch("http://localhost:5000/api/users/connection-requests", {
+      credentials: "include"
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setConnectionRequests(data.data);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Failed to load requests", err);
+        setLoading(false);
+      });
   }, []);
 
-// ✅ ACCEPT REQUEST
-  const handleAccept = async (id) => {
-    try {
-      const res = await fetch(buildApiUrl(`/api/requests/${id}/accept`), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json", // Good practice to include
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const json = await res.json().catch(() => ({})); // Safely parse JSON
-
-      if (!res.ok || !json.success) {
-        console.error("Backend refused accept:", json);
-        alert(`Failed to connect: ${json.message || "Server error"}`);
-        return; // 🛑 Stop here! Don't remove the card from the UI
-      }
-
-      // ✅ Only remove from UI if the backend actually confirmed success
-      setConnectionRequests(prev => prev.filter(r => r.id !== id));
-
-    } catch (err) {
-      console.error("Accept network error:", err);
-      alert("A network error occurred while trying to connect.");
-    }
-  };
-
-  // ✅ REJECT REQUEST
-  const handleReject = async (id) => {
-    try {
-      const res = await fetch(buildApiUrl(`/api/requests/${id}/reject`), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const json = await res.json().catch(() => ({}));
-
-      if (!res.ok || !json.success) {
-        console.error("Backend refused reject:", json);
-        alert(`Failed to decline: ${json.message || "Server error"}`);
-        return; 
-      }
-
-      setConnectionRequests(prev => prev.filter(r => r.id !== id));
-
-    } catch (err) {
-      console.error("Reject network error:", err);
-    }
-  };
+  if (loading) {
+    return <div className="p-8 text-lg">Loading requests...</div>;
+  }
 
   return (
     <div className={`w-full h-full flex ${colors.bgSecondary} transition-colors duration-300`}>
