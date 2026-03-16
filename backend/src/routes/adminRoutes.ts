@@ -60,4 +60,9 @@ router.post("/users/:id/unban", adminController.unbanUser.bind(adminController))
 // GET    /api/admin/stats              — dashboard summary counts
 router.get("/stats", adminController.getStats.bind(adminController));
 
+router.delete(
+  "/interests/:tag",
+  adminController.removeInterest.bind(adminController)
+);
+
 export default router;
