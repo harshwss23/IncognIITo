@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "@/app/layout/AppShell";
+import { ProtectedRoute } from "@/app/components/ProtectedRoute";
 
 // components (your existing screens)
 import { FuturisticChatInterface } from "@/app/components/FuturisticChatInterface";
@@ -23,25 +24,24 @@ export default function AppRoutes() {
     <Routes>
       {/* Global layout (background + theme toggle) */}
       <Route element={<AppShell />}>
-        <Route path="/" element={<HomePageScreen />} />
-
-        {/* Auth */}
+        {/* Public Routes */}
         <Route path="/landing" element={<LandingAuthPortal />} />
         <Route path="/register" element={<RegistrationScreen />} />
         <Route path="/login" element={<DedicatedLoginScreen />} />
         <Route path="/forgot" element={<ForgotPasswordScreen />} />
 
-        {/* App */}
-        <Route path="/chat" element={<FuturisticChatInterface />} />
-        <Route path="/requests" element={<ChatRequestsDashboard />} />
-        <Route path="/dashboard" element={<MainDashboard />} />
-        <Route path="/live" element={<LiveInteractionRoom />} />
-        <Route path="/profile" element={<UserProfile />} />
-        <Route path="/session" element={<PostSessionModal />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/homepage" element={<HomePageScreen />} />
-{/* To be removed Later at end Active Users*/}
-<Route path="/active-users" element={<ActiveUsersScreen/>}/>
+        {/* Protected Routes */}
+        <Route path="/" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><FuturisticChatInterface /></ProtectedRoute>} />
+        <Route path="/requests" element={<ProtectedRoute><ChatRequestsDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
+        <Route path="/live" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+        <Route path="/session" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
+        <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
+
         {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

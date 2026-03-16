@@ -109,6 +109,14 @@ export async function authFetch(path: string, init: RequestInit = {}, retryOnUna
 
   const nextAccessToken = await refreshAccessToken();
   if (!nextAccessToken) {
+    // If not on an auth-related page, redirect to login
+    const publicPaths = ["/api/auth/login", "/api/auth/register", "/api/auth/verify-otp", "/api/auth/forgot-password"];
+    const isPublicPath = publicPaths.some(p => path.startsWith(p));
+
+    if (!isPublicPath) {
+      clearAuthTokens();
+      window.location.href = "/login";
+    }
     return response;
   }
 

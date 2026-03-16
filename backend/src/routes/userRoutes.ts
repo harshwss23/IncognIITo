@@ -18,7 +18,6 @@ router.use(authMiddleware.authenticate.bind(authMiddleware));
 // GET /api/users/profile - Get user profile
 router.get(
   "/",
-  authMiddleware.authenticate.bind(authMiddleware),
   async (req: Request, res: Response) => {
     try {
       // ✅ Optional: only verified users can access

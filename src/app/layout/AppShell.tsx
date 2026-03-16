@@ -1,10 +1,22 @@
-import React from "react";
-import { Outlet } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { useThemeColors } from "@/app/hooks/useThemeColors";
 
 export function AppShell() {
   const colors = useThemeColors();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const publicPaths = ["/login", "/register", "/landing", "/forgot"];
+    const isPublicPath = publicPaths.some((path) => location.pathname.startsWith(path));
+
+    if (!token && !isPublicPath) {
+      navigate("/login");
+    }
+  }, [location, navigate]);
 
   return (
     <div className={`h-screen w-screen overflow-hidden ${colors.bgPrimary}`}>

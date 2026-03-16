@@ -17,8 +17,8 @@ interface TokenPayload {
 
 export class TokenService {
   private JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
-  private ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes
-  private REFRESH_TOKEN_EXPIRY = '7d'; // 7 days
+  private ACCESS_TOKEN_EXPIRY = '7d';
+  private REFRESH_TOKEN_EXPIRY = '365d';
 
   // Generate JWT access token (like Shopio's generateToken)
   generateAccessToken(payload: TokenPayload): string {
@@ -47,7 +47,7 @@ export class TokenService {
 
   // Create session and store token in database (like Shopio's JWTToken entity)
   async createSession(userId: number, token: string): Promise<void> {
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 365 days
 
     await query(
       `INSERT INTO sessions (session_id, user_id, expires_at) 

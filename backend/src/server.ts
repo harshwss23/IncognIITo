@@ -10,10 +10,13 @@ import { transporter } from "./config/smtp";
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
 import matchRoutes from "./routes/matchRoutes";
+import adminRoutes from "./routes/adminRoutes";
+import chatRoutes from "./routes/chatRoutes";
+import requestRoutes from "./routes/requestRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
 import { MatchingService } from "./services/matchingService";
-import { queueService } from "./services/queueService";
+import { registerSocketHandlers } from "./socket/socket";
 
 dotenv.config();
 
@@ -131,31 +134,15 @@ class Server {
     this.app.use("/api/auth", authRoutes);
     this.app.use("/api/users", userRoutes);
     this.app.use("/api/match", matchRoutes);
+    this.app.use("/api/admin", adminRoutes);
+    this.app.use("/api/chats", chatRoutes);
+    this.app.use("/api/requests", requestRoutes);
 
     this.app.use(errorHandler.notFound.bind(errorHandler));
   }
 
   private initializeSocketHandlers(): void {
-    this.io.on("connection", (socket) => {
-      const userId = socket.handshake.auth?.userId;
-
-      if (!userId) {
-        socket.disconnect();
-        return;
-      }
-
-      socket.join(`user:${userId}`);
-      console.log(`Socket connected: user ${userId}`);
-
-      socket.on("disconnect", async () => {
-        console.log(`Socket disconnected: user ${userId}`);
-        try {
-          await queueService.cleanupUser(parseInt(userId, 10));
-        } catch (err) {
-          console.error(`Cleanup error for user ${userId}:`, err);
-        }
-      });
-    });
+    registerSocketHandlers(this.io);
   }
 
   private initializeErrorHandling(): void {
@@ -171,7 +158,7 @@ class Server {
       console.log(`API Base URL: http://localhost:${this.port}/api`);
       console.log("================================");
 
-      pool.query("SELECT NOW()", (err: any) => {
+      pool.query("SELECT NOW()", (err: Error | null) => {
         if (err) {
           console.error("Database connection failed", err);
         } else {
@@ -184,7 +171,7 @@ class Server {
       await ensureAdminSchema();
 
       setInterval(() => {
-        tokenService.cleanupExpiredSessions().catch((err) => {
+        tokenService.cleanupExpiredSessions().catch((err: Error) => {
           console.error("Session cleanup error:", err);
         });
       }, 60 * 60 * 1000);
