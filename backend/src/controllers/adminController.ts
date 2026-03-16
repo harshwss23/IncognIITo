@@ -153,7 +153,30 @@ export class AdminController {
       res.status(500).json({ success: false, message: 'Failed to unban user' });
     }
   }
+// DELETE /api/admin/interests/:tag
+// Remove interest globally from all profiles
+async removeInterest(req: Request, res: Response): Promise<void> {
+  try {
+    const tag = req.params.tag;
 
+    if (!tag) {
+      res.status(400).json({ success: false, message: 'Interest tag required' });
+      return;
+    }
+
+    await query(
+      `UPDATE user_profiles
+       SET interests = array_remove(interests, $1)`,
+      [tag]
+    );
+
+    res.json({ success: true, message: `Interest '${tag}' removed from all profiles` });
+
+  } catch (error) {
+    console.error('Admin removeInterest error:', error);
+    res.status(500).json({ success: false, message: 'Failed to remove interest' });
+  }
+}
   // GET /api/admin/stats — dashboard summary
   async getStats(_req: Request, res: Response): Promise<void> {
     try {
