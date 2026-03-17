@@ -8,6 +8,7 @@ import { INTERESTS } from '@/app/constants/interests';
 export function UserProfile() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const MAX_INTERESTS = 10;
 
   const [profile, setProfile] = useState<UserProfileModel | null>(null);
   const [displayName, setDisplayName] = useState('');
@@ -259,28 +260,37 @@ export function UserProfile() {
           <h3 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             Interest Tags
           </h3>
+          <p className={`text-sm mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            Select up to {MAX_INTERESTS} interests.
+          </p>
           <div className="flex flex-wrap gap-3">
             {INTERESTS.map((interest) => {
               const selected = interests.includes(interest);
+              const limitReached = !selected && interests.length >= MAX_INTERESTS;
               return (
                 <button
                   key={interest}
                   type="button"
                   onClick={() => {
-                    setInterests((prev) =>
-                      prev.includes(interest)
-                        ? prev.filter((item) => item !== interest)
-                        : [...prev, interest]
-                    );
+                    setInterests((prev) => {
+                      if (prev.includes(interest)) return prev.filter((item) => item !== interest);
+                      if (prev.length >= MAX_INTERESTS) return prev;
+                      return [...prev, interest];
+                    });
                   }}
+                  disabled={limitReached}
                   className={`group flex items-center gap-3 pl-5 pr-3 py-3 rounded-full border transition
                   ${selected
                     ? isDark
                       ? 'bg-blue-600/20 border-blue-500 text-white'
                       : 'bg-blue-50 border-blue-400 text-blue-700'
-                    : isDark
-                      ? 'bg-[#020617] border-white/10 text-white'
-                      : 'bg-slate-50 border-slate-200 text-slate-700'
+                    : limitReached
+                      ? isDark
+                        ? 'bg-[#0B1224] border-white/5 text-slate-500 cursor-not-allowed'
+                        : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                      : isDark
+                        ? 'bg-[#020617] border-white/10 text-white'
+                        : 'bg-slate-50 border-slate-200 text-slate-700'
                   }`}
                 >
                   <span>{interest}</span>
