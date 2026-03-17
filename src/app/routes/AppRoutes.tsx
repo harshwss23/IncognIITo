@@ -35,7 +35,7 @@ export default function AppRoutes() {
         <Route path="/chat" element={<ProtectedRoute><FuturisticChatInterface /></ProtectedRoute>} />
         <Route path="/requests" element={<ProtectedRoute><ChatRequestsDashboard /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
-        <Route path="/live" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
+        <Route path="/live/:roomId" element={<LiveInteractionRoom />} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
         <Route path="/session" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />

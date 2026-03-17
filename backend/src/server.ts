@@ -3,21 +3,24 @@ import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import http from "http";
-import { Server as SocketServer } from "socket.io";
+import { Server as SocketIOServer } from "socket.io";
 
 import { pool } from "./config/database";
 import { transporter } from "./config/smtp";
+
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
-import matchRoutes from "./routes/matchRoutes";
-import adminRoutes from "./routes/adminRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import requestRoutes from "./routes/requestRoutes";
+import adminRoutes from "./routes/adminRoutes";
+import matchRoutes from "./routes/matchRoutes";
+
 import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
 import { MatchingService } from "./services/matchingService";
 import { registerSocketHandlers } from "./socket/socket";
 
+// Load environment variables
 dotenv.config();
 
 type PgError = Error & { code?: string };
@@ -59,14 +62,10 @@ async function ensureAdminSchema(): Promise<void> {
     console.log("✅ Admin schema verified");
   } catch (error) {
     const pgError = error as PgError;
-
     if (pgError.code === "42501") {
-      console.warn(
-        "⚠️ Skipping admin schema migration because the database user does not own existing tables. Apply schema.sql as a local superuser to complete setup."
-      );
+      console.warn("⚠️ Skipping admin schema migration: User does not own tables.");
       return;
     }
-
     console.error("⚠️ Admin schema check failed:", error);
   }
 }
@@ -74,7 +73,7 @@ async function ensureAdminSchema(): Promise<void> {
 class Server {
   public app: Application;
   private httpServer: http.Server;
-  public io: SocketServer;
+  public io: SocketIOServer;
   private port: number;
   private matchingService: MatchingService;
 
@@ -84,11 +83,11 @@ class Server {
 
     this.httpServer = http.createServer(this.app);
 
-    this.io = new SocketServer(this.httpServer, {
+    this.io = new SocketIOServer(this.httpServer, {
       cors: {
         origin: process.env.FRONTEND_URL || "http://localhost:5173",
-        methods: ["GET", "POST"],
         credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
       },
     });
 
@@ -96,7 +95,7 @@ class Server {
 
     this.initializeMiddlewares();
     this.initializeRoutes();
-    this.initializeSocketHandlers();
+    this.initializeSockets();
     this.initializeErrorHandling();
   }
 
@@ -134,15 +133,124 @@ class Server {
     this.app.use("/api/auth", authRoutes);
     this.app.use("/api/users", userRoutes);
     this.app.use("/api/match", matchRoutes);
-    this.app.use("/api/admin", adminRoutes);
-    this.app.use("/api/chats", chatRoutes);
     this.app.use("/api/requests", requestRoutes);
+    this.app.use("/api/chats", chatRoutes);
+    this.app.use("/api/admin", adminRoutes);
 
     this.app.use(errorHandler.notFound.bind(errorHandler));
   }
 
-  private initializeSocketHandlers(): void {
-    registerSocketHandlers(this.io);
+  // ─── WEBRTC SIGNALING & OMEGLE-STYLE SECURITY LOGIC ──────────────────
+  private initializeSockets(): void {
+    registerSocketHandlers(this.io); // Puraane handlers
+
+    // 🔒 1. MIDDLEWARE: Pre-connection Token Verification
+    this.io.use(async (socket, next) => {
+      try {
+        const token = socket.handshake.auth.token;
+        if (!token) {
+          return next(new Error("Authentication error: No token provided"));
+        }
+
+        const decoded: any = await tokenService.verifyToken(token);
+        const userId = decoded?.id || decoded?.userId;
+
+        if (!userId) {
+          return next(new Error("Authentication error: Invalid or expired token"));
+        }
+
+        socket.data.userId = userId;
+        next();
+      } catch (err) {
+        console.error("Socket authentication error:", err);
+        return next(new Error("Authentication error: Server validation failed"));
+      }
+    });
+
+    // 🔌 2. CONNECTION EVENT
+    this.io.on("connection", (socket) => {
+      const userId = socket.data.userId; 
+      console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId})`);
+
+      // HELPER: Room ko DB se permanently delete karna
+      const destroySession = async (roomID: string) => {
+        try {
+          await pool.query(
+            `DELETE FROM matchmaking_sessions WHERE room_id = $1`,
+            [roomID]
+          );
+          console.log(`🗑️ Deleted room ${roomID} from database (Session Ended).`);
+        } catch (err) {
+          console.error(`Error deleting room ${roomID}:`, err);
+        }
+      };
+
+      // ─── JOIN ROOM ──────────────
+      socket.on("join_room", async (roomID) => {
+        try {
+          // Check for Duplicate Tabs
+          const socketsInRoom = await this.io.in(roomID).fetchSockets();
+          const isAlreadyInRoom = socketsInRoom.some(s => s.data.userId === userId);
+
+          if (isAlreadyInRoom) {
+            socket.emit("room_error", "You are already connected to this session from another tab/device.");
+            console.log(`⚠️ Blocked duplicate tab for User ${userId} in room ${roomID}`);
+            return;
+          }
+
+          // Verify Database Access
+          const result = await pool.query(
+            `SELECT * FROM matchmaking_sessions 
+             WHERE room_id = $1 
+             AND (user1_id = $2 OR user2_id = $2) 
+             AND status = 'active'`,
+            [roomID, userId]
+          );
+
+          if (result.rows.length > 0) {
+            socket.join(roomID);
+            socket.emit("room_joined_success");
+            socket.to(roomID).emit("user_joined", socket.id);
+            console.log(`✅ User ${userId} joined room ${roomID}`);
+          } else {
+            socket.emit("room_error", "You are not authorized to join this room, or it has been ended.");
+            console.log(`❌ Unauthorized/Expired access blocked for User ${userId}`);
+          }
+        } catch (error) {
+          console.error("Room join error:", error);
+          socket.emit("room_error", "Internal server error while verifying room.");
+        }
+      });
+
+      // ─── MANUAL END CALL ──────────────
+      socket.on("leave_room", async (roomID) => {
+        socket.leave(roomID);
+        // Dusre user ko alert bhej kar usko bhi matchmaking par bhej do
+        socket.to(roomID).emit("session_ended", "Your partner has left the chat.");
+        await destroySession(roomID);
+      });
+
+      // ─── ACCIDENTAL DISCONNECT (Tab closed, network drop) ──────────────
+      socket.on("disconnecting", async () => {
+        for (const roomID of socket.rooms) {
+          if (roomID !== socket.id) { // Apna khud ka default room ignore karo
+            socket.to(roomID).emit("session_ended", "Your partner got disconnected randomly.");
+            await destroySession(roomID);
+          }
+        }
+      });
+
+      // ─── WEBRTC SIGNALING EVENTS ──────────────
+      socket.on("offer", (data) => socket.to(data.roomID).emit("receive_offer", data));
+      socket.on("send_message", (data) => socket.to(data.roomID).emit("receive_message", data));
+      socket.on("answer", (data) => socket.to(data.roomID).emit("receive_answer", data));
+      socket.on("camera_status", (data) => socket.to(data.roomID).emit("receive_camera_status", data));
+      socket.on("ice_candidate", (data) => socket.to(data.roomID).emit("receive_ice_candidate", data));
+
+      socket.on("disconnect", () => {
+        console.log(`❌ Socket Disconnected: ${socket.id} (User ID: ${userId})`);
+      });
+    });
   }
 
   private initializeErrorHandling(): void {
@@ -151,23 +259,20 @@ class Server {
 
   public start(): void {
     this.httpServer.listen(this.port, async () => {
-      console.log("IncognIITo Backend Server");
+      console.log("🚀 IncognIITo Backend Server");
       console.log("================================");
-      console.log(`Server running on port ${this.port}`);
-      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-      console.log(`API Base URL: http://localhost:${this.port}/api`);
+      console.log(`📡 Server running on port ${this.port}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`🔗 API Base URL: http://localhost:${this.port}/api`);
+      console.log(`🧩 Socket URL: http://localhost:${this.port}`);
       console.log("================================");
 
       pool.query("SELECT NOW()", (err: Error | null) => {
-        if (err) {
-          console.error("Database connection failed", err);
-        } else {
-          console.log("✅ Database connected");
-        }
+        if (err) console.error("❌ Database connection failed", err);
+        else console.log("✅ Database connected");
       });
 
       this.matchingService.start();
-
       await ensureAdminSchema();
 
       setInterval(() => {
@@ -183,10 +288,8 @@ class Server {
 
   private async shutdown(): Promise<void> {
     console.log("\nShutting down server...");
-
     try {
       this.matchingService.stop();
-
       this.io.close();
 
       await new Promise<void>((resolve, reject) => {
@@ -198,7 +301,6 @@ class Server {
 
       await pool.end();
       console.log("Database connections closed");
-
       transporter.close();
       console.log("SMTP connection closed");
 

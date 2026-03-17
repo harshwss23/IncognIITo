@@ -1,29 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import io, { Socket } from 'socket.io-client'
 import {
-  Video,
-  Mic,
-  MicOff,
-  VideoOff,
-  Send,
-  Settings,
-  Shield,
-  PhoneOff,
+  Video, Mic, MicOff, VideoOff, Send, Settings, Shield, PhoneOff, AlertTriangle, Loader2
 } from 'lucide-react'
 import { useThemeColors } from '@/app/hooks/useThemeColors'
 import { useTheme } from '@/app/contexts/ThemeContext'
-import { socketUrl } from '@/services/config'
+import { getAccessToken } from '@/services/auth' // Apna path check kar lena
 
-const SOCKET_SERVER_URL = socketUrl
-const ROOM_ID = 'incogniito-test-room'
+const SOCKET_SERVER_URL = 'http://localhost:5050'
 
 export function LiveInteractionRoom() {
   const colors = useThemeColors()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
 
-  /* ---------------- REFS ---------------- */
+  // URL se Room ID nikalna aur Navigation setup
+  const { roomId } = useParams<{ roomId: string }>()
+  const ROOM_ID = roomId as string
+  const navigate = useNavigate()
 
+  /* ---------------- REFS ---------------- */
   const socketRef = useRef<Socket | null>(null)
   const peerRef = useRef<RTCPeerConnection | null>(null)
 
@@ -35,12 +32,12 @@ export function LiveInteractionRoom() {
 
   const iceQueueRef = useRef<RTCIceCandidateInit[]>([])
   const initializedRef = useRef(false)
-  
-  // FIX 1: Track the latest state to avoid stale closures in socket events
-  const cameraOnRef = useRef(false) 
+  const cameraOnRef = useRef(false)
 
   /* ---------------- STATE ---------------- */
-
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null) 
+  const [errorReason, setErrorReason] = useState<string>('') 
+  
   const [micOn, setMicOn] = useState(false)
   const [cameraOn, setCameraOn] = useState(false)
   const [remoteCameraOn, setRemoteCameraOn] = useState(false)
@@ -51,11 +48,8 @@ export function LiveInteractionRoom() {
     {
       id: 1,
       sender: 'them',
-      text: 'Connection established. Say hi!',
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      text: 'Secure connection established. Say hi!',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ])
 
@@ -65,13 +59,11 @@ export function LiveInteractionRoom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages])
 
-  /* ---------------- PEER ---------------- */
-
+  /* ---------------- PEER CONNECTION ---------------- */
   const createPeer = useCallback(() => {
     const peer = new RTCPeerConnection({
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
     })
-
     peerRef.current = peer
 
     if (localStreamRef.current) {
@@ -82,11 +74,7 @@ export function LiveInteractionRoom() {
 
     peer.ontrack = (event) => {
       remoteStreamRef.current = event.streams[0]
-      // FIX 4: Prevent double-assignment stutter (ontrack fires for both audio & video)
-      if (
-        remoteVideoRef.current &&
-        remoteVideoRef.current.srcObject !== event.streams[0]
-      ) {
+      if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== event.streams[0]) {
         remoteVideoRef.current.srcObject = event.streams[0]
       }
       setRemoteConnected(true)
@@ -94,37 +82,22 @@ export function LiveInteractionRoom() {
 
     peer.onicecandidate = (event) => {
       if (event.candidate && socketRef.current) {
-        socketRef.current.emit('ice_candidate', {
-          roomID: ROOM_ID,
-          candidate: event.candidate,
-        })
+        socketRef.current.emit('ice_candidate', { roomID: ROOM_ID, candidate: event.candidate })
       }
     }
 
     peer.onconnectionstatechange = () => {
-      if (
-        peer.connectionState === 'disconnected' ||
-        peer.connectionState === 'failed'
-      ) {
+      if (peer.connectionState === 'disconnected' || peer.connectionState === 'failed') {
         cleanupPeer()
       }
     }
-
     return peer
-  }, [])
+  }, [ROOM_ID])
 
   /* ---------------- CLEANUP ---------------- */
-
   const cleanupPeer = () => {
-    if (peerRef.current) {
-      peerRef.current.close()
-      peerRef.current = null
-    }
-
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null
-    }
-
+    if (peerRef.current) { peerRef.current.close(); peerRef.current = null }
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
     remoteStreamRef.current = null
     setRemoteConnected(false)
     setRemoteCameraOn(false)
@@ -132,31 +105,24 @@ export function LiveInteractionRoom() {
 
   const fullCleanup = () => {
     cleanupPeer()
-
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop())
       localStreamRef.current = null
     }
-
     if (socketRef.current) {
       socketRef.current.disconnect()
       socketRef.current = null
     }
   }
 
-  /* ---------------- INIT ---------------- */
-
+  /* ---------------- INIT & SOCKET LISTENERS ---------------- */
   useEffect(() => {
-    if (initializedRef.current) return
+    if (initializedRef.current || !ROOM_ID) return
     initializedRef.current = true
 
     const init = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
-        })
-
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         stream.getTracks().forEach((track) => (track.enabled = false))
         localStreamRef.current = stream
 
@@ -164,20 +130,54 @@ export function LiveInteractionRoom() {
           localVideoRef.current.srcObject = stream
         }
 
+        const token = getAccessToken()
+        if (!token) {
+          alert('Authentication error. Please log in again.')
+          navigate('/login')
+          return
+        }
+
         const socket = io(SOCKET_SERVER_URL, {
           transports: ['websocket'],
+          auth: { token: token }
         })
 
         socketRef.current = socket
+
+        // 🚨 Middleware Rejection Catch
+        socket.on("connect_error", (err) => {
+          console.error("Socket Connection Error:", err.message);
+          setIsAuthorized(false);
+          setErrorReason(err.message);
+          fullCleanup();
+        });
 
         socket.on('connect', () => {
           socket.emit('join_room', ROOM_ID)
         })
 
-        socket.on('user_joined', async () => {
-          // Sync camera state with new arrival
-          socket.emit('camera_status', { roomID: ROOM_ID, isOn: cameraOnRef.current })
+        // 🚨 Room Join Rejection
+        socket.on('room_error', (errorMsg) => {
+          setIsAuthorized(false)
+          setErrorReason(errorMsg)
+          fullCleanup()
+        })
 
+        // ✅ Room Join Success
+        socket.on('room_joined_success', () => {
+          setIsAuthorized(true)
+        })
+
+        // 🔴 NAYA EVENT: Jab room delete ho jaye (manual ya tab close)
+        socket.on('session_ended', (message) => {
+          alert(message || "The session has ended. Redirecting you to matchmaking...");
+          fullCleanup();
+          navigate('/matchmaking'); // Wapas matchmaking page par bhej do
+        })
+
+        // WEBRTC SIGNALING
+        socket.on('user_joined', async () => {
+          socket.emit('camera_status', { roomID: ROOM_ID, isOn: cameraOnRef.current })
           const peer = createPeer()
           const offer = await peer.createOffer()
           await peer.setLocalDescription(offer)
@@ -185,17 +185,12 @@ export function LiveInteractionRoom() {
         })
 
         socket.on('receive_offer', async ({ offer }) => {
-          // Sync camera state back to the caller
           socket.emit('camera_status', { roomID: ROOM_ID, isOn: cameraOnRef.current })
-
           const peer = createPeer()
           await peer.setRemoteDescription(offer)
 
-          // FIX 2: Drain the ICE queue for the callee!
           iceQueueRef.current.forEach(async (candidate) => {
-            try {
-              await peer.addIceCandidate(candidate)
-            } catch (e) { console.error(e) }
+            try { await peer.addIceCandidate(candidate) } catch (e) { console.error(e) }
           })
           iceQueueRef.current = []
 
@@ -207,38 +202,24 @@ export function LiveInteractionRoom() {
         socket.on('receive_answer', async ({ answer }) => {
           if (!peerRef.current) return
           await peerRef.current.setRemoteDescription(answer)
-
           iceQueueRef.current.forEach(async (candidate) => {
-            try {
-              await peerRef.current?.addIceCandidate(candidate)
-            } catch (e) { console.error(e) }
+            try { await peerRef.current?.addIceCandidate(candidate) } catch (e) { console.error(e) }
           })
           iceQueueRef.current = []
         })
 
         socket.on('receive_ice_candidate', async ({ candidate }) => {
           if (!peerRef.current) return
-
           if (peerRef.current.remoteDescription) {
-            try {
-              await peerRef.current.addIceCandidate(candidate)
-            } catch (e) { console.error(e) }
+            try { await peerRef.current.addIceCandidate(candidate) } catch (e) { console.error(e) }
           } else {
             iceQueueRef.current.push(candidate)
           }
         })
 
-        socket.on('receive_camera_status', ({ isOn }) => {
-          setRemoteCameraOn(isOn)
-        })
+        socket.on('receive_camera_status', ({ isOn }) => setRemoteCameraOn(isOn))
+        socket.on('receive_message', (msg) => setChatMessages((prev) => [...prev, { ...msg, sender: 'them' }]))
 
-        socket.on('receive_message', (msg) => {
-          setChatMessages((prev) => [...prev, { ...msg, sender: 'them' }])
-        })
-
-        socket.on('peer_disconnected', () => {
-          cleanupPeer()
-        })
       } catch (err) {
         alert('Camera/Microphone permission required.')
       }
@@ -248,11 +229,11 @@ export function LiveInteractionRoom() {
 
     return () => {
       fullCleanup()
+      initializedRef.current = false
     }
-  }, [createPeer])
+  }, [createPeer, ROOM_ID, navigate])
 
   /* ---------------- CONTROLS ---------------- */
-
   const toggleMic = () => {
     if (!localStreamRef.current) return
     const track = localStreamRef.current.getAudioTracks()[0]
@@ -266,87 +247,74 @@ export function LiveInteractionRoom() {
     if (!localStreamRef.current || !socketRef.current) return
     const track = localStreamRef.current.getVideoTracks()[0]
     if (!track) return
-
     const newState = !cameraOn
     track.enabled = newState
     setCameraOn(newState)
-    cameraOnRef.current = newState // Keep the ref synced
+    cameraOnRef.current = newState
 
-    socketRef.current.emit('camera_status', {
-      roomID: ROOM_ID,
-      isOn: newState,
-    })
+    socketRef.current.emit('camera_status', { roomID: ROOM_ID, isOn: newState })
   }
 
   const sendMessage = () => {
     if (!msgInput.trim() || !socketRef.current) return
-
     const message = {
       id: Date.now(),
       text: msgInput,
-      time: new Date().toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       roomID: ROOM_ID,
     }
-
     setChatMessages((prev) => [...prev, { ...message, sender: 'me' }])
     socketRef.current.emit('send_message', message)
     setMsgInput('')
   }
 
   const endCall = () => {
-    socketRef.current?.emit('leave_room', ROOM_ID)
+    // Backend ko alert karo ki manual disconnect hua hai
+    if (socketRef.current) {
+      socketRef.current.emit('leave_room', ROOM_ID)
+    }
     fullCleanup()
-    alert('Session ended.')
+    navigate('/matchmaking') // Khud ko matchmaking par bhej do
   }
 
-  /* ---------------- UI ---------------- */
+  /* ---------------- UNAUTHORIZED / LOADING UI ---------------- */
+  if (isAuthorized === false) {
+    return (
+      <div className={`w-full h-screen flex flex-col items-center justify-center ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+        <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+        <p className="text-slate-500 mb-6 text-center max-w-md">
+          {errorReason || "You are not authorized to join this room."}
+        </p>
+        <button onClick={() => navigate('/matchmaking')} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          Find a New Match
+        </button>
+      </div>
+    )
+  }
 
+  if (isAuthorized === null) {
+    return (
+      <div className={`w-full h-screen flex flex-col items-center justify-center ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+        <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-4" />
+        <p className="text-slate-500 font-medium">Verifying Secure Connection...</p>
+      </div>
+    )
+  }
+
+  /* ---------------- MAIN UI ---------------- */
   return (
-    <div
-      className={`w-full h-full flex flex-col transition-colors duration-500 ${
-        isDark ? 'bg-slate-950' : 'bg-slate-50'
-      }`}
-    >
+    <div className={`w-full h-screen flex flex-col transition-colors duration-500 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
       {/* HEADER */}
-      <div
-        className={`h-16 flex items-center justify-between px-6 border-b ${
-          isDark
-            ? 'bg-slate-900/80 border-white/10'
-            : 'bg-white border-slate-200'
-        }`}
-      >
+      <div className={`h-16 flex items-center justify-between px-6 border-b ${isDark ? 'bg-slate-900/80 border-white/10' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-4">
-          <div
-            className={`p-2 rounded-lg ${
-              isDark ? 'bg-white/5' : 'bg-slate-100'
-            }`}
-          >
-            <Shield
-              className={`w-5 h-5 ${
-                isDark ? 'text-blue-400' : 'text-blue-600'
-              }`}
-            />
+          <div className={`p-2 rounded-lg ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}>
+            <Shield className={`w-5 h-5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
           </div>
-          <h3
-            className={`font-bold text-sm ${
-              isDark ? 'text-white' : 'text-slate-900'
-            }`}
-          >
-            Live Session : LunarGhost
-          </h3>
+          <h3 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>IncognIITo Live Session</h3>
         </div>
-
         <div className="flex items-center gap-2">
-          <button
-            className={`p-2 rounded-full ${
-              isDark
-                ? 'hover:bg-white/10 text-white'
-                : 'hover:bg-slate-100 text-slate-600'
-            }`}
-          >
+          <button className={`p-2 rounded-full ${isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-slate-100 text-slate-600'}`}>
             <Settings className="w-5 h-5" />
           </button>
         </div>
@@ -357,69 +325,38 @@ export function LiveInteractionRoom() {
         {/* VIDEO SIDE */}
         <div className="flex-[0.75] bg-black relative flex items-center justify-center p-6">
           <div className="relative w-full h-full bg-slate-900 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="w-full h-full object-cover"
-            />
+            <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
 
             {!remoteConnected && (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-400">
-                WAITING FOR PEER...
+              <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-medium">
+                WAITING FOR PEER TO JOIN...
               </div>
             )}
 
-            {/* FIX 3: Added background color (bg-slate-900) and z-10 so it actually covers the video block */}
             {remoteConnected && !remoteCameraOn && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-900 text-slate-400 z-10">
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900 text-slate-400 z-10 font-medium">
                 PARTNER CAMERA OFF
               </div>
             )}
           </div>
 
           {/* SELF PIP */}
-          <div className="absolute bottom-10 right-10 w-64 h-40 bg-slate-800 rounded-xl overflow-hidden border-2 z-20 border-white/10">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-            />
+          <div className="absolute bottom-10 right-10 w-64 h-40 bg-slate-800 rounded-xl overflow-hidden border-2 z-20 border-white/10 shadow-lg">
+            <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             {!cameraOn && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-900 text-slate-400 text-xs">
-                Camera Off
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 text-slate-300 text-sm font-medium backdrop-blur-sm">
+                Your Camera is Off
               </div>
             )}
           </div>
         </div>
 
         {/* CHAT SIDE */}
-        <div
-          className={`flex-[0.25] flex flex-col border-l ${
-            isDark
-              ? 'bg-slate-900 border-white/10'
-              : 'bg-white border-slate-200'
-          }`}
-        >
+        <div className={`flex-[0.25] flex flex-col border-l ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {chatMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${
-                  msg.sender === 'me'
-                    ? 'justify-end'
-                    : 'justify-start'
-                }`}
-              >
-                <div
-                  className={`px-4 py-2 rounded-2xl text-sm ${
-                    msg.sender === 'me'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-200 text-black'
-                  }`}
-                >
+              <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`px-4 py-2 rounded-2xl text-sm max-w-[85%] break-words ${msg.sender === 'me' ? 'bg-blue-600 text-white rounded-br-sm' : isDark ? 'bg-slate-800 text-slate-200 rounded-bl-sm' : 'bg-slate-200 text-slate-900 rounded-bl-sm'}`}>
                   {msg.text}
                 </div>
               </div>
@@ -427,17 +364,17 @@ export function LiveInteractionRoom() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 border-t">
+          <div className={`p-4 border-t ${isDark ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-white'}`}>
             <div className="flex items-center gap-2">
               <input
                 value={msgInput}
                 onChange={(e) => setMsgInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
                 placeholder="Type a message..."
-                className="flex-1 px-3 py-2 border rounded-lg text-black"
+                className={`flex-1 px-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-400' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-500'}`}
               />
-              <button onClick={sendMessage} className="text-blue-500">
-                <Send />
+              <button onClick={sendMessage} disabled={!msgInput.trim()} className={`p-2.5 rounded-xl transition-colors ${msgInput.trim() ? 'bg-blue-600 text-white hover:bg-blue-700' : isDark ? 'bg-slate-800 text-slate-500' : 'bg-slate-100 text-slate-400'}`}>
+                <Send className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -445,17 +382,17 @@ export function LiveInteractionRoom() {
       </div>
 
       {/* CONTROLS */}
-      <div className="h-20 flex items-center justify-center gap-6 border-t">
-        <button onClick={toggleMic} className="p-4 rounded-full bg-slate-200 dark:bg-slate-800">
-          {micOn ? <Mic /> : <MicOff />}
+      <div className={`h-20 flex items-center justify-center gap-6 border-t ${isDark ? 'bg-slate-900/80 border-white/10' : 'bg-white border-slate-200'}`}>
+        <button onClick={toggleMic} className={`p-4 rounded-full transition-all ${micOn ? isDark ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-100 text-slate-900 hover:bg-slate-200' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}>
+          {micOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
         </button>
 
-        <button onClick={toggleCamera} className="p-4 rounded-full bg-slate-200 dark:bg-slate-800">
-          {cameraOn ? <Video /> : <VideoOff />}
+        <button onClick={toggleCamera} className={`p-4 rounded-full transition-all ${cameraOn ? isDark ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-100 text-slate-900 hover:bg-slate-200' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}>
+          {cameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
         </button>
 
-        <button onClick={endCall} className="p-4 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30">
-          <PhoneOff />
+        <button onClick={endCall} className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600 hover:scale-105 transition-all shadow-lg shadow-red-500/20">
+          <PhoneOff className="w-6 h-6" />
         </button>
       </div>
     </div>
