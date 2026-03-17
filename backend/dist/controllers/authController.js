@@ -263,7 +263,7 @@ class AuthController {
         try {
             // @ts-ignore - user is attached by authMiddleware
             const userId = req.user.userId;
-            const userResult = await (0, database_1.query)(`SELECT u.id, u.email, u.display_name, u.verified,
+            const userResult = await (0, database_1.query)(`SELECT u.id, u.email, u.display_name, u.verified, u.is_admin,
                 p.interests, p.avatar_url, p.total_chats, p.total_reports, p.rating, p.is_banned
          FROM users u
          LEFT JOIN user_profiles p ON u.id = p.user_id

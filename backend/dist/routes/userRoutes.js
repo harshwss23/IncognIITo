@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const database_1 = require("../config/database");
+const interests_1 = require("../constants/interests");
 const router = (0, express_1.Router)();
 // All user routes require authentication
 router.use(authMiddleware_1.authMiddleware.authenticate.bind(authMiddleware_1.authMiddleware));
@@ -68,6 +69,18 @@ router.put('/profile', async (req, res) => {
     try {
         const userId = req.user.userId;
         const { displayName, interests, avatarUrl } = req.body;
+        // Normalize and validate interests against the allowed list
+        const allowedInterests = new Set(interests_1.INTERESTS);
+        const interestsProvided = Array.isArray(interests);
+        const sanitizedInterests = interestsProvided
+            ? Array.from(new Set(interests
+                .map((i) => (typeof i === 'string' ? i.trim() : ''))
+                .filter((i) => i && allowedInterests.has(i))))
+            : null;
+        // Ensure profile row exists so updates don't noop
+        await (0, database_1.query)(`INSERT INTO user_profiles (user_id)
+       VALUES ($1)
+       ON CONFLICT (user_id) DO NOTHING`, [userId]);
         // Update user table
         if (displayName !== undefined) {
             await (0, database_1.query)('UPDATE users SET display_name = $1 WHERE id = $2', [displayName, userId]);
@@ -76,7 +89,7 @@ router.put('/profile', async (req, res) => {
         await (0, database_1.query)(`UPDATE user_profiles 
        SET interests = COALESCE($1, interests),
            avatar_url = COALESCE($2, avatar_url)
-       WHERE user_id = $3`, [interests, avatarUrl, userId]);
+       WHERE user_id = $3`, [sanitizedInterests, avatarUrl, userId]);
         res.status(200).json({
             success: true,
             message: 'Profile updated successfully',

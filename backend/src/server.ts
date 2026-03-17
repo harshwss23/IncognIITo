@@ -19,7 +19,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
 import { MatchingService } from "./services/matchingService";
 import { queueService } from "./services/queueService";
-import { registerSocketHandlers } from "./sockets/socketHandlers";
+import { registerSocketHandlers } from "./socket/socket";
 
 // Load environment variables
 dotenv.config();
