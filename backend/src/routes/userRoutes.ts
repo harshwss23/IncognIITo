@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { query } from '../config/database';
 import { Request, Response } from 'express';
+import { INTERESTS } from '../constants/interests';
 
 const router = Router();
 
@@ -85,6 +86,27 @@ router.put('/profile', async (req: Request, res: Response) => {
     const userId = req.user!.userId;
     const { displayName, interests, avatarUrl } = req.body;
 
+    // Normalize and validate interests against the allowed list
+    const allowedInterests = new Set(INTERESTS);
+    const interestsProvided = Array.isArray(interests);
+    const sanitizedInterests = interestsProvided
+      ? Array.from(
+          new Set(
+            (interests as unknown[])
+              .map((i) => (typeof i === 'string' ? i.trim() : ''))
+              .filter((i) => i && allowedInterests.has(i))
+          )
+        )
+      : null;
+
+    // Ensure profile row exists so updates don't noop
+    await query(
+      `INSERT INTO user_profiles (user_id)
+       VALUES ($1)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [userId]
+    );
+
     // Update user table
     if (displayName !== undefined) {
       await query(
@@ -99,7 +121,7 @@ router.put('/profile', async (req: Request, res: Response) => {
        SET interests = COALESCE($1, interests),
            avatar_url = COALESCE($2, avatar_url)
        WHERE user_id = $3`,
-      [interests, avatarUrl, userId]
+      [sanitizedInterests, avatarUrl, userId]
     );
 
     res.status(200).json({
