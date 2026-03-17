@@ -71,7 +71,7 @@ export function HomePageScreen() {
 
   const logout = () => {
     clearAuthTokens();
-    window.location.href = "/login";
+    window.location.href = "/landing";
   };
 
   const navItems = [

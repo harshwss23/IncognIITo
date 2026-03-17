@@ -47,7 +47,7 @@ export function AdminDashboard() {
     }
 
     clearAuthTokens();
-    window.location.assign('/login?next=/admin');
+    window.location.assign('/landing');
   };
 
   // Fetch users + reports from backend on mount

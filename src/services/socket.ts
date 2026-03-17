@@ -15,8 +15,8 @@ socket.on("connect_error", (error) => {
     clearAuthTokens();
     socket.disconnect();
 
-    if (window.location.pathname !== "/login") {
-      window.location.href = "/login";
+    if (window.location.pathname !== "/landing") {
+      window.location.href = "/landing";
     }
   }
 });
