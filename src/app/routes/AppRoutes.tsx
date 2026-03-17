@@ -26,14 +26,13 @@ export default function AppRoutes() {
       {/* Global layout (background + theme toggle) */}
       <Route element={<AppShell />}>
         {/* Public Routes */}
-        <Route path="/landing" element={<LandingAuthPortal />} />
+        <Route path="/" element={<LandingAuthPortal />} />
         <Route path="/register" element={<RegistrationScreen />} />
         <Route path="/login" element={<DedicatedLoginScreen />} />
         <Route path="/forgot" 
         element={<ForgotPasswordScreen />} />
 
         {/* Protected Routes */}
-        <Route path="/" element={<Navigate to="/landing" replace />} />
         <Route path="/chat" element={<ProtectedRoute><FuturisticChatInterface /></ProtectedRoute>} />
         <Route path="/requests" element={<ProtectedRoute><ChatRequestsDashboard /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
@@ -47,7 +46,7 @@ export default function AppRoutes() {
         <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
 
         {/* fallback */}
-        <Route path="*" element={<Navigate to="/landing" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );
