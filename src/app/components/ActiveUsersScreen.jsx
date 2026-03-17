@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Search, UserPlus } from "lucide-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
-import { buildApiUrl } from "@/services/config";
+import { authFetch } from "@/services/auth";
 
 export function ActiveUsersScreen() {
   const { theme } = useTheme();
@@ -17,10 +17,7 @@ export function ActiveUsersScreen() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(buildApiUrl("/api/users/profile"), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await authFetch("/api/users/profile");
 
         const json = await res.json();
         if (json.success) setMe(json.data.user);
@@ -35,11 +32,7 @@ export function ActiveUsersScreen() {
     const fetchUsers = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-
-        const res = await fetch(buildApiUrl("/api/users"), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await authFetch("/api/users");
 
         const json = await res.json();
 
@@ -70,13 +63,10 @@ export function ActiveUsersScreen() {
 
   const sendRequest = async (receiverId) => {
     try {
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(buildApiUrl("/api/requests/send"), {
+      const res = await authFetch("/api/requests/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ receiverId }),
       });

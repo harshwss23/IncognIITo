@@ -311,7 +311,7 @@ export class AuthController {
       const userId = req.user.userId;
 
       const userResult = await query(
-        `SELECT u.id, u.email, u.display_name, u.verified,
+        `SELECT u.id, u.email, u.display_name, u.verified, u.is_admin,
                 p.interests, p.avatar_url, p.total_chats, p.total_reports, p.rating, p.is_banned
          FROM users u
          LEFT JOIN user_profiles p ON u.id = p.user_id

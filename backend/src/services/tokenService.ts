@@ -15,6 +15,11 @@ interface TokenPayload {
   verified: boolean;
 }
 
+type TokenVerificationResult = {
+  payload: TokenPayload | null;
+  reason: 'valid' | 'expired' | 'invalid';
+};
+
 export class TokenService {
   private JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
   private ACCESS_TOKEN_EXPIRY = '7d';
@@ -34,15 +39,32 @@ export class TokenService {
     } as jwt.SignOptions);
   }
 
-  // Verify and decode token (like Shopio's validateToken)
-  verifyToken(token: string): TokenPayload | null {
+  verifyTokenDetailed(token: string): TokenVerificationResult {
     try {
       const decoded = jwt.verify(token, this.JWT_SECRET) as TokenPayload;
-      return decoded;
+      return {
+        payload: decoded,
+        reason: 'valid',
+      };
     } catch (error) {
-      console.error('Token verification failed:', error);
-      return null;
+      if (error instanceof jwt.TokenExpiredError) {
+        return {
+          payload: null,
+          reason: 'expired',
+        };
+      }
+
+      console.warn('Token verification failed: invalid token');
+      return {
+        payload: null,
+        reason: 'invalid',
+      };
     }
+  }
+
+  // Verify and decode token (like Shopio's validateToken)
+  verifyToken(token: string): TokenPayload | null {
+    return this.verifyTokenDetailed(token).payload;
   }
 
   // Create session and store token in database (like Shopio's JWTToken entity)

@@ -25,14 +25,15 @@ export function registerSocketHandlers(io: Server) {
       const token = getToken(socket);
       if (!token) return next(new Error("AUTH_REQUIRED"));
 
-      const payload = tokenService.verifyToken(token);
-      if (!payload) return next(new Error("INVALID_TOKEN"));
+      const { payload, reason } = tokenService.verifyTokenDetailed(token);
+      if (!payload) return next(new Error(reason === "expired" ? "TOKEN_EXPIRED" : "INVALID_TOKEN"));
 
       (socket as AuthedSocket).user = {
         userId: payload.userId,
         email: payload.email,
         verified: payload.verified,
       };
+      socket.data.userId = payload.userId;
 
       next();
     } catch {

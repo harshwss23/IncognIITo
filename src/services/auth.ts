@@ -22,12 +22,40 @@ export class ApiError extends Error {
 
 let refreshRequest: Promise<string | null> | null = null;
 
+function decodeJwtPayload(token: string): { exp?: number } | null {
+  try {
+    const [, payload] = token.split(".");
+    if (!payload) {
+      return null;
+    }
+
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    return JSON.parse(window.atob(padded));
+  } catch {
+    return null;
+  }
+}
+
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function isTokenExpired(token: string | null): boolean {
+  if (!token) {
+    return true;
+  }
+
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) {
+    return false;
+  }
+
+  return payload.exp * 1000 <= Date.now();
 }
 
 export function setAuthTokens(tokens: Tokens): void {
@@ -41,6 +69,15 @@ export function setAuthTokens(tokens: Tokens): void {
 export function clearAuthTokens(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+export async function ensureValidAccessToken(): Promise<string | null> {
+  const accessToken = getAccessToken();
+  if (accessToken && !isTokenExpired(accessToken)) {
+    return accessToken;
+  }
+
+  return refreshAccessToken();
 }
 
 function withAuthHeaders(headers: HeadersInit | undefined, accessToken: string | null): Headers {

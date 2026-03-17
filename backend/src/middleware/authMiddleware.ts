@@ -40,12 +40,12 @@ export class AuthMiddleware {
       const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
       // Verify token
-      const payload = tokenService.verifyToken(token);
+      const { payload, reason } = tokenService.verifyTokenDetailed(token);
 
       if (!payload) {
         res.status(401).json({
           success: false,
-          message: 'Invalid or expired token',
+          message: reason === 'expired' ? 'Token expired' : 'Invalid token',
         });
         return;
       }

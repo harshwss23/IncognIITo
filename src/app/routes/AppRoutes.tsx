@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "@/app/layout/AppShell";
 import { ProtectedRoute } from "@/app/components/ProtectedRoute";
+import { AdminRoute } from "@/app/components/AdminRoute";
 
 // components (your existing screens)
 import { FuturisticChatInterface } from "@/app/components/FuturisticChatInterface";
@@ -35,10 +36,12 @@ export default function AppRoutes() {
         <Route path="/chat" element={<ProtectedRoute><FuturisticChatInterface /></ProtectedRoute>} />
         <Route path="/requests" element={<ProtectedRoute><ChatRequestsDashboard /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
-        <Route path="/live/:roomId" element={<LiveInteractionRoom />} />
+        <Route path="/live" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
+        <Route path="/live/:roomId" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
+        <Route path="/matchmaking" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
         <Route path="/session" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
 

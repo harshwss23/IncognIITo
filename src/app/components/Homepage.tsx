@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useThemeColors } from "@/app/hooks/useThemeColors";
 import { useTheme } from "@/app/contexts/ThemeContext";
-import { buildApiUrl } from "@/services/config";
+import { authFetch, clearAuthTokens } from "@/services/auth";
 
 export function HomePageScreen() {
   const colors = useThemeColors();
@@ -31,16 +31,8 @@ export function HomePageScreen() {
     const fetchProfile = async () => {
       setProfileLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          setUser(null);
-          setProfileLoading(false);
-          return;
-        }
-
-        const res = await fetch(buildApiUrl("/api/users/profile"), {
+        const res = await authFetch("/api/users/profile", {
           method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
         });
 
         const json = await res.json().catch(() => ({}));
@@ -78,8 +70,7 @@ export function HomePageScreen() {
   }, [displayName]);
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("refreshToken");
+    clearAuthTokens();
     window.location.href = "/login";
   };
 

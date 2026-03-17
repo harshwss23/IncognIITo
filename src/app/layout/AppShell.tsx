@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { useThemeColors } from "@/app/hooks/useThemeColors";
+import { getAccessToken, isTokenExpired } from "@/services/auth";
 
 export function AppShell() {
   const colors = useThemeColors();
@@ -9,11 +10,11 @@ export function AppShell() {
   const location = useLocation();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = getAccessToken();
     const publicPaths = ["/login", "/register", "/landing", "/forgot"];
     const isPublicPath = publicPaths.some((path) => location.pathname.startsWith(path));
 
-    if (!token && !isPublicPath) {
+    if ((!token || isTokenExpired(token)) && !isPublicPath) {
       navigate("/login");
     }
   }, [location, navigate]);
