@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MessageCircle, MessageSquare, User, Check, Shield } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
-import { buildApiUrl } from '@/services/config';
+import { authFetch } from '@/services/auth';
 
 export function ChatRequestsDashboard() {
   const colors = useThemeColors();
@@ -9,18 +9,12 @@ export function ChatRequestsDashboard() {
   const [connectionRequests, setConnectionRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const token = localStorage.getItem("token");
-
   // ✅ FETCH REQUESTS FROM API
   const fetchRequests = async () => {
     try {
       setLoading(true);
 
-      const res = await fetch(buildApiUrl('/api/requests/incoming'), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const res = await authFetch('/api/requests/incoming');
 
       const json = await res.json();
 
@@ -45,11 +39,10 @@ export function ChatRequestsDashboard() {
 // ✅ ACCEPT REQUEST
   const handleAccept = async (id) => {
     try {
-      const res = await fetch(buildApiUrl(`/api/requests/${id}/accept`), {
+      const res = await authFetch(`/api/requests/${id}/accept`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json", // Good practice to include
-          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -73,11 +66,10 @@ export function ChatRequestsDashboard() {
   // ✅ REJECT REQUEST
   const handleReject = async (id) => {
     try {
-      const res = await fetch(buildApiUrl(`/api/requests/${id}/reject`), {
+      const res = await authFetch(`/api/requests/${id}/reject`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
       });
 

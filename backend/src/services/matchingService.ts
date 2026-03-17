@@ -1,5 +1,5 @@
 import { Server as SocketServer } from 'socket.io';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { queueService, QueueEntry } from './queueService';
 import { jaccardScore } from '../constants/interests';
 import { query } from '../config/database';
@@ -114,7 +114,7 @@ export class MatchingService {
     userB: QueueEntry,
     score: number
   ): Promise<void> {
-    const roomId = uuidv4(); // Unique room ID for WebRTC later
+    const roomId = randomUUID(); // Unique room ID for WebRTC later
     const matchScore = Math.round(score * 100);
 
     try {

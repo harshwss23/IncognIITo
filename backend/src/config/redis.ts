@@ -10,7 +10,7 @@ const redisClient = createClient({
   },
 });
 
-redisClient.on('error', (err) => {
+redisClient.on('error', (err: unknown) => {
   console.error('Redis error:', err);
 });
 
@@ -19,7 +19,7 @@ redisClient.on('connect', () => {
 });
 
 // Connect immediately when this module is imported
-redisClient.connect().catch((err) => {
+redisClient.connect().catch((err: unknown) => {
   console.error('Redis failed to connect:', err);
 });
 

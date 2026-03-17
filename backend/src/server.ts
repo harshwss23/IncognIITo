@@ -144,29 +144,6 @@ class Server {
   private initializeSockets(): void {
     registerSocketHandlers(this.io); // Puraane handlers
 
-    // 🔒 1. MIDDLEWARE: Pre-connection Token Verification
-    this.io.use(async (socket, next) => {
-      try {
-        const token = socket.handshake.auth.token;
-        if (!token) {
-          return next(new Error("Authentication error: No token provided"));
-        }
-
-        const decoded: any = await tokenService.verifyToken(token);
-        const userId = decoded?.id || decoded?.userId;
-
-        if (!userId) {
-          return next(new Error("Authentication error: Invalid or expired token"));
-        }
-
-        socket.data.userId = userId;
-        next();
-      } catch (err) {
-        console.error("Socket authentication error:", err);
-        return next(new Error("Authentication error: Server validation failed"));
-      }
-    });
-
     // 🔌 2. CONNECTION EVENT
     this.io.on("connection", (socket) => {
       const userId = socket.data.userId; 
