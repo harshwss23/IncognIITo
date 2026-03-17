@@ -70,15 +70,29 @@ export class MatchController {
     try {
       const userId = req.user!.userId;
 
-      // Check active session first
+      // Check active session first (Redis)
       const roomId = await queueService.getActiveSession(userId);
       if (roomId) {
-        res.status(200).json({
-          success: true,
-          status: 'matched',
-          roomId,
-        });
-        return;
+        // Cross-validate: confirm DB also says this session is still active
+        // Prevents stale Redis keys (from crashes/restarts) from returning ghost roomIds
+        const dbCheck = await query(
+          `SELECT id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`,
+          [roomId]
+        );
+
+        if (dbCheck.rows.length === 0) {
+          // Redis says matched, but DB disagrees → stale key, self-heal
+          await queueService.clearActiveSession(userId);
+          console.log(`Cleared stale Redis session for user ${userId} (roomId: ${roomId} not active in DB)`);
+          // Fall through to idle below
+        } else {
+          res.status(200).json({
+            success: true,
+            status: 'matched',
+            roomId,
+          });
+          return;
+        }
       }
 
       // Check if in queue
@@ -100,52 +114,92 @@ export class MatchController {
     }
   }
 
+
   // POST /api/match/end
   // User ends the session (clicks "Next" or "Leave")
+  // async endSession(req: Request, res: Response): Promise<void> {
+  //   try {
+  //     const userId = req.user!.userId;
+
+  //     const roomId = await queueService.getActiveSession(userId);
+  //     if (!roomId) {
+  //       res.status(400).json({ success: false, message: 'No active session' });
+  //       return;
+  //     }
+
+  //     // Get session from DB to find the other user
+  //     const sessionResult = await query(
+  //       `SELECT id, user1_id, user2_id FROM matchmaking_sessions
+  //        WHERE room_id = $1 AND status = 'active'`,
+  //       [roomId]
+  //     );
+
+  //     if (sessionResult.rows.length > 0) {
+  //       const session = sessionResult.rows[0];
+  //       const partnerId = session.user1_id === userId
+  //         ? session.user2_id
+  //         : session.user1_id;
+
+  //       // Mark session as completed in PostgreSQL
+  //       await query(
+  //         `UPDATE matchmaking_sessions
+  //          SET status = 'completed', session_end = NOW()
+  //          WHERE id = $1`,
+  //         [session.id]
+  //       );
+
+  //       // Clear both users' session from Redis
+  //       await Promise.all([
+  //         queueService.clearActiveSession(userId),
+  //         queueService.clearActiveSession(partnerId),
+  //       ]);
+  //     }
+
+  //     res.status(200).json({ success: true, message: 'Session ended' });
+  //   } catch (error) {
+  //     console.error('End session error:', error);
+  //     res.status(500).json({ success: false, message: 'Failed to end session' });
+  //   }
+  // }
   async endSession(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user!.userId;
-
       const roomId = await queueService.getActiveSession(userId);
       if (!roomId) {
         res.status(400).json({ success: false, message: 'No active session' });
         return;
       }
-
+      // Always clear the caller's session from Redis immediately
+      await queueService.clearActiveSession(userId);  // ← MOVED OUT of the if block
       // Get session from DB to find the other user
       const sessionResult = await query(
         `SELECT id, user1_id, user2_id FROM matchmaking_sessions
-         WHERE room_id = $1 AND status = 'active'`,
+        WHERE room_id = $1 AND status = 'active'`,
         [roomId]
       );
-
       if (sessionResult.rows.length > 0) {
         const session = sessionResult.rows[0];
         const partnerId = session.user1_id === userId
           ? session.user2_id
           : session.user1_id;
-
         // Mark session as completed in PostgreSQL
         await query(
           `UPDATE matchmaking_sessions
-           SET status = 'completed', session_end = NOW()
-           WHERE id = $1`,
+          SET status = 'completed', session_end = NOW()
+          WHERE id = $1`,
           [session.id]
         );
-
-        // Clear both users' session from Redis
-        await Promise.all([
-          queueService.clearActiveSession(userId),
-          queueService.clearActiveSession(partnerId),
-        ]);
+        // Clear partner's session from Redis
+        await queueService.clearActiveSession(partnerId);  // ← Only partner here now
       }
-
       res.status(200).json({ success: true, message: 'Session ended' });
     } catch (error) {
       console.error('End session error:', error);
       res.status(500).json({ success: false, message: 'Failed to end session' });
     }
   }
+
 }
 
 export const matchController = new MatchController();
+
