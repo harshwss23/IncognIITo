@@ -17,7 +17,7 @@ export function LiveInteractionRoom() {
 
   // URL se Room ID nikalna aur Navigation setup
   const { roomId } = useParams<{ roomId: string }>()
-  const ROOM_ID = roomId as string
+  const ROOM_ID = roomId ?? ''
   const navigate = useNavigate()
 
   /* ---------------- REFS ---------------- */
@@ -139,6 +139,12 @@ export function LiveInteractionRoom() {
 
   /* ---------------- INIT & SOCKET LISTENERS ---------------- */
   useEffect(() => {
+    if (!ROOM_ID) {
+      setIsAuthorized(false)
+      setErrorReason('Missing room ID. Open this page using a valid match link.')
+      return
+    }
+
     if (initializedRef.current || !ROOM_ID) return
     initializedRef.current = true
 
@@ -162,7 +168,7 @@ export function LiveInteractionRoom() {
         const token = getAccessToken()
         if (!token) {
           alert('Authentication error. Please log in again.')
-          navigate('/login')
+          navigate('/landing')
           return
         }
 

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { socket } from "@/services/socket";
 import { Send, MessageSquare, ShieldCheck } from "lucide-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
-import { buildApiUrl } from "@/services/config";
+import { authFetch, ensureValidAccessToken } from "@/services/auth";
 
 type ChatMsg = {
   id: string | number;
@@ -32,22 +32,21 @@ export function FuturisticChatInterface() {
   // 1. Initialize Profile & Friends
   useEffect(() => {
     const init = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) return;
+      const token = await ensureValidAccessToken();
+      if (!token) {
+        setLoading(false);
+        return;
+      }
 
       try {
         // Fetch Me
-        const meRes = await fetch(buildApiUrl("/api/users/profile"), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const meRes = await authFetch("/api/users/profile");
         const meJson = await meRes.json();
         const currentId = safeStr(meJson?.data?.user?.id);
         setMyId(currentId);
 
         // Fetch Friends
-        const fRes = await fetch(buildApiUrl("/api/requests/mutual"), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const fRes = await authFetch("/api/requests/mutual");
         const fJson = await fRes.json();
         if (fRes.ok && fJson.success) {
           const list = fJson.data.requests || [];
@@ -82,10 +81,7 @@ export function FuturisticChatInterface() {
 
     // Fetch History
     const fetchHistory = async () => {
-      const token = localStorage.getItem("token");
-      const res = await fetch(buildApiUrl(`/api/chats/${activeFriend.chat_id}/messages`), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await authFetch(`/api/chats/${activeFriend.chat_id}/messages`);
       const json = await res.json();
       if (res.ok && json.success) {
         setMessages(json.data.messages.map((m: any) => ({
@@ -98,6 +94,9 @@ export function FuturisticChatInterface() {
     };
 
     fetchHistory();
+    if (!socket.connected) {
+      socket.connect();
+    }
     socket.emit("join_chat", { chatId: activeFriend.chat_id });
 
     // Handle incoming messages

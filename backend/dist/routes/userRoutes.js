@@ -13,7 +13,7 @@ const router = (0, express_1.Router)();
 // All user routes require authentication
 router.use(authMiddleware_1.authMiddleware.authenticate.bind(authMiddleware_1.authMiddleware));
 // GET /api/users/profile - Get user profile
-router.get("/", authMiddleware_1.authMiddleware.authenticate.bind(authMiddleware_1.authMiddleware), async (req, res) => {
+router.get("/", async (req, res) => {
     try {
         // ✅ Optional: only verified users can access
         // if (!req.user?.verified) {

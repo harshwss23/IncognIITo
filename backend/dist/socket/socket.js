@@ -21,14 +21,15 @@ function registerSocketHandlers(io) {
             const token = getToken(socket);
             if (!token)
                 return next(new Error("AUTH_REQUIRED"));
-            const payload = tokenService_1.tokenService.verifyToken(token);
+            const { payload, reason } = tokenService_1.tokenService.verifyTokenDetailed(token);
             if (!payload)
-                return next(new Error("INVALID_TOKEN"));
+                return next(new Error(reason === "expired" ? "TOKEN_EXPIRED" : "INVALID_TOKEN"));
             socket.user = {
                 userId: payload.userId,
                 email: payload.email,
                 verified: payload.verified,
             };
+            socket.data.userId = payload.userId;
             next();
         }
         catch {

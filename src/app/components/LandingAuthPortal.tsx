@@ -1,11 +1,13 @@
 import React from 'react';
 import { LogIn, Mail, Fingerprint, Shield, Users, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 
 export function LandingAuthPortal() {
   const colors = useThemeColors();
   const { theme } = useTheme();
+    const navigate = useNavigate();
   const isDark = theme === 'dark';
   
   return (
@@ -96,7 +98,9 @@ export function LandingAuthPortal() {
               {/* Actions */}
               <div className="space-y-4">
                   {/* SSO Button */}
-                  <button className={`group relative w-full overflow-hidden rounded-xl p-1 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
+                  <button
+                      onClick={() => navigate('/login')}
+                      className={`group relative w-full overflow-hidden rounded-xl p-1 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
                       ${isDark ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-slate-900'}`}>
                       <div className={`relative h-full w-full rounded-lg px-6 py-4 flex items-center justify-center gap-3 transition-all
                           ${isDark ? 'bg-[#0f172a] group-hover:bg-opacity-90' : 'bg-slate-900 text-white'}`}>
@@ -107,7 +111,9 @@ export function LandingAuthPortal() {
                   </button>
 
                   {/* Email Button */}
-                  <button className={`w-full rounded-xl px-6 py-4 border-2 font-bold flex items-center justify-center gap-3 transition-all duration-300 hover:bg-opacity-50
+                  <button
+                      onClick={() => navigate('/register')}
+                      className={`w-full rounded-xl px-6 py-4 border-2 font-bold flex items-center justify-center gap-3 transition-all duration-300 hover:bg-opacity-50
                       ${isDark 
                         ? 'border-white/10 text-white hover:bg-white/10' 
                         : 'border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'}`}>

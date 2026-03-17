@@ -88,7 +88,7 @@ export class QueueService {
 
     // Batch fetch all interests in ONE Redis call using MGET
     // Instead of N separate GET calls → single round trip ⚡
-    const interestKeys = members.map(m => `user:interests:${m.value}`);
+    const interestKeys = members.map((member: { value: string }) => `user:interests:${member.value}`);
     const interestValues = await redisClient.mGet(interestKeys);
 
     const entries: QueueEntry[] = [];

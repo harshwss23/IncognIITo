@@ -19,6 +19,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
 import { MatchingService } from "./services/matchingService";
 import { queueService } from "./services/queueService";
+import { registerSocketHandlers } from "./sockets/socketHandlers";
 
 // Load environment variables
 dotenv.config();
@@ -142,7 +143,8 @@ class Server {
 
   // ─── WEBRTC SOCKET LOGIC (SECURED) ──────────────────
   private initializeSockets(): void {
-    
+    registerSocketHandlers(this.io); // Puraane handlers
+
     // 1. SOCKET AUTHENTICATION MIDDLEWARE
     this.io.use(async (socket, next) => {
       try {
@@ -151,9 +153,8 @@ class Server {
           return next(new Error("Token is missing"));
         }
 
-        // Token verify karo aur userId nikalo
-        const decoded = await tokenService.verifyToken(token) as any;
-        socket.data.userId = decoded.userId || decoded.id; 
+        const decoded = (await tokenService.verifyToken(token)) as any;
+        socket.data.userId = decoded.userId || decoded.id;
 
         if (!socket.data.userId) {
           return next(new Error("Invalid token payload"));
@@ -162,10 +163,11 @@ class Server {
         next();
       } catch (error) {
         console.error("Socket Auth Error:", error);
-        next(new Error("Invalid or expired token")); 
+        next(new Error("Invalid or expired token"));
       }
     });
 
+    // 🔌 2. CONNECTION EVENT
     this.io.on("connection", (socket) => {
       const userId = socket.data.userId;
       console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId})`);
@@ -173,46 +175,47 @@ class Server {
       // ─── SECURE JOIN ROOM ──────────────
       socket.on("join_room", async (roomID) => {
         try {
-          // 1. Queue Service se real-time active session nikalo
           const assignedRoomId = await queueService.getActiveSession(userId);
 
-          // Validation: Check karo ki user kisi valid room ka hissa hai, aur kya wo wahi room hai
           if (!assignedRoomId || assignedRoomId !== roomID) {
-            console.warn(`🚨 Security: User ${userId} blocked from entering unauthorized Room ${roomID}`);
+            console.warn(
+              `🚨 Security: User ${userId} blocked from entering unauthorized Room ${roomID}`
+            );
             socket.emit("room_error", "You are not authorized to join this room.");
             return;
           }
 
-          // 2. Prevent Multiple Tabs & Room Overcrowding 
           const socketsInRoom = await this.io.in(roomID).fetchSockets();
-          
-          // Check if this specific user is already in the room (e.g., from another tab)
-          const isUserAlreadyInRoom = socketsInRoom.some(s => s.data.userId === userId);
-          
+
+          const isUserAlreadyInRoom = socketsInRoom.some(
+            (s) => s.data.userId === userId
+          );
+
           if (isUserAlreadyInRoom) {
-            console.warn(`⚠️ User ${userId} tried to join room ${roomID} multiple times (Multiple tabs).`);
-            socket.emit("room_error", "You are already connected to this session in another tab/window.");
+            console.warn(
+              `⚠️ User ${userId} tried to join room ${roomID} multiple times (Multiple tabs).`
+            );
+            socket.emit(
+              "room_error",
+              "You are already connected to this session in another tab/window."
+            );
             return;
           }
 
-          // Extra safety: A room should strictly have max 2 users
           if (socketsInRoom.length >= 2) {
             console.warn(`⚠️ Room ${roomID} is already full.`);
             socket.emit("room_error", "This room is already full.");
             return;
           }
 
-          // 3. Agar sab checks pass ho gaye, toh join allow karo
           socket.join(roomID);
-          
-          // ✅ FIX ADDED HERE: Mark this socket as successfully joined
+
           socket.data.hasSuccessfullyJoined = true;
-          
+
           console.log(`🔓 User ${userId} securely joined room ${roomID}`);
-          
+
           socket.emit("room_joined_success");
-          
-          // Dusre user ko alert karo ki partner aa gaya
+
           socket.to(roomID).emit("user_joined", socket.id);
         } catch (error) {
           console.error(`Room validation failed for user ${userId}:`, error);
@@ -228,35 +231,44 @@ class Server {
       });
 
       // ─── WEBRTC SIGNALING EVENTS (PURE RELAY) ──────────────
-      socket.on("offer", (data) => socket.to(data.roomID).emit("receive_offer", data));
-      socket.on("answer", (data) => socket.to(data.roomID).emit("receive_answer", data));
-      socket.on("ice_candidate", (data) => socket.to(data.roomID).emit("receive_ice_candidate", data));
-      
+      socket.on("offer", (data) =>
+        socket.to(data.roomID).emit("receive_offer", data)
+      );
+      socket.on("answer", (data) =>
+        socket.to(data.roomID).emit("receive_answer", data)
+      );
+      socket.on("ice_candidate", (data) =>
+        socket.to(data.roomID).emit("receive_ice_candidate", data)
+      );
+
       // ─── EXTRA DATA RELAY ──────────────
-      socket.on("send_message", (data) => socket.to(data.roomID).emit("receive_message", data));
-      socket.on("camera_status", (data) => socket.to(data.roomID).emit("receive_camera_status", data));
+      socket.on("send_message", (data) =>
+        socket.to(data.roomID).emit("receive_message", data)
+      );
+      socket.on("camera_status", (data) =>
+        socket.to(data.roomID).emit("receive_camera_status", data)
+      );
 
       // ─── DISCONNECT ──────────────
       socket.on("disconnect", async () => {
         console.log(`❌ Socket Disconnected: ${socket.id} (User: ${userId})`);
-        
+
         try {
-          // ✅ FIX ADDED HERE: Ignore disconnects from rejected sockets (like a second tab)
           if (!socket.data.hasSuccessfullyJoined) {
-            console.log(`⚠️ Ignored session cleanup for ${socket.id} (Was denied access / Second tab)`);
-            // Queue se zaroor hata do incase user matchmaking screen par wait karte hue tab close kar de
+            console.log(
+              `⚠️ Ignored session cleanup for ${socket.id} (Was denied access / Second tab)`
+            );
             await queueService.leaveQueue(userId).catch(() => {});
-            return; 
+            return;
           }
 
-          // Normal session cleanup for legit users
           const roomId = await queueService.getActiveSession(userId);
-          
-          if (roomId) {
-            // 1. Dusre user ko force redirect karne ke liye socket event bhejo
-            socket.to(roomId).emit("session_ended", "Your partner disconnected. Redirecting...");
 
-            // 2. Database aur Redis se session clear karo
+          if (roomId) {
+            socket
+              .to(roomId)
+              .emit("session_ended", "Your partner disconnected. Redirecting...");
+
             const sessionResult = await pool.query(
               `SELECT id, user1_id, user2_id FROM matchmaking_sessions 
                WHERE room_id = $1 AND status = 'active'`,
@@ -265,7 +277,7 @@ class Server {
 
             if (sessionResult.rows.length > 0) {
               const session = sessionResult.rows[0];
-              
+
               await pool.query(
                 `UPDATE matchmaking_sessions 
                  SET status = 'completed', session_end = NOW() 
@@ -273,14 +285,12 @@ class Server {
                 [session.id]
               );
 
-              // Clear active sessions
               await queueService.clearActiveSession(session.user1_id);
               await queueService.clearActiveSession(session.user2_id);
               console.log(`🧹 Cleaned up session ${roomId} due to disconnect.`);
             }
           } else {
-             // Failsafe: Agar active session nahi hai par user queue mein tha
-             await queueService.leaveQueue(userId).catch(() => {});
+            await queueService.leaveQueue(userId).catch(() => {});
           }
         } catch (error) {
           console.error("Error handling forceful disconnect cleanup:", error);
