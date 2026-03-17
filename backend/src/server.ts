@@ -18,7 +18,8 @@ import matchRoutes from "./routes/matchRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { tokenService } from "./services/tokenService";
 import { MatchingService } from "./services/matchingService";
-import { registerSocketHandlers } from "./socket/socket";
+import { queueService } from "./services/queueService";
+import { registerSocketHandlers } from "./sockets/socketHandlers";
 
 // Load environment variables
 dotenv.config();
@@ -140,92 +141,160 @@ class Server {
     this.app.use(errorHandler.notFound.bind(errorHandler));
   }
 
-  // ─── WEBRTC SIGNALING & OMEGLE-STYLE SECURITY LOGIC ──────────────────
+  // ─── WEBRTC SOCKET LOGIC (SECURED) ──────────────────
   private initializeSockets(): void {
     registerSocketHandlers(this.io); // Puraane handlers
 
+    // 1. SOCKET AUTHENTICATION MIDDLEWARE
+    this.io.use(async (socket, next) => {
+      try {
+        const token = socket.handshake.auth.token;
+        if (!token) {
+          return next(new Error("Token is missing"));
+        }
+
+        const decoded = (await tokenService.verifyToken(token)) as any;
+        socket.data.userId = decoded.userId || decoded.id;
+
+        if (!socket.data.userId) {
+          return next(new Error("Invalid token payload"));
+        }
+
+        next();
+      } catch (error) {
+        console.error("Socket Auth Error:", error);
+        next(new Error("Invalid or expired token"));
+      }
+    });
+
     // 🔌 2. CONNECTION EVENT
     this.io.on("connection", (socket) => {
-      const userId = socket.data.userId; 
+      const userId = socket.data.userId;
       console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId})`);
 
-      // HELPER: Room ko DB se permanently delete karna
-      const destroySession = async (roomID: string) => {
-        try {
-          await pool.query(
-            `DELETE FROM matchmaking_sessions WHERE room_id = $1`,
-            [roomID]
-          );
-          console.log(`🗑️ Deleted room ${roomID} from database (Session Ended).`);
-        } catch (err) {
-          console.error(`Error deleting room ${roomID}:`, err);
-        }
-      };
-
-      // ─── JOIN ROOM ──────────────
+      // ─── SECURE JOIN ROOM ──────────────
       socket.on("join_room", async (roomID) => {
         try {
-          // Check for Duplicate Tabs
-          const socketsInRoom = await this.io.in(roomID).fetchSockets();
-          const isAlreadyInRoom = socketsInRoom.some(s => s.data.userId === userId);
+          const assignedRoomId = await queueService.getActiveSession(userId);
 
-          if (isAlreadyInRoom) {
-            socket.emit("room_error", "You are already connected to this session from another tab/device.");
-            console.log(`⚠️ Blocked duplicate tab for User ${userId} in room ${roomID}`);
+          if (!assignedRoomId || assignedRoomId !== roomID) {
+            console.warn(
+              `🚨 Security: User ${userId} blocked from entering unauthorized Room ${roomID}`
+            );
+            socket.emit("room_error", "You are not authorized to join this room.");
             return;
           }
 
-          // Verify Database Access
-          const result = await pool.query(
-            `SELECT * FROM matchmaking_sessions 
-             WHERE room_id = $1 
-             AND (user1_id = $2 OR user2_id = $2) 
-             AND status = 'active'`,
-            [roomID, userId]
+          const socketsInRoom = await this.io.in(roomID).fetchSockets();
+
+          const isUserAlreadyInRoom = socketsInRoom.some(
+            (s) => s.data.userId === userId
           );
 
-          if (result.rows.length > 0) {
-            socket.join(roomID);
-            socket.emit("room_joined_success");
-            socket.to(roomID).emit("user_joined", socket.id);
-            console.log(`✅ User ${userId} joined room ${roomID}`);
-          } else {
-            socket.emit("room_error", "You are not authorized to join this room, or it has been ended.");
-            console.log(`❌ Unauthorized/Expired access blocked for User ${userId}`);
+          if (isUserAlreadyInRoom) {
+            console.warn(
+              `⚠️ User ${userId} tried to join room ${roomID} multiple times (Multiple tabs).`
+            );
+            socket.emit(
+              "room_error",
+              "You are already connected to this session in another tab/window."
+            );
+            return;
           }
+
+          if (socketsInRoom.length >= 2) {
+            console.warn(`⚠️ Room ${roomID} is already full.`);
+            socket.emit("room_error", "This room is already full.");
+            return;
+          }
+
+          socket.join(roomID);
+
+          socket.data.hasSuccessfullyJoined = true;
+
+          console.log(`🔓 User ${userId} securely joined room ${roomID}`);
+
+          socket.emit("room_joined_success");
+
+          socket.to(roomID).emit("user_joined", socket.id);
         } catch (error) {
-          console.error("Room join error:", error);
-          socket.emit("room_error", "Internal server error while verifying room.");
+          console.error(`Room validation failed for user ${userId}:`, error);
+          socket.emit("room_error", "Server error verifying your room.");
         }
       });
 
       // ─── MANUAL END CALL ──────────────
-      socket.on("leave_room", async (roomID) => {
+      socket.on("leave_room", (roomID) => {
         socket.leave(roomID);
-        // Dusre user ko alert bhej kar usko bhi matchmaking par bhej do
         socket.to(roomID).emit("session_ended", "Your partner has left the chat.");
-        await destroySession(roomID);
+        console.log(`🚪 User ${userId} left room ${roomID}`);
       });
 
-      // ─── ACCIDENTAL DISCONNECT (Tab closed, network drop) ──────────────
-      socket.on("disconnecting", async () => {
-        for (const roomID of socket.rooms) {
-          if (roomID !== socket.id) { // Apna khud ka default room ignore karo
-            socket.to(roomID).emit("session_ended", "Your partner got disconnected randomly.");
-            await destroySession(roomID);
+      // ─── WEBRTC SIGNALING EVENTS (PURE RELAY) ──────────────
+      socket.on("offer", (data) =>
+        socket.to(data.roomID).emit("receive_offer", data)
+      );
+      socket.on("answer", (data) =>
+        socket.to(data.roomID).emit("receive_answer", data)
+      );
+      socket.on("ice_candidate", (data) =>
+        socket.to(data.roomID).emit("receive_ice_candidate", data)
+      );
+
+      // ─── EXTRA DATA RELAY ──────────────
+      socket.on("send_message", (data) =>
+        socket.to(data.roomID).emit("receive_message", data)
+      );
+      socket.on("camera_status", (data) =>
+        socket.to(data.roomID).emit("receive_camera_status", data)
+      );
+
+      // ─── DISCONNECT ──────────────
+      socket.on("disconnect", async () => {
+        console.log(`❌ Socket Disconnected: ${socket.id} (User: ${userId})`);
+
+        try {
+          if (!socket.data.hasSuccessfullyJoined) {
+            console.log(
+              `⚠️ Ignored session cleanup for ${socket.id} (Was denied access / Second tab)`
+            );
+            await queueService.leaveQueue(userId).catch(() => {});
+            return;
           }
+
+          const roomId = await queueService.getActiveSession(userId);
+
+          if (roomId) {
+            socket
+              .to(roomId)
+              .emit("session_ended", "Your partner disconnected. Redirecting...");
+
+            const sessionResult = await pool.query(
+              `SELECT id, user1_id, user2_id FROM matchmaking_sessions 
+               WHERE room_id = $1 AND status = 'active'`,
+              [roomId]
+            );
+
+            if (sessionResult.rows.length > 0) {
+              const session = sessionResult.rows[0];
+
+              await pool.query(
+                `UPDATE matchmaking_sessions 
+                 SET status = 'completed', session_end = NOW() 
+                 WHERE id = $1`,
+                [session.id]
+              );
+
+              await queueService.clearActiveSession(session.user1_id);
+              await queueService.clearActiveSession(session.user2_id);
+              console.log(`🧹 Cleaned up session ${roomId} due to disconnect.`);
+            }
+          } else {
+            await queueService.leaveQueue(userId).catch(() => {});
+          }
+        } catch (error) {
+          console.error("Error handling forceful disconnect cleanup:", error);
         }
-      });
-
-      // ─── WEBRTC SIGNALING EVENTS ──────────────
-      socket.on("offer", (data) => socket.to(data.roomID).emit("receive_offer", data));
-      socket.on("send_message", (data) => socket.to(data.roomID).emit("receive_message", data));
-      socket.on("answer", (data) => socket.to(data.roomID).emit("receive_answer", data));
-      socket.on("camera_status", (data) => socket.to(data.roomID).emit("receive_camera_status", data));
-      socket.on("ice_candidate", (data) => socket.to(data.roomID).emit("receive_ice_candidate", data));
-
-      socket.on("disconnect", () => {
-        console.log(`❌ Socket Disconnected: ${socket.id} (User ID: ${userId})`);
       });
     });
   }

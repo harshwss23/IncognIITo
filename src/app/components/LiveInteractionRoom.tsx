@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useThemeColors } from '@/app/hooks/useThemeColors'
 import { useTheme } from '@/app/contexts/ThemeContext'
-import { getAccessToken } from '@/services/auth' // Apna path check kar lena
+import { getAccessToken } from '@/services/auth'
 
 const SOCKET_SERVER_URL = 'http://localhost:5050'
 
@@ -38,10 +38,16 @@ export function LiveInteractionRoom() {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null) 
   const [errorReason, setErrorReason] = useState<string>('') 
   
+  // 🚨 NAYA REF: Tab close hone pe state track karne ke liye (taaki dusra tab API hit na kare)
+  const isAuthorizedRef = useRef<boolean | null>(null)
+
   const [micOn, setMicOn] = useState(false)
   const [cameraOn, setCameraOn] = useState(false)
   const [remoteCameraOn, setRemoteCameraOn] = useState(false)
   const [remoteConnected, setRemoteConnected] = useState(false)
+  
+  // Autoplay block handle karne ke liye
+  const [autoplayError, setAutoplayError] = useState(false)
 
   const [msgInput, setMsgInput] = useState('')
   const [chatMessages, setChatMessages] = useState<any[]>([
@@ -54,6 +60,11 @@ export function LiveInteractionRoom() {
   ])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // 🚨 Jab bhi isAuthorized state change ho, usko ref mein sync karo
+  useEffect(() => {
+    isAuthorizedRef.current = isAuthorized
+  }, [isAuthorized])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -76,6 +87,16 @@ export function LiveInteractionRoom() {
       remoteStreamRef.current = event.streams[0]
       if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== event.streams[0]) {
         remoteVideoRef.current.srcObject = event.streams[0]
+        
+        // Autoplay Policy Fix
+        setTimeout(() => {
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.play().catch((error) => {
+              console.warn("Autoplay policy blocked audio/video playback:", error)
+              setAutoplayError(true)
+            })
+          }
+        }, 500)
       }
       setRemoteConnected(true)
     }
@@ -101,6 +122,7 @@ export function LiveInteractionRoom() {
     remoteStreamRef.current = null
     setRemoteConnected(false)
     setRemoteCameraOn(false)
+    setAutoplayError(false)
   }
 
   const fullCleanup = () => {
@@ -128,7 +150,14 @@ export function LiveInteractionRoom() {
 
     const init = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } 
+        });
         stream.getTracks().forEach((track) => (track.enabled = false))
         localStreamRef.current = stream
 
@@ -150,7 +179,6 @@ export function LiveInteractionRoom() {
 
         socketRef.current = socket
 
-        // 🚨 Middleware Rejection Catch
         socket.on("connect_error", (err) => {
           console.error("Socket Connection Error:", err.message);
           setIsAuthorized(false);
@@ -162,24 +190,22 @@ export function LiveInteractionRoom() {
           socket.emit('join_room', ROOM_ID)
         })
 
-        // 🚨 Room Join Rejection
         socket.on('room_error', (errorMsg) => {
           setIsAuthorized(false)
           setErrorReason(errorMsg)
           fullCleanup()
         })
 
-        // ✅ Room Join Success
         socket.on('room_joined_success', () => {
           setIsAuthorized(true)
         })
 
-        // 🔴 NAYA EVENT: Jab room delete ho jaye (manual ya tab close)
+        // 🚨 EK HI SESSION ENDED LISTENER HAI AB
         socket.on('session_ended', (message) => {
-          alert(message || "The session has ended. Redirecting you to matchmaking...");
+          console.log(message);
           fullCleanup();
-          navigate('/matchmaking'); // Wapas matchmaking page par bhej do
-        })
+          navigate(`/session/${ROOM_ID}`); 
+        });
 
         // WEBRTC SIGNALING
         socket.on('user_joined', async () => {
@@ -239,6 +265,13 @@ export function LiveInteractionRoom() {
     }
   }, [createPeer, ROOM_ID, navigate])
 
+  /* ---------------- FIX: Re-attach Local Video on Authorization ---------------- */
+  useEffect(() => {
+    if (isAuthorized && localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current
+    }
+  }, [isAuthorized])
+
   /* ---------------- CONTROLS ---------------- */
   const toggleMic = () => {
     if (!localStreamRef.current) return
@@ -274,13 +307,61 @@ export function LiveInteractionRoom() {
     setMsgInput('')
   }
 
-  const endCall = () => {
-    // Backend ko alert karo ki manual disconnect hua hai
-    if (socketRef.current) {
-      socketRef.current.emit('leave_room', ROOM_ID)
+  // 1. Intentional End Call (Button Click)
+  const endCall = async () => {
+    try {
+      await fetch('http://localhost:5050/api/match/end', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getAccessToken()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      console.error("Failed to hit end API", error);
     }
-    fullCleanup()
-    navigate('/matchmaking') // Khud ko matchmaking par bhej do
+
+    if (socketRef.current) {
+      socketRef.current.emit('leave_room', ROOM_ID);
+    }
+
+    fullCleanup();
+    navigate(`/session/${ROOM_ID}`);
+  }
+
+  // 2. Tab Close / Browser Exit Handle Karna
+  useEffect(() => {
+    const handleTabClose = () => {
+      // 🚨 FIX: Sirf authorized tab hi ye API hit karega (Dusra tab close hone pe ignore hoga)
+      if (isAuthorizedRef.current === true) {
+        const token = getAccessToken();
+        if (token) {
+          fetch('http://localhost:5050/api/match/end', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            keepalive: true 
+          });
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleTabClose);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleTabClose);
+    };
+  }, []);
+
+  const handlePlayRemote = () => {
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.muted = false; 
+      remoteVideoRef.current.play().then(() => {
+        setAutoplayError(false)
+      }).catch(err => console.error("Playback failed even after user interaction:", err))
+    }
   }
 
   /* ---------------- UNAUTHORIZED / LOADING UI ---------------- */
@@ -293,7 +374,7 @@ export function LiveInteractionRoom() {
           {errorReason || "You are not authorized to join this room."}
         </p>
         <button onClick={() => navigate('/matchmaking')} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-          Find a New Match
+          Return to Matchmaking
         </button>
       </div>
     )
@@ -339,9 +420,22 @@ export function LiveInteractionRoom() {
               </div>
             )}
 
-            {remoteConnected && !remoteCameraOn && (
+            {remoteConnected && !remoteCameraOn && !autoplayError && (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-900 text-slate-400 z-10 font-medium">
                 PARTNER CAMERA OFF
+              </div>
+            )}
+
+            {/* 🚨 TAP TO UNMUTE OVERLAY */}
+            {autoplayError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 text-white z-20 backdrop-blur-sm">
+                <p className="mb-4 text-lg font-medium">Browser blocked audio</p>
+                <button 
+                  onClick={handlePlayRemote} 
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 transition-colors text-white rounded-lg shadow-lg"
+                >
+                  Tap to Play & Unmute
+                </button>
               </div>
             )}
           </div>
