@@ -32,8 +32,8 @@ export class MatchingService {
   // Called once from server.ts when the server starts
   start(): void {
     if (this.intervalId) return; // Already running
-    this.intervalId = setInterval(() => this.runMatchingCycle(), 500);
-    console.log('✅ Matching loop started (every 500ms)');
+    this.intervalId = setInterval(() => this.runMatchingCycle(), 1000);
+    console.log('✅ Matching loop started (every 1000ms)');
   }
 
   // ─── STOP MATCHING LOOP ──────────────────────────────────────────────
@@ -45,7 +45,7 @@ export class MatchingService {
   }
 
   // ─── ONE MATCHING CYCLE ──────────────────────────────────────────────
-  // This runs every 500ms. Single thread, no overlap.
+  // This runs every 1000ms. Single thread, no overlap.
   private async runMatchingCycle(): Promise<void> {
     if (this.isRunning) return; // Previous cycle still running, skip
     this.isRunning = true;
