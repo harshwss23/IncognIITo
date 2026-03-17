@@ -139,7 +139,7 @@ export function LiveInteractionRoom() {
         const token = getAccessToken()
         if (!token) {
           alert('Authentication error. Please log in again.')
-          navigate('/login')
+          navigate('/landing')
           return
         }
 

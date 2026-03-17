@@ -15,7 +15,7 @@ export function AppShell() {
     const isPublicPath = publicPaths.some((path) => location.pathname.startsWith(path));
 
     if ((!token || isTokenExpired(token)) && !isPublicPath) {
-      navigate("/login");
+      navigate("/landing");
     }
   }, [location, navigate]);
 

@@ -32,7 +32,7 @@ export default function AppRoutes() {
         <Route path="/forgot" element={<ForgotPasswordScreen />} />
 
         {/* Protected Routes */}
-        <Route path="/" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
+        <Route path="/" element={<Navigate to="/landing" replace />} />
         <Route path="/chat" element={<ProtectedRoute><FuturisticChatInterface /></ProtectedRoute>} />
         <Route path="/requests" element={<ProtectedRoute><ChatRequestsDashboard /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />

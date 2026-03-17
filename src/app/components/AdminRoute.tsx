@@ -68,7 +68,7 @@ export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   }, [token]);
 
   if (!token || isTokenExpired(token)) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/landing" state={{ from: location }} replace />;
   }
 
   if (isChecking) {
@@ -76,7 +76,7 @@ export const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/login?next=/admin" replace />;
+    return <Navigate to="/landing" replace />;
   }
 
   return <>{children}</>;

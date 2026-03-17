@@ -152,7 +152,7 @@ export async function authFetch(path: string, init: RequestInit = {}, retryOnUna
 
     if (!isPublicPath) {
       clearAuthTokens();
-      window.location.href = "/login";
+      window.location.href = "/";
     }
     return response;
   }
