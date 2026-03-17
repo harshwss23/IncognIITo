@@ -37,7 +37,7 @@ export default function AppRoutes() {
         <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
         <Route path="/live/:roomId" element={<LiveInteractionRoom />} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-        <Route path="/session" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
+        <Route path="/session/:roomid" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
