@@ -1,23 +1,99 @@
-import React, { useState } from 'react';
-import { User, Award, X, LogOut, Camera, Plus } from 'lucide-react';
-import { useThemeColors } from '@/app/hooks/useThemeColors';
+import React, { useEffect, useState } from 'react';
+import { User, Award, X, LogOut, Camera, Plus, Loader2, AlertCircle, Check } from 'lucide-react';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import { ApiError, clearAuthTokens } from '@/services/auth';
+import { getUserProfile, updateUserProfile, UserProfile as UserProfileModel } from '@/services/user';
+import { INTERESTS } from '@/app/constants/interests';
 
 export function UserProfile() {
-  const colors = useThemeColors();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  const [displayName, setDisplayName] = useState('CyberUser47');
-  const [totalReports] = useState(128);
+  const [profile, setProfile] = useState<UserProfileModel | null>(null);
+  const [displayName, setDisplayName] = useState('');
+  const [interests, setInterests] = useState<string[]>([]);
+  const [totalReports, setTotalReports] = useState(0);
+  const [rating, setRating] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const [interests, setInterests] = useState([
-    'Competitive Programming',
-    'Anime',
-    'Machine Learning',
-    'Game Dev',
-    'Photography'
-  ]);
+  const handleAuthFailure = (status: number) => {
+    if (status === 401) {
+      clearAuthTokens();
+      window.location.assign('/login');
+    }
+  };
+
+  const loadProfile = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const user = await getUserProfile();
+      setProfile(user);
+      setDisplayName(user.displayName ?? '');
+      setInterests(user.interests ?? []);
+      setTotalReports(user.totalReports ?? 0);
+      setRating(user.rating ?? 0);
+    } catch (err: unknown) {
+      console.error('Failed to load profile:', err);
+
+      if (err instanceof ApiError) {
+        handleAuthFailure(err.status);
+        setError(err.message || 'Failed to load profile');
+      } else {
+        setError('Failed to load profile');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadProfile();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      await updateUserProfile({ displayName, interests });
+      setProfile((prev) => (prev ? { ...prev, displayName, interests } : prev));
+      setSuccess('Profile updated');
+    } catch (err: unknown) {
+      console.error('Update profile error:', err);
+
+      if (err instanceof ApiError) {
+        handleAuthFailure(err.status);
+        setError(err.message || 'Failed to update profile');
+      } else {
+        setError('Failed to update profile');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLogout = () => {
+    clearAuthTokens();
+    window.location.assign('/login');
+  };
+
+  if (loading) {
+    return (
+      <div className={`w-full h-full flex items-center justify-center ${isDark ? 'bg-[#020617]' : 'bg-white'}`}>
+        <div className="flex items-center gap-3 text-lg font-semibold">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+          <span className={isDark ? 'text-white' : 'text-slate-800'}>Loading profile...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -66,6 +142,23 @@ export function UserProfile() {
 
         {/* Edit name */}
         <div className="flex-1 px-8 space-y-6">
+          {(error || success) && (
+            <div
+              className={`rounded-xl p-3 text-sm font-medium flex items-center gap-2 border ${
+                error
+                  ? isDark
+                    ? 'bg-red-900/40 text-red-200 border-red-500/40'
+                    : 'bg-red-50 text-red-700 border-red-200'
+                  : isDark
+                    ? 'bg-emerald-900/40 text-emerald-200 border-emerald-500/40'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}
+            >
+              {error ? <AlertCircle className="w-4 h-4" /> : <Check className="w-4 h-4" />}
+              <span>{error || success}</span>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label
               className={`text-sm font-bold uppercase tracking-wider
@@ -87,17 +180,21 @@ export function UserProfile() {
           </div>
 
           <button
+            onClick={handleSave}
+            disabled={saving}
             className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-transform
             hover:scale-[1.02] active:scale-[0.98]
-            ${isDark ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-900 hover:bg-slate-800'}`}
+            ${isDark ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-900 hover:bg-slate-800'}
+            ${saving ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            Save Changes
+            {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
 
         {/* Logout */}
         <div className="p-8 border-t border-inherit">
           <button
+            onClick={handleLogout}
             className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 border-2 transition-colors
             ${isDark
               ? 'border-red-500/20 text-red-400 hover:bg-red-500/10'
@@ -120,7 +217,7 @@ export function UserProfile() {
         {/* STATS */}
         <div className="grid grid-cols-3 gap-6 mb-10">
           <StatCard title="Total Reports" value={totalReports} isDark={isDark} />
-          <StatCard title="Reputation" value="4.8★" highlight isDark={isDark} />
+          <StatCard title="Reputation" value={`${rating.toFixed(1)}★`} highlight isDark={isDark} />
           <StatCard title="Interests" value={interests.length} isDark={isDark} />
         </div>
 
@@ -145,7 +242,8 @@ export function UserProfile() {
 
           <div className="text-right">
             <div className={`text-7xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              4.8<span className="text-4xl text-yellow-500 ml-2">★</span>
+              {rating.toFixed(1)}
+              <span className="text-4xl text-yellow-500 ml-2">★</span>
             </div>
             <div className="text-green-500 font-medium mt-1">
               Excellent Standing
@@ -161,34 +259,45 @@ export function UserProfile() {
           <h3 className={`text-xl font-bold mb-6 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             Interest Tags
           </h3>
-
           <div className="flex flex-wrap gap-3">
-            {interests.map((interest, idx) => (
-              <div
-                key={idx}
-                className={`group flex items-center gap-3 pl-5 pr-3 py-3 rounded-full border
-                ${isDark
-                  ? 'bg-[#020617] border-white/10 text-white'
-                  : 'bg-slate-50 border-slate-200 text-slate-700'
-                }`}
-              >
-                <span>{interest}</span>
-                <button className="opacity-0 group-hover:opacity-100 transition">
-                  <X className="w-4 h-4 text-red-400" />
+            {INTERESTS.map((interest) => {
+              const selected = interests.includes(interest);
+              return (
+                <button
+                  key={interest}
+                  type="button"
+                  onClick={() => {
+                    setInterests((prev) =>
+                      prev.includes(interest)
+                        ? prev.filter((item) => item !== interest)
+                        : [...prev, interest]
+                    );
+                  }}
+                  className={`group flex items-center gap-3 pl-5 pr-3 py-3 rounded-full border transition
+                  ${selected
+                    ? isDark
+                      ? 'bg-blue-600/20 border-blue-500 text-white'
+                      : 'bg-blue-50 border-blue-400 text-blue-700'
+                    : isDark
+                      ? 'bg-[#020617] border-white/10 text-white'
+                      : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  <span>{interest}</span>
+                  <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs
+                    ${selected
+                      ? isDark
+                        ? 'border-blue-300 text-blue-100'
+                        : 'border-blue-500 text-blue-600'
+                      : isDark
+                        ? 'border-white/20 text-white/60'
+                        : 'border-slate-300 text-slate-400'
+                    }`}>
+                    {selected ? '✓' : '+'}
+                  </span>
                 </button>
-              </div>
-            ))}
-
-            <button
-              className={`flex items-center gap-2 px-5 py-3 rounded-full border border-dashed
-              ${isDark
-                ? 'border-slate-700 text-slate-500 hover:text-white'
-                : 'border-slate-300 text-slate-400 hover:text-blue-600'
-              }`}
-            >
-              <Plus className="w-5 h-5" />
-              Add Tag
-            </button>
+              );
+            })}
           </div>
         </div>
       </div>
