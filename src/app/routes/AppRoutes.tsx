@@ -18,6 +18,7 @@ import { AdminDashboard } from "@/app/components/AdminDashboard";
 import { ForgotPasswordScreen } from "@/app/components/ForgptPassword";
 import { HomePageScreen } from "@/app/components/Homepage";
 import { ActiveUsersScreen } from "../components/ActiveUsersScreen";
+import { MatchingBuffer } from "@/app/components/MatchingBuffer";
 
 export default function AppRoutes() {
   return (
@@ -35,6 +36,7 @@ export default function AppRoutes() {
         <Route path="/chat" element={<ProtectedRoute><FuturisticChatInterface /></ProtectedRoute>} />
         <Route path="/requests" element={<ProtectedRoute><ChatRequestsDashboard /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
+        <Route path="/match-waiting" element={<ProtectedRoute><MatchingBuffer /></ProtectedRoute>} />
         <Route path="/live/:roomId" element={<LiveInteractionRoom />} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
         <Route path="/session" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />

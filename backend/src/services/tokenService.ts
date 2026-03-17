@@ -4,7 +4,7 @@
 // - Generates JWT access tokens (15min expiry)
 // - Generates refresh tokens (7 days expiry)
 // - Validates and decodes tokens
-// - Stores tokens in database for session management
+// - Stores tokens in database for session management..
 
 import jwt from 'jsonwebtoken';
 import { query } from '../config/database';

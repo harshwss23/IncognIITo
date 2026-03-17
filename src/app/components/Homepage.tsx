@@ -20,7 +20,9 @@ export function HomePageScreen() {
   const isDark = theme === "dark";
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState("home"); // home | requests | chats | match | profile
+  const [activeTab, setActiveTab] = useState('home'); // home | requests | chats | match | profile
+  const [isJoiningQueue, setIsJoiningQueue] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
 
   // ✅ profile state
   const [user, setUser] = useState(null);
@@ -81,6 +83,48 @@ export function HomePageScreen() {
     localStorage.removeItem("token");
     localStorage.removeItem("refreshToken");
     window.location.href = "/login";
+  };
+
+  // Handle Continue button click when activeTab is "match"
+  const handleContinueClick = async () => {
+    if (activeTab !== "match") {
+      return;
+    }
+
+    setIsJoiningQueue(true);
+    setQueueError(null);
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setQueueError("Authentication token not found");
+        setIsJoiningQueue(false);
+        return;
+      }
+
+      const res = await fetch(buildApiUrl("/api/match/join"), {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setQueueError(data.message || "Failed to join matching queue");
+        setIsJoiningQueue(false);
+        return;
+      }
+
+      // Successfully joined queue, navigate to waiting screen
+      navigate("/match-waiting");
+    } catch (err) {
+      console.error("Join queue error:", err);
+      setQueueError("Failed to connect to server");
+      setIsJoiningQueue(false);
+    }
   };
 
   const navItems = [
@@ -277,10 +321,21 @@ export function HomePageScreen() {
                 <MiniStep isDark={isDark} n="02" t="Take action" d="Accept/decline, open chats, or join queue." />
                 <MiniStep isDark={isDark} n="03" t="Stay safe" d="Use report/block if anything feels wrong." />
 
-                <button className="mt-3 w-full group relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-3 text-white font-bold text-sm shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                {queueError && (
+                  <div className={`rounded-2xl border p-4 ${isDark ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'}`}>
+                    <p className={`text-sm font-semibold ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                      ⚠️ {queueError}
+                    </p>
+                  </div>
+                )}
+
+                <button 
+                  onClick={handleContinueClick}
+                  disabled={isJoiningQueue}
+                  className="mt-3 w-full group relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-3 text-white font-bold text-sm shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
                   <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
                   <div className="relative flex items-center justify-center gap-2">
-                    <span>Continue</span>
+                    <span>{isJoiningQueue ? 'Joining...' : 'Continue'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </button>
