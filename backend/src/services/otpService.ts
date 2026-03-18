@@ -59,6 +59,7 @@ export class OTPService {
     let userResult = await query('SELECT id, verified FROM users WHERE email = $1', [email]);
     let userId: number;
 
+// DISPLAY NAMES
     if (userResult.rows.length === 0) {
       // Generate random default display name
       const adjectives = ['Wild', 'Silent', 'Hidden', 'Phantom', 'Shadow', 'Mystic', 'Neon', 'Cosmic', 'Stealth'];
