@@ -146,6 +146,92 @@ export class MatchController {
       res.status(500).json({ success: false, message: 'Failed to end session' });
     }
   }
+
+  // POST /api/match/rate
+  // User rates the person they just chatted with (optional)
+  async rateUser(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { rating } = req.body;
+
+      // Validate rating if provided
+      if (rating !== null && rating !== undefined) {
+        if (rating < 1 || rating > 5 || !Number.isInteger(rating)) {
+          res.status(400).json({
+            success: false,
+            message: 'Rating must be an integer between 1 and 5'
+          });
+          return;
+        }
+      }
+
+      // Get the current session's room ID
+      const roomId = await queueService.getActiveSession(userId);
+      if (!roomId) {
+        res.status(400).json({ success: false, message: 'No active session found' });
+        return;
+      }
+
+      // Get session from DB to find the other user
+      const sessionResult = await query(
+        `SELECT id, user1_id, user2_id FROM matchmaking_sessions
+         WHERE room_id = $1 AND (status = 'active' OR status = 'completed')`,
+        [roomId]
+      );
+
+      if (sessionResult.rows.length === 0) {
+        res.status(400).json({ success: false, message: 'Session not found' });
+        return;
+      }
+
+      const session = sessionResult.rows[0];
+      const targetUserId = session.user1_id === userId
+        ? session.user2_id
+        : session.user1_id;
+
+      // Only update rating if provided
+      if (rating !== null && rating !== undefined) {
+        const profileResult = await query(
+          `SELECT rating, rating_count FROM user_profiles WHERE user_id = $1`,
+          [targetUserId]
+        );
+
+        let newRating = rating;
+        let newRatingCount = 1;
+
+        if (profileResult.rows.length > 0) {
+          const { rating: currentRating, rating_count: currentCount } = profileResult.rows[0];
+          newRatingCount = (currentCount || 0) + 1;
+          
+          // Calculate weighted average: (current_rating * current_count + new_rating) / new_count
+          newRating = ((currentRating * (currentCount || 0)) + rating) / newRatingCount;
+        }
+
+        // Update user profile with new rating and rating count
+        await query(
+          `UPDATE user_profiles
+           SET rating = $1, rating_count = $2, updated_at = NOW()
+           WHERE user_id = $3`,
+          [newRating, newRatingCount, targetUserId]
+        );
+
+        res.status(200).json({
+          success: true,
+          message: 'Rating submitted successfully',
+          newRating: newRating.toFixed(2),
+          ratingCount: newRatingCount
+        });
+      } else {
+        res.status(200).json({
+          success: true,
+          message: 'Feedback submitted successfully'
+        });
+      }
+    } catch (error) {
+      console.error('Rate user error:', error);
+      res.status(500).json({ success: false, message: 'Failed to submit feedback' });
+    }
+  }
 }
 
 export const matchController = new MatchController();

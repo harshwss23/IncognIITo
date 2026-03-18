@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     total_chats INTEGER DEFAULT 0,
     total_reports INTEGER DEFAULT 0,
     rating DECIMAL(3, 2) DEFAULT 0.00 CHECK (rating >= 0 AND rating <= 5),
+    rating_count INTEGER DEFAULT 0,
     is_banned BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

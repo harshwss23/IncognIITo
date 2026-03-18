@@ -1,17 +1,54 @@
 import React, { useState } from 'react';
-import { Star, AlertTriangle, X, Check, ThumbsUp, UserPlus } from 'lucide-react';
+import { Star, AlertTriangle, X, Check, ThumbsUp, UserPlus, Loader2 } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import { authFetch } from '@/services/auth';
+import { useNavigate } from 'react-router-dom';
 
 export function PostSessionModal() {
   const colors = useThemeColors();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const navigate = useNavigate();
   
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [requestSent, setRequestSent] = useState(false);
   const [reportMode, setReportMode] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+
+  const handleSubmitFeedback = async () => {
+    setIsSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const response = await authFetch('/api/match/rate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rating: rating || null }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to submit feedback');
+      }
+
+      setSubmitSuccess(true);
+      // Redirect to matchmaking after 2 seconds
+      setTimeout(() => {
+        navigate('/matchmaking');
+      }, 2000);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Failed to submit feedback');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     // MAIN CONTAINER: Full Screen Overlay
@@ -118,12 +155,40 @@ export function PostSessionModal() {
             {/* Bottom Actions */}
             <div className="w-full max-w-md space-y-5">
                 {/* Submit Button */}
-                <button className={`w-full py-5 rounded-2xl font-black text-xl text-white shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
-                    ${isDark 
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-blue-500/20' 
-                        : 'bg-slate-900 hover:bg-slate-800 hover:shadow-2xl'}`}>
-                    Submit Feedback
+                <button 
+                    onClick={handleSubmitFeedback}
+                    disabled={isSubmitting || submitSuccess}
+                    className={`w-full py-5 rounded-2xl font-black text-xl text-white shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2
+                    ${submitSuccess
+                        ? (isDark 
+                            ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:shadow-emerald-500/20' 
+                            : 'bg-emerald-600 hover:shadow-emerald-600')
+                        : (isDark 
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed' 
+                            : 'bg-slate-900 hover:bg-slate-800 hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed')
+                    }`}>
+                    {isSubmitting ? (
+                        <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            <span>Submitting...</span>
+                        </>
+                    ) : submitSuccess ? (
+                        <>
+                            <Check className="w-5 h-5" />
+                            <span>Feedback Sent!</span>
+                        </>
+                    ) : (
+                        <span>Submit Feedback</span>
+                    )}
                 </button>
+
+                {/* Error Message */}
+                {submitError && (
+                    <div className={`p-4 rounded-lg flex items-center gap-2 ${isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600'}`}>
+                        <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                        <span className="text-sm">{submitError}</span>
+                    </div>
+                )}
 
                 {/* Report Link */}
                 <button 
