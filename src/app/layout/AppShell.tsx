@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ThemeToggle } from "@/app/components/ThemeToggle";
 import { useThemeColors } from "@/app/hooks/useThemeColors";
 import { getAccessToken, isTokenExpired } from "@/services/auth";
 
@@ -11,11 +10,13 @@ export function AppShell() {
 
   useEffect(() => {
     const token = getAccessToken();
-    const publicPaths = ["/login", "/register", "/landing", "/forgot"];
-    const isPublicPath = publicPaths.some((path) => location.pathname.startsWith(path));
+    const publicPaths = ["/", "/login", "/register", "/forgot"];
+    const isPublicPath = publicPaths.some((path) => 
+      path === "/" ? location.pathname === "/" : location.pathname.startsWith(path)
+    );
 
     if ((!token || isTokenExpired(token)) && !isPublicPath) {
-      navigate("/landing");
+      navigate("/");
     }
   }, [location, navigate]);
 
@@ -30,12 +31,6 @@ export function AppShell() {
             backgroundSize: "100px 100px, 100px 100px, 20px 20px, 20px 20px",
           }}
         />
-      </div>
-
-      {/* FLOATING CONTROLS */}
-      <div className="fixed top-6 right-8 z-[100] flex items-center gap-4 bg-white/10 backdrop-blur-md p-2 rounded-full border border-white/20 shadow-lg">
-        <span className={`text-xs font-bold px-2 ${colors.textPrimary}`}>App</span>
-        <ThemeToggle />
       </div>
 
       {/* ROUTE CONTENT */}

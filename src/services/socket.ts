@@ -10,13 +10,25 @@ export const socket = io(socketUrl, {
   transports: ["websocket"],
 });
 
+// Listener for matchmaking events
+// This is called when the backend matches two users
+socket.on("matched", (payload: { roomId: string; matchScore: number; event: string }) => {
+  console.log("✅ Matched event received:", payload);
+  // The MatchingBuffer component will listen for this event and navigate to live room
+});
+
+// Listener for connection errors
+socket.on("disconnect", () => {
+  console.warn("⚠️ Socket disconnected");
+});
+
 socket.on("connect_error", (error) => {
   if (error.message === "TOKEN_EXPIRED" || error.message === "INVALID_TOKEN" || error.message === "AUTH_REQUIRED") {
     clearAuthTokens();
     socket.disconnect();
 
-    if (window.location.pathname !== "/landing") {
-      window.location.href = "/landing";
+    if (window.location.pathname !== "/") {
+      window.location.href = "/";
     }
   }
 });

@@ -8,7 +8,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!token || isTokenExpired(token)) {
     // Redirect to login but save the current location to redirect back after login
-    return <Navigate to="/landing" state={{ from: location }} replace />;
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

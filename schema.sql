@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 -- ============================================
 -- IncognIITo Database Schema (Idempotent)
 -- Run from project root with a local superuser role:
@@ -247,7 +246,6 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO incogniito_user;
 -- \d user_profiles
 -- \d verification_tokens
 -- \d sessions
-=======
 -- ============================================
 -- IncognIITo Database Schema (Idempotent)
 -- Run from project root with a local superuser role:
@@ -491,4 +489,4 @@ $$ LANGUAGE plpgsql;
 GRANT ALL ON SCHEMA public TO incogniito_user;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO incogniito_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO incogniito_user;
->>>>>>> Stashed changes
+

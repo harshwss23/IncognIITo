@@ -3,12 +3,12 @@ import { Mail, Lock, Sparkles, ArrowRight, Check, ShieldCheck, Globe, UserPlus }
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
-
+import { useNavigate } from 'react-router-dom';
 export function RegistrationScreen() {
   const colors = useThemeColors();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [strength, setStrength] = useState(0);
@@ -310,7 +310,7 @@ export function RegistrationScreen() {
                     <div className={`flex-grow border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`}></div>
                 </div>
 
-                <button className={`w-full p-4 rounded-xl font-bold flex items-center justify-center gap-3 border-2 transition-all
+                <button onClick={() => navigate('/login')} className={`w-full p-4 rounded-xl font-bold flex items-center justify-center gap-3 border-2 transition-all
                     ${isDark 
                         ? 'border-white/10 hover:bg-white/5 text-white' 
                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'

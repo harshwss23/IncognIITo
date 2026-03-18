@@ -276,10 +276,114 @@ export class AuthController {
     }
   }
 
+  // ==========================================
+  // FORGOT PASSWORD FLOW
+  // ==========================================
+
+  // Step 1: Request OTP for Forgot Password
+  async forgotPasswordOTP(req: Request, res: Response): Promise<void> {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        res.status(400).json({ success: false, message: 'Email is required' });
+        return;
+      }
+
+      const sanitizedEmail = ValidationUtils.sanitizeEmail(email);
+
+      // Check if user exists FIRST
+      const userResult = await query('SELECT id FROM users WHERE email = $1', [sanitizedEmail]);
+      
+      if (userResult.rows.length === 0) {
+        res.status(404).json({ success: false, message: 'No account found with this email.' });
+        return;
+      }
+
+      // Generate and send OTP (passing true for isPasswordReset)
+      try {
+        await otpService.sendOTP(sanitizedEmail, true); // 🔥 FIX APPLIED HERE
+      } catch (otpError: any) {
+        throw otpError;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Password reset OTP sent to your email.',
+      });
+    } catch (error: any) {
+      console.error('Forgot Password OTP error:', error);
+      res.status(400).json({ success: false, message: error.message || 'Failed to send OTP' });
+    }
+  }
+
+  // Step 2: Verify OTP and Reset Password
+  async resetPassword(req: Request, res: Response): Promise<void> {
+    try {
+      const { email, otp, password } = req.body;
+
+      if (!email || !otp || !password) {
+        res.status(400).json({ success: false, message: 'Email, OTP, and new password are required' });
+        return;
+      }
+
+      if (!ValidationUtils.isValidPassword(password)) {
+        res.status(400).json({ success: false, message: 'Password must be at least 8 characters with letters and numbers' });
+        return;
+      }
+
+      // Verify the OTP (passing true for isPasswordReset)
+      const verificationResult = await otpService.verifyOTP(email, otp, true); // 🔥 FIX ALREADY APPLIED HERE
+
+      if (!verificationResult.success) {
+        res.status(400).json({ success: false, message: verificationResult.message });
+        return;
+      }
+
+      // Hash the NEW password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Update user password in Database
+      await query(
+        'UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING id, verified',
+        [passwordHash, email]
+      );
+
+      // Find user to generate login tokens
+      const userResult = await query('SELECT id, email, verified FROM users WHERE email = $1', [email]);
+      const user = userResult.rows[0];
+
+      // Generate tokens so user is instantly logged in after reset
+      const { accessToken, refreshToken } = await tokenService.generateTokenPair(
+        user.id,
+        user.email,
+        user.verified
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'Password has been reset successfully!',
+        data: {
+          user: { id: user.id, email: user.email, verified: user.verified },
+          accessToken,
+          refreshToken,
+        },
+      });
+    } catch (error: any) {
+      console.error('Reset Password error:', error);
+      res.status(500).json({ success: false, message: error.message || 'Failed to reset password' });
+    }
+  }
+
   // Resend OTP (with cooldown)
   async resendOTP(req: Request, res: Response): Promise<void> {
     try {
       const { email } = req.body;
+      
+      // Determine if this is a resend for password reset or normal registration
+      // You can pass an optional flag from the frontend if needed, but for now 
+      // we'll default to standard resend to avoid breaking your current frontend setup.
+      const isPasswordReset = req.body.isPasswordReset || false;
 
       if (!email) {
         res.status(400).json({
@@ -289,7 +393,7 @@ export class AuthController {
         return;
       }
 
-      await otpService.resendOTP(email);
+      await otpService.resendOTP(email, isPasswordReset);
 
       res.status(200).json({
         success: true,
