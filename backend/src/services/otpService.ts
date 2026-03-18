@@ -59,6 +59,7 @@ export class OTPService {
     let userResult = await query('SELECT id, verified FROM users WHERE email = $1', [email]);
     let userId: number;
 
+// DISPLAY NAMES
     if (userResult.rows.length === 0) {
       // 🔥 CHANGED: Don't create a new account if they are just trying to reset password
       if (isPasswordReset) {
