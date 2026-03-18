@@ -61,22 +61,25 @@ export class OTPService {
 
 // DISPLAY NAMES
     if (userResult.rows.length === 0) {
-      // 🔥 CHANGED: Don't create a new account if they are just trying to reset password
-      if (isPasswordReset) {
-        throw new Error('No account found with this email.');
-      }
+      // Generate random default display name
+      const adjectives = ['Wild', 'Silent', 'Hidden', 'Phantom', 'Shadow', 'Mystic', 'Neon', 'Cosmic', 'Stealth'];
+      const nouns = ['Tiger', 'Wolf', 'Dragon', 'Ninja', 'Phoenix', 'Rider', 'Ghost', 'Stalker','Lion'];
+      const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+      const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+      const randomNumber = Math.floor(1000 + Math.random() * 9000); // 4-digit number
+      const defaultDisplayName = `${randomAdjective}${randomNoun}_${randomNumber}`;
 
-      // Create new user with temporary password (will be set during first login)
+      // Create new user with temporary password and default display name
       const newUser = await query(
-        'INSERT INTO users (email, password_hash, verified) VALUES ($1, $2, $3) RETURNING id',
-        [email, 'TEMP_PASSWORD_TO_BE_SET', false]
+        'INSERT INTO users (email, password_hash, verified, display_name) VALUES ($1, $2, $3, $4) RETURNING id',
+        [email, 'TEMP_PASSWORD_TO_BE_SET', false, defaultDisplayName]
       );
       userId = newUser.rows[0].id;
     } else {
       userId = userResult.rows[0].id;
-      
-      // 🔥 CHANGED: Bypass the "already verified" check ONLY IF it's a password reset
-      if (userResult.rows[0].verified && !isPasswordReset) {
+
+      // If already verified, don't allow new OTP
+      if (userResult.rows[0].verified) {
         throw new Error('Email already verified. Please login.');
       }
     }
@@ -141,10 +144,10 @@ export class OTPService {
       console.log(`User ${email} verified successfully`);
     }
 
-    return { 
-      success: true, 
-      userId, 
-      message: isPasswordReset ? 'OTP verified for password reset' : 'Email verified successfully' 
+    return {
+      success: true,
+      userId,
+      message: 'Email verified successfully'
     };
   }
 
