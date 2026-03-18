@@ -37,11 +37,11 @@ export function LandingAuthPortal() {
             <div className="flex items-center gap-3 mb-6">
                 <div className={`h-px w-12 ${isDark ? 'bg-blue-500' : 'bg-blue-600'}`}></div>
                 <span className={`text-sm font-bold tracking-[0.2em] uppercase ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
-                    IITK Exclusive Network
+                    IITK's Exclusive Network
                 </span>
             </div>
             <h1 className={`text-8xl font-black tracking-tighter leading-[0.9] mb-6 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                Incogn<br/>
+                Incogn
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">IIT</span>o
             </h1>
             <p className={`text-xl max-w-md font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
