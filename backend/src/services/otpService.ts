@@ -14,7 +14,6 @@ export class OTPService {
   }
 
   // Send OTP to email
-  // 🔥 CHANGED: Added `isPasswordReset` parameter
   async sendOTP(email: string, isPasswordReset: boolean = false): Promise<void> {
     email = ValidationUtils.sanitizeEmail(email);
 
@@ -26,7 +25,7 @@ export class OTPService {
       throw new Error('Only IITK email addresses (@iitk.ac.in) are allowed');
     }
 
-    // 🔥 CHANGED: Dynamic token type based on flow
+    // Dynamic token type based on flow
     const tokenType = isPasswordReset ? 'password_reset' : 'email_verify';
 
     const recentOTPs = await query(
@@ -36,7 +35,7 @@ export class OTPService {
        WHERE u.email = $1 
        AND vt.token_type = $2
        AND vt.created_at > NOW() - INTERVAL '1 hour'`,
-      [email, tokenType] // 🔥 CHANGED: passed tokenType
+      [email, tokenType]
     );
 
     if (parseInt(recentOTPs.rows[0].count) >= this.MAX_RESEND_ATTEMPTS) {
@@ -52,15 +51,19 @@ export class OTPService {
        WHERE user_id = (SELECT id FROM users WHERE email = $1) 
        AND token_type = $2
        AND used = false`,
-      [email, tokenType] // 🔥 CHANGED: passed tokenType
+      [email, tokenType]
     );
 
     // Find or create user
     let userResult = await query('SELECT id, verified FROM users WHERE email = $1', [email]);
     let userId: number;
 
-// DISPLAY NAMES
     if (userResult.rows.length === 0) {
+      // Don't create a new account if they are just trying to reset password
+      if (isPasswordReset) {
+        throw new Error('No account found with this email.');
+      }
+
       // Generate random default display name
       const adjectives = ['Wild', 'Silent', 'Hidden', 'Phantom', 'Shadow', 'Mystic', 'Neon', 'Cosmic', 'Stealth'];
       const nouns = ['Tiger', 'Wolf', 'Dragon', 'Ninja', 'Phoenix', 'Rider', 'Ghost', 'Stalker','Lion'];
@@ -77,9 +80,9 @@ export class OTPService {
       userId = newUser.rows[0].id;
     } else {
       userId = userResult.rows[0].id;
-
-      // If already verified, don't allow new OTP
-      if (userResult.rows[0].verified) {
+      
+      // Bypass the "already verified" check ONLY IF it's a password reset
+      if (userResult.rows[0].verified && !isPasswordReset) {
         throw new Error('Email already verified. Please login.');
       }
     }
@@ -88,7 +91,7 @@ export class OTPService {
     await query(
       `INSERT INTO verification_tokens (user_id, token, token_type, expires_at) 
        VALUES ($1, $2, $3, $4)`,
-      [userId, otp, tokenType, expiresAt] // 🔥 CHANGED: inserted dynamic tokenType
+      [userId, otp, tokenType, expiresAt]
     );
 
     // Send OTP via email
@@ -98,7 +101,6 @@ export class OTPService {
   }
 
   // Verify OTP and activate account
-  // 🔥 CHANGED: Added `isPasswordReset` parameter
   async verifyOTP(email: string, otp: string, isPasswordReset: boolean = false): Promise<{ success: boolean; userId?: number; message: string }> {
     email = ValidationUtils.sanitizeEmail(email);
 
@@ -106,7 +108,7 @@ export class OTPService {
       return { success: false, message: 'Invalid OTP format' };
     }
 
-    // 🔥 CHANGED: Dynamic token type based on flow
+    // Dynamic token type based on flow
     const tokenType = isPasswordReset ? 'password_reset' : 'email_verify';
 
     // Find valid OTP
@@ -119,7 +121,7 @@ export class OTPService {
        AND vt.token_type = $3
        AND vt.expires_at > NOW()
        AND vt.used = false`,
-      [email, otp, tokenType] // 🔥 CHANGED: passed tokenType
+      [email, otp, tokenType]
     );
 
     if (result.rows.length === 0) {
@@ -131,7 +133,7 @@ export class OTPService {
     // Mark OTP as used
     await query('UPDATE verification_tokens SET used = true WHERE id = $1', [tokenId]);
 
-    // 🔥 CHANGED: Only mark user verified and send welcome email if it's a normal signup
+    // Only mark user verified and send welcome email if it's a normal signup
     if (!isPasswordReset) {
       // Mark user as verified
       await query('UPDATE users SET verified = true WHERE id = $1', [userId]);
@@ -144,19 +146,18 @@ export class OTPService {
       console.log(`User ${email} verified successfully`);
     }
 
-    return {
-      success: true,
-      userId,
-      message: 'Email verified successfully'
+    return { 
+      success: true, 
+      userId, 
+      message: isPasswordReset ? 'OTP verified for password reset' : 'Email verified successfully' 
     };
   }
 
   // Resend OTP
-  // 🔥 CHANGED: Added `isPasswordReset` parameter
   async resendOTP(email: string, isPasswordReset: boolean = false): Promise<void> {
     email = ValidationUtils.sanitizeEmail(email);
     
-    // 🔥 CHANGED: Dynamic token type
+    // Dynamic token type
     const tokenType = isPasswordReset ? 'password_reset' : 'email_verify';
 
     // Check cooldown
@@ -168,7 +169,7 @@ export class OTPService {
        AND vt.token_type = $2
        ORDER BY vt.created_at DESC
        LIMIT 1`,
-      [email, tokenType] // 🔥 CHANGED: passed tokenType
+      [email, tokenType]
     );
 
     if (lastOTP.rows.length > 0) {
@@ -182,7 +183,7 @@ export class OTPService {
     }
 
     // Send new OTP
-    await this.sendOTP(email, isPasswordReset); // 🔥 CHANGED: Pass the flag forward
+    await this.sendOTP(email, isPasswordReset);
   }
 }
 
