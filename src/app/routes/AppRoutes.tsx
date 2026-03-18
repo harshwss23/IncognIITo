@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "../layout/AppShell";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { AdminRoute } from "../components/AdminRoute";
+import { PublicRoute } from "../components/PublicRoute";
 
 // components (your existing screens)
 import { FuturisticChatInterface } from "../components/FuturisticChatInterface";
@@ -27,11 +28,10 @@ export default function AppRoutes() {
       {/* Global layout (background + theme toggle) */}
       <Route element={<AppShell />}>
         {/* Public Routes */}
-        <Route path="/" element={<LandingAuthPortal />} />
-        <Route path="/register" element={<RegistrationScreen />} />
-        <Route path="/login" element={<DedicatedLoginScreen />} />
-        <Route path="/forgot" 
-        element={<ForgotPasswordScreen />} />
+        <Route path="/" element={<PublicRoute><LandingAuthPortal /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><RegistrationScreen /></PublicRoute>} />
+        <Route path="/login" element={<PublicRoute><DedicatedLoginScreen /></PublicRoute>} />
+        <Route path="/forgot" element={<PublicRoute><ForgotPasswordScreen /></PublicRoute>} />
 
         {/* Protected Routes */}
         <Route path="/chat" element={<ProtectedRoute><FuturisticChatInterface /></ProtectedRoute>} />
@@ -41,7 +41,7 @@ export default function AppRoutes() {
         <Route path="/live/:roomId" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
         <Route path="/matchmaking" element={<ProtectedRoute><MatchingBuffer /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-        <Route path="/session" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
+        <Route path="/session/:roomid" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
