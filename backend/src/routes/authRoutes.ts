@@ -12,7 +12,8 @@ import { authMiddleware } from '../middleware/authMiddleware';
 const router = Router();
 
 // PUBLIC ROUTES (no authentication required)
-
+router.post('/forgot-password-otp', authController.forgotPasswordOTP.bind(authController));
+router.post('/reset-password', authController.resetPassword.bind(authController));
 // POST /api/auth/request-otp - Send OTP to email
 router.post('/request-otp', authController.requestOTP.bind(authController));
 // POST /api/auth/verify-otp - Verify OTP and set password
