@@ -16,8 +16,8 @@ const database_1 = require("../config/database");
 class TokenService {
     constructor() {
         this.JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
-        this.ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes
-        this.REFRESH_TOKEN_EXPIRY = '7d'; // 7 days
+        this.ACCESS_TOKEN_EXPIRY = '7d';
+        this.REFRESH_TOKEN_EXPIRY = '365d';
     }
     // Generate JWT access token (like Shopio's generateToken)
     generateAccessToken(payload) {
@@ -31,20 +31,35 @@ class TokenService {
             expiresIn: this.REFRESH_TOKEN_EXPIRY,
         });
     }
-    // Verify and decode token (like Shopio's validateToken)
-    verifyToken(token) {
+    verifyTokenDetailed(token) {
         try {
             const decoded = jsonwebtoken_1.default.verify(token, this.JWT_SECRET);
-            return decoded;
+            return {
+                payload: decoded,
+                reason: 'valid',
+            };
         }
         catch (error) {
-            console.error('Token verification failed:', error);
-            return null;
+            if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
+                return {
+                    payload: null,
+                    reason: 'expired',
+                };
+            }
+            console.warn('Token verification failed: invalid token');
+            return {
+                payload: null,
+                reason: 'invalid',
+            };
         }
+    }
+    // Verify and decode token (like Shopio's validateToken)
+    verifyToken(token) {
+        return this.verifyTokenDetailed(token).payload;
     }
     // Create session and store token in database (like Shopio's JWTToken entity)
     async createSession(userId, token) {
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 365 days
         await (0, database_1.query)(`INSERT INTO sessions (session_id, user_id, expires_at) 
        VALUES ($1, $2, $3)`, [token, userId, expiresAt]);
     }

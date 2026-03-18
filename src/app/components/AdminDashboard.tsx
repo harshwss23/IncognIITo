@@ -40,12 +40,14 @@ export function AdminDashboard() {
   const [error, setError] = useState('');
 
   const handleAuthFailure = (status: number) => {
-    if (status !== 401) {
+    // Admin endpoints return 403 for authenticated non-admin users.
+    // Keep the previous UX of sending users to login for admin credentials.
+    if (status !== 401 && status !== 403) {
       return;
     }
 
     clearAuthTokens();
-    window.location.assign('/login');
+    window.location.assign('/');
   };
 
   // Fetch users + reports from backend on mount

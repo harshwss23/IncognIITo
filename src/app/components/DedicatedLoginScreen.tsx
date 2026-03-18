@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Lock, Mail, LogIn, KeyRound, ArrowRight, ShieldCheck, Globe } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
@@ -8,6 +8,7 @@ import { setAuthTokens } from '@/services/auth';
 
 export function DedicatedLoginScreen() {
     const navigate = useNavigate();
+    const location = useLocation();
   const colors = useThemeColors();
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
@@ -50,8 +51,11 @@ export function DedicatedLoginScreen() {
 
             setAuthTokens({ accessToken: token, refreshToken });
 
-            // Redirect AFTER storing token
-            navigate('/homepage');
+            // Redirect AFTER storing token.
+            const fromState = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+            const nextFromQuery = new URLSearchParams(location.search).get('next');
+            const nextPath = fromState || nextFromQuery || '/homepage';
+            navigate(nextPath);
             return;
         } else {
             setError(data?.message || 'Login failed.');

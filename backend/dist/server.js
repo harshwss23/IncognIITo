@@ -16,9 +16,13 @@ const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const chatRoutes_1 = __importDefault(require("./routes/chatRoutes"));
 const requestRoutes_1 = __importDefault(require("./routes/requestRoutes"));
 const adminRoutes_1 = __importDefault(require("./routes/adminRoutes"));
+const matchRoutes_1 = __importDefault(require("./routes/matchRoutes"));
 const errorHandler_1 = require("./middleware/errorHandler");
 const tokenService_1 = require("./services/tokenService");
+const matchingService_1 = require("./services/matchingService");
+const queueService_1 = require("./services/queueService");
 const socket_1 = require("./socket/socket");
+// Load environment variables
 dotenv_1.default.config();
 async function ensureAdminSchema() {
     try {
@@ -52,7 +56,7 @@ async function ensureAdminSchema() {
     catch (error) {
         const pgError = error;
         if (pgError.code === "42501") {
-            console.warn("⚠️ Skipping admin schema migration because the database user does not own existing tables. Apply schema.sql as a local superuser to complete setup.");
+            console.warn("⚠️ Skipping admin schema migration: User does not own tables.");
             return;
         }
         console.error("⚠️ Admin schema check failed:", error);
@@ -70,10 +74,11 @@ class Server {
                 methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
             },
         });
+        this.matchingService = new matchingService_1.MatchingService(this.io);
         this.initializeMiddlewares();
         this.initializeRoutes();
-        this.initializeErrorHandling();
         this.initializeSockets();
+        this.initializeErrorHandling();
     }
     initializeMiddlewares() {
         this.app.use((0, cors_1.default)({
@@ -102,43 +107,116 @@ class Server {
         });
         this.app.use("/api/auth", authRoutes_1.default);
         this.app.use("/api/users", userRoutes_1.default);
+        this.app.use("/api/match", matchRoutes_1.default);
         this.app.use("/api/requests", requestRoutes_1.default);
         this.app.use("/api/chats", chatRoutes_1.default);
         this.app.use("/api/admin", adminRoutes_1.default);
         this.app.use(errorHandler_1.errorHandler.notFound.bind(errorHandler_1.errorHandler));
     }
+    // ─── WEBRTC SOCKET LOGIC (SECURED) ──────────────────
     initializeSockets() {
-        (0, socket_1.registerSocketHandlers)(this.io);
+        (0, socket_1.registerSocketHandlers)(this.io); // Puraane handlers
+        // 1. SOCKET AUTHENTICATION MIDDLEWARE
+        this.io.use(async (socket, next) => {
+            try {
+                const token = socket.handshake.auth.token;
+                if (!token) {
+                    return next(new Error("Token is missing"));
+                }
+                const decoded = (await tokenService_1.tokenService.verifyToken(token));
+                socket.data.userId = decoded.userId || decoded.id;
+                if (!socket.data.userId) {
+                    return next(new Error("Invalid token payload"));
+                }
+                next();
+            }
+            catch (error) {
+                console.error("Socket Auth Error:", error);
+                next(new Error("Invalid or expired token"));
+            }
+        });
+        // 🔌 2. CONNECTION EVENT
         this.io.on("connection", (socket) => {
-            console.log(`🔌 Socket Connected: ${socket.id}`);
-            socket.on("join_room", (roomID) => {
-                socket.join(roomID);
-                socket.to(roomID).emit("user_joined", socket.id);
-            });
-            socket.on("offer", (data) => {
-                socket.to(data.roomID).emit("receive_offer", data);
-            });
-            socket.on("send_message", (data) => {
-                socket.to(data.roomID).emit("receive_message", data);
-            });
-            socket.on("answer", (data) => {
-                socket.to(data.roomID).emit("receive_answer", data);
-            });
-            socket.on("camera_status", (data) => {
-                socket.to(data.roomID).emit("receive_camera_status", data);
-            });
-            socket.on("ice_candidate", (data) => {
-                socket.to(data.roomID).emit("receive_ice_candidate", data);
-            });
-            socket.on("disconnecting", () => {
-                socket.rooms.forEach((room) => {
-                    if (room !== socket.id) {
-                        socket.to(room).emit("peer_disconnected");
+            const userId = socket.data.userId;
+            console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId})`);
+            // ─── SECURE JOIN ROOM ──────────────
+            socket.on("join_room", async (roomID) => {
+                try {
+                    const assignedRoomId = await queueService_1.queueService.getActiveSession(userId);
+                    if (!assignedRoomId || assignedRoomId !== roomID) {
+                        console.warn(`🚨 Security: User ${userId} blocked from entering unauthorized Room ${roomID}`);
+                        socket.emit("room_error", "You are not authorized to join this room.");
+                        return;
                     }
-                });
+                    const socketsInRoom = await this.io.in(roomID).fetchSockets();
+                    const isUserAlreadyInRoom = socketsInRoom.some((s) => s.data.userId === userId);
+                    if (isUserAlreadyInRoom) {
+                        console.warn(`⚠️ User ${userId} tried to join room ${roomID} multiple times (Multiple tabs).`);
+                        socket.emit("room_error", "You are already connected to this session in another tab/window.");
+                        return;
+                    }
+                    if (socketsInRoom.length >= 2) {
+                        console.warn(`⚠️ Room ${roomID} is already full.`);
+                        socket.emit("room_error", "This room is already full.");
+                        return;
+                    }
+                    socket.join(roomID);
+                    socket.data.hasSuccessfullyJoined = true;
+                    console.log(`🔓 User ${userId} securely joined room ${roomID}`);
+                    socket.emit("room_joined_success");
+                    socket.to(roomID).emit("user_joined", socket.id);
+                }
+                catch (error) {
+                    console.error(`Room validation failed for user ${userId}:`, error);
+                    socket.emit("room_error", "Server error verifying your room.");
+                }
             });
-            socket.on("disconnect", () => {
-                console.log(`❌ Socket Disconnected: ${socket.id}`);
+            // ─── MANUAL END CALL ──────────────
+            socket.on("leave_room", (roomID) => {
+                socket.leave(roomID);
+                socket.to(roomID).emit("session_ended", "Your partner has left the chat.");
+                console.log(`🚪 User ${userId} left room ${roomID}`);
+            });
+            // ─── WEBRTC SIGNALING EVENTS (PURE RELAY) ──────────────
+            socket.on("offer", (data) => socket.to(data.roomID).emit("receive_offer", data));
+            socket.on("answer", (data) => socket.to(data.roomID).emit("receive_answer", data));
+            socket.on("ice_candidate", (data) => socket.to(data.roomID).emit("receive_ice_candidate", data));
+            // ─── EXTRA DATA RELAY ──────────────
+            socket.on("send_message", (data) => socket.to(data.roomID).emit("receive_message", data));
+            socket.on("camera_status", (data) => socket.to(data.roomID).emit("receive_camera_status", data));
+            // ─── DISCONNECT ──────────────
+            socket.on("disconnect", async () => {
+                console.log(`❌ Socket Disconnected: ${socket.id} (User: ${userId})`);
+                try {
+                    if (!socket.data.hasSuccessfullyJoined) {
+                        console.log(`⚠️ Ignored session cleanup for ${socket.id} (Was denied access / Second tab)`);
+                        await queueService_1.queueService.leaveQueue(userId).catch(() => { });
+                        return;
+                    }
+                    const roomId = await queueService_1.queueService.getActiveSession(userId);
+                    if (roomId) {
+                        socket
+                            .to(roomId)
+                            .emit("session_ended", "Your partner disconnected. Redirecting...");
+                        const sessionResult = await database_1.pool.query(`SELECT id, user1_id, user2_id FROM matchmaking_sessions 
+               WHERE room_id = $1 AND status = 'active'`, [roomId]);
+                        if (sessionResult.rows.length > 0) {
+                            const session = sessionResult.rows[0];
+                            await database_1.pool.query(`UPDATE matchmaking_sessions 
+                 SET status = 'completed', session_end = NOW() 
+                 WHERE id = $1`, [session.id]);
+                            await queueService_1.queueService.clearActiveSession(session.user1_id);
+                            await queueService_1.queueService.clearActiveSession(session.user2_id);
+                            console.log(`🧹 Cleaned up session ${roomId} due to disconnect.`);
+                        }
+                    }
+                    else {
+                        await queueService_1.queueService.leaveQueue(userId).catch(() => { });
+                    }
+                }
+                catch (error) {
+                    console.error("Error handling forceful disconnect cleanup:", error);
+                }
             });
         });
     }
@@ -155,12 +233,12 @@ class Server {
             console.log(`🧩 Socket URL: http://localhost:${this.port}`);
             console.log("================================");
             database_1.pool.query("SELECT NOW()", (err) => {
-                if (err) {
-                    console.error("❌ Database connection failed");
-                    return;
-                }
-                console.log("✅ Database connected");
+                if (err)
+                    console.error("❌ Database connection failed", err);
+                else
+                    console.log("✅ Database connected");
             });
+            this.matchingService.start();
             await ensureAdminSchema();
             setInterval(() => {
                 tokenService_1.tokenService.cleanupExpiredSessions().catch((err) => {
@@ -174,8 +252,16 @@ class Server {
     async shutdown() {
         console.log("\nShutting down server...");
         try {
+            this.matchingService.stop();
             this.io.close();
-            this.httpServer.close();
+            await new Promise((resolve, reject) => {
+                this.httpServer.close((err) => {
+                    if (err)
+                        reject(err);
+                    else
+                        resolve();
+                });
+            });
             await database_1.pool.end();
             console.log("Database connections closed");
             smtp_1.transporter.close();

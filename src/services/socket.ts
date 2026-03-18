@@ -1,9 +1,11 @@
 import { io } from "socket.io-client";
 import { socketUrl } from "@/services/config";
+import { clearAuthTokens, getAccessToken } from "@/services/auth";
 
 export const socket = io(socketUrl, {
+  autoConnect: false,
   auth: (callback) => {
-    callback({ token: localStorage.getItem("token") });
+    callback({ token: getAccessToken() });
   },
   transports: ["websocket"],
 });
@@ -20,6 +22,13 @@ socket.on("disconnect", () => {
   console.warn("⚠️ Socket disconnected");
 });
 
-socket.on("connect_error", (error: any) => {
-  console.error("❌ Socket connection error:", error);
+socket.on("connect_error", (error) => {
+  if (error.message === "TOKEN_EXPIRED" || error.message === "INVALID_TOKEN" || error.message === "AUTH_REQUIRED") {
+    clearAuthTokens();
+    socket.disconnect();
+
+    if (window.location.pathname !== "/") {
+      window.location.href = "/";
+    }
+  }
 });

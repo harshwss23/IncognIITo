@@ -1,24 +1,24 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { AppShell } from "@/app/layout/AppShell";
-import { ProtectedRoute } from "@/app/components/ProtectedRoute";
+import { AppShell } from "../layout/AppShell";
+import { ProtectedRoute } from "../components/ProtectedRoute";
+import { AdminRoute } from "../components/AdminRoute";
 
 // components (your existing screens)
-import { FuturisticChatInterface } from "@/app/components/FuturisticChatInterface";
-import { ChatRequestsDashboard } from "@/app/components/ChatRequestsDashboard";
-import { MainDashboard } from "@/app/components/MainDashboard";
-import { LiveInteractionRoom } from "@/app/components/LiveInteractionRoom";
-import { UserProfile } from "@/app/components/UserProfile";
-import { LandingAuthPortal } from "@/app/components/LandingAuthPortal";
-import { RegistrationScreen } from "@/app/components/RegistrationScreen";
-import { OTPVerificationScreen } from "@/app/components/OTPVerificationScreen";
-import { DedicatedLoginScreen } from "@/app/components/DedicatedLoginScreen";
-import { PostSessionModal } from "@/app/components/PostSessionModal";
-import { AdminDashboard } from "@/app/components/AdminDashboard";
-import { ForgotPasswordScreen } from "@/app/components/ForgptPassword";
-import { HomePageScreen } from "@/app/components/Homepage";
+import { FuturisticChatInterface } from "../components/FuturisticChatInterface";
+import { ChatRequestsDashboard } from "../components/ChatRequestsDashboard";
+import { MainDashboard } from "../components/MainDashboard";
+import { LiveInteractionRoom } from "../components/LiveInteractionRoom";
+import { UserProfile } from "../components/UserProfile";
+import { LandingAuthPortal } from "../components/LandingAuthPortal";
+import { RegistrationScreen } from "../components/RegistrationScreen";
+import { OTPVerificationScreen } from "../components/OTPVerificationScreen";
+import { DedicatedLoginScreen } from "../components/DedicatedLoginScreen";
+import { PostSessionModal } from "../components/PostSessionModal";
+import { AdminDashboard } from "../components/AdminDashboard";
+import { ForgotPasswordScreen } from "../components/ForgptPassword";
+import { HomePageScreen } from "../components/Homepage";
 import { ActiveUsersScreen } from "../components/ActiveUsersScreen";
-import { MatchingBuffer } from "@/app/components/MatchingBuffer";
 
 export default function AppRoutes() {
   return (
@@ -26,21 +26,22 @@ export default function AppRoutes() {
       {/* Global layout (background + theme toggle) */}
       <Route element={<AppShell />}>
         {/* Public Routes */}
-        <Route path="/landing" element={<LandingAuthPortal />} />
+        <Route path="/" element={<LandingAuthPortal />} />
         <Route path="/register" element={<RegistrationScreen />} />
         <Route path="/login" element={<DedicatedLoginScreen />} />
-        <Route path="/forgot" element={<ForgotPasswordScreen />} />
+        <Route path="/forgot" 
+        element={<ForgotPasswordScreen />} />
 
         {/* Protected Routes */}
-        <Route path="/" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/chat" element={<ProtectedRoute><FuturisticChatInterface /></ProtectedRoute>} />
         <Route path="/requests" element={<ProtectedRoute><ChatRequestsDashboard /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
-        <Route path="/match-waiting" element={<ProtectedRoute><MatchingBuffer /></ProtectedRoute>} />
-        <Route path="/live/:roomId" element={<LiveInteractionRoom />} />
+        <Route path="/live" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
+        <Route path="/live/:roomId" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
+        <Route path="/matchmaking" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
         <Route path="/session" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
 

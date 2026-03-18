@@ -1,5 +1,5 @@
 import { Server as SocketServer } from 'socket.io';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import { queueService, QueueEntry } from './queueService';
 import { jaccardScore } from '../constants/interests';
 import { query } from '../config/database';
@@ -32,8 +32,8 @@ export class MatchingService {
   // Called once from server.ts when the server starts
   start(): void {
     if (this.intervalId) return; // Already running
-    this.intervalId = setInterval(() => this.runMatchingCycle(), 500);
-    console.log('✅ Matching loop started (every 500ms)');
+    this.intervalId = setInterval(() => this.runMatchingCycle(), 1000);
+    console.log('✅ Matching loop started (every 1000ms)');
   }
 
   // ─── STOP MATCHING LOOP ──────────────────────────────────────────────
@@ -45,7 +45,7 @@ export class MatchingService {
   }
 
   // ─── ONE MATCHING CYCLE ──────────────────────────────────────────────
-  // This runs every 500ms. Single thread, no overlap.
+  // This runs every 1000ms. Single thread, no overlap.
   private async runMatchingCycle(): Promise<void> {
     if (this.isRunning) return; // Previous cycle still running, skip
     this.isRunning = true;
@@ -114,7 +114,7 @@ export class MatchingService {
     userB: QueueEntry,
     score: number
   ): Promise<void> {
-    const roomId = uuidv4(); // Unique room ID for WebRTC later
+    const roomId = randomUUID(); // Unique room ID for WebRTC later
     const matchScore = Math.round(score * 100);
 
     try {
