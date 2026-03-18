@@ -93,6 +93,7 @@ export function HomePageScreen() {
       ? "Your Profile"
       : "Welcome to IncognIITo";
 
+
   const desc =
     activeTab === "requests"
       ? "Review incoming requests with shared interests and match score. Accept to start an anonymous chat, or decline to skip."
@@ -131,14 +132,20 @@ export function HomePageScreen() {
               onClick={() => {
                 if (item.id === "people") {
                   navigate("/active-users");
-                } if (item.id === "requests") {
+                  return;
+                }
+
+                if (item.id === "requests") {
                   navigate("/requests");
-                } if (item.id === "chats") {
+                  return;
+                }
+
+                if (item.id === "chats") {
                   navigate("/chat");
+                  return;
                 }
-                else {
-                  setActiveTab(item.id);
-                }
+
+                setActiveTab(item.id);
               }}
               className={`w-full flex items-center justify-between px-4 py-4 rounded-xl transition-all duration-300 group
                 ${

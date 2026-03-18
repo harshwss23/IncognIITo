@@ -11,6 +11,8 @@ const authController_1 = require("../controllers/authController");
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const router = (0, express_1.Router)();
 // PUBLIC ROUTES (no authentication required)
+router.post('/forgot-password-otp', authController_1.authController.forgotPasswordOTP.bind(authController_1.authController));
+router.post('/reset-password', authController_1.authController.resetPassword.bind(authController_1.authController));
 // POST /api/auth/request-otp - Send OTP to email
 router.post('/request-otp', authController_1.authController.requestOTP.bind(authController_1.authController));
 // POST /api/auth/verify-otp - Verify OTP and set password
