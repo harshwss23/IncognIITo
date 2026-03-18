@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MessageCircle, MessageSquare, User, Check, Shield } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { authFetch } from '@/services/auth';
 
 export function ChatRequestsDashboard() {
   const colors = useThemeColors();
+  const navigate = useNavigate();
 
   const [connectionRequests, setConnectionRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -114,12 +116,10 @@ export function ChatRequestsDashboard() {
             <span className="font-semibold text-sm">Chat Requests</span>
           </button>
 
-          <button className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-all group">
-            <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            <span className="font-medium text-sm">Current Chats</span>
-          </button>
-
-          <button className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-all group">
+          <button
+            onClick={() => navigate('/profile')}
+            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-all group"
+          >
             <User className="w-5 h-5 group-hover:scale-110 transition-transform" />
             <span className="font-medium text-sm">Profile</span>
           </button>
