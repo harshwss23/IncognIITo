@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -14,6 +14,7 @@ import { useThemeColors } from "@/app/hooks/useThemeColors";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, clearAuthTokens } from "@/services/auth";
 import { buildApiUrl } from "@/services/config";
+
 export function HomePageScreen() {
   const colors = useThemeColors();
   const { theme } = useTheme();
@@ -25,8 +26,24 @@ export function HomePageScreen() {
   const [queueError, setQueueError] = useState<string | null>(null);
 
   // ✅ profile state
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setHeaderMenuOpen(false);
+      }
+    };
+    if (headerMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [headerMenuOpen]);
 
   // ✅ Fetch Profile
   useEffect(() => {
@@ -123,7 +140,7 @@ export function HomePageScreen() {
     { id: "chats", label: "Active Chats", icon: MessageSquareText, count: 0 },
     { id: "people", label: "Active Users", icon: Users, count: 0 }, // ✅ redirects to /active-users
     { id: "match", label: "Start Matching", icon: Video, count: 0 },
-    { id: "profile", label: "Profile", icon: User, count: 0 },
+    // { id: "profile", label: "Profile", icon: User, count: 0 },
   ];
 
   const title =
@@ -209,7 +226,7 @@ export function HomePageScreen() {
         </nav>
 
         {/* User snippet */}
-        <div className={`p-6 border-t ${isDark ? "border-white/10" : "border-slate-200"}`}>
+        {/* <div className={`p-6 border-t ${isDark ? "border-white/10" : "border-slate-200"}`}>
           <div
             className={`p-4 rounded-2xl flex items-center gap-3 transition-colors
               ${isDark ? "bg-white/5 hover:bg-white/10" : "bg-slate-100 hover:bg-slate-200"}`}
@@ -229,7 +246,7 @@ export function HomePageScreen() {
               <LogOut className={`w-4 h-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
             </button>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* --- RIGHT MAJOR CONTENT --- */}
@@ -252,6 +269,74 @@ export function HomePageScreen() {
             <p className={`text-sm mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
               {activeTab === "home" ? "Quick overview of the platform." : "Understand this section and proceed."}
             </p>
+          </div>
+
+          {/* User Profile Dropdown */}
+          <div className="relative" ref={menuRef}>
+            <button 
+              onClick={() => setHeaderMenuOpen(!headerMenuOpen)}
+              className={`w-14 h-14 rounded-full ring-2 ring-offset-2 transition-all focus:outline-none flex items-center justify-center shadow-lg
+                ${isDark ? 'ring-offset-slate-900 ring-transparent hover:ring-blue-500' : 'ring-offset-white ring-transparent hover:ring-blue-400'}`}
+            >
+               {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
+                 <img src={user?.avatarUrl || user?.avatar_url || user?.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
+               ) : (
+                 <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl">
+                   {profileLoading ? "…" : avatarLetter}
+                 </div>
+               )}
+            </button>
+
+            {headerMenuOpen && (
+              <div className={`absolute right-0 mt-4 w-80 rounded-3xl shadow-2xl border overflow-hidden z-50 transition-all transform origin-top-right
+                ${isDark ? 'bg-slate-800 border-white/10 shadow-black/50' : 'bg-white border-slate-200 shadow-2xl'}`}>
+                
+                <div className={`p-8 border-b flex flex-col items-center ${isDark ? 'border-white/10' : 'border-slate-100'}`}>
+                  <div className={`w-40 h-40 rounded-full mb-6 shadow-lg ring-4
+                    ${isDark ? 'ring-slate-700' : 'ring-slate-50'}`}>
+                    {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
+                      <img src={user?.avatarUrl || user?.avatar_url || user?.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-6xl">
+                        {avatarLetter}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <p className={`font-extrabold text-xl text-center truncate w-full ${isDark ? "text-white" : "text-slate-900"}`}>
+                    {displayName}
+                  </p>
+                  <p className={`text-base text-center truncate w-full mt-2 mb-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    {user?.email || "Verified IITK User"}
+                  </p>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  <button 
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      navigate("/profile");
+                    }}
+                    className={`w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl text-base font-semibold transition-colors
+                      ${isDark ? 'hover:bg-white/10 text-white' : 'hover:bg-slate-50 text-slate-800'}`}
+                  >
+                    <User className="w-5 h-5 text-blue-500" />
+                    Edit Profile
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setHeaderMenuOpen(false);
+                      logout();
+                    }}
+                    className={`w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl text-base font-semibold transition-colors
+                      ${isDark ? 'hover:bg-white/10 text-red-400' : 'hover:bg-red-50 text-red-600'}`}
+                  >
+                    <LogOut className="w-5 h-5" />
+                    Log Out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

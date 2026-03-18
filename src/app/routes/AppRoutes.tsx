@@ -45,6 +45,7 @@ export default function AppRoutes() {
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
+        <Route path="/match-waiting" element={<ProtectedRoute><MatchingBuffer /></ProtectedRoute>} />
 
         {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
