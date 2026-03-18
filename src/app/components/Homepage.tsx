@@ -127,7 +127,7 @@ export function HomePageScreen() {
       }
 
       // Successfully joined queue, navigate to waiting screen
-      navigate("/match-waiting");
+      navigate("/matchmaking");
     } catch (err) {
       console.error("Join queue error:", err);
       setQueueError("Failed to connect to server");
