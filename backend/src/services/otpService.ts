@@ -1,11 +1,4 @@
 // FILE: src/services/otpService.ts
-// PURPOSE: OTP generation, storage, and verification (like Shopio's EmailOtpService)
-// WHAT IT DOES:
-// - Generates 6-digit random OTP
-// - Validates IITK email domain
-// - Stores OTP in database with 5-minute expiry
-// - Invalidates old OTPs when new one is requested
-// - Verifies OTP and marks user as verified
 
 import { query } from '../config/database';
 import { emailService } from './emailService';
@@ -20,9 +13,9 @@ export class OTPService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  // Send OTP to email (like Shopio's generateAndSendOtp method)
-  async sendOTP(email: string): Promise<void> {
-    // Sanitize and validate email
+  // Send OTP to email
+  // 🔥 CHANGED: Added `isPasswordReset` parameter
+  async sendOTP(email: string, isPasswordReset: boolean = false): Promise<void> {
     email = ValidationUtils.sanitizeEmail(email);
 
     if (!ValidationUtils.isValidEmail(email)) {
@@ -33,14 +26,17 @@ export class OTPService {
       throw new Error('Only IITK email addresses (@iitk.ac.in) are allowed');
     }
 
+    // 🔥 CHANGED: Dynamic token type based on flow
+    const tokenType = isPasswordReset ? 'password_reset' : 'email_verify';
+
     const recentOTPs = await query(
       `SELECT COUNT(*) as count 
        FROM verification_tokens vt
        JOIN users u ON u.id = vt.user_id
        WHERE u.email = $1 
-       AND vt.token_type = 'email_verify'
+       AND vt.token_type = $2
        AND vt.created_at > NOW() - INTERVAL '1 hour'`,
-      [email]
+      [email, tokenType] // 🔥 CHANGED: passed tokenType
     );
 
     if (parseInt(recentOTPs.rows[0].count) >= this.MAX_RESEND_ATTEMPTS) {
@@ -54,9 +50,9 @@ export class OTPService {
       `UPDATE verification_tokens 
        SET used = true 
        WHERE user_id = (SELECT id FROM users WHERE email = $1) 
-       AND token_type = 'email_verify'
+       AND token_type = $2
        AND used = false`,
-      [email]
+      [email, tokenType] // 🔥 CHANGED: passed tokenType
     );
 
     // Find or create user
@@ -91,34 +87,38 @@ export class OTPService {
     await query(
       `INSERT INTO verification_tokens (user_id, token, token_type, expires_at) 
        VALUES ($1, $2, $3, $4)`,
-      [userId, otp, 'email_verify', expiresAt]
+      [userId, otp, tokenType, expiresAt] // 🔥 CHANGED: inserted dynamic tokenType
     );
 
     // Send OTP via email
     await emailService.sendOTP(email, otp);
 
-    console.log(`OTP sent to ${email} (User ID: ${userId})`);
+    console.log(`OTP sent to ${email} (User ID: ${userId}, Type: ${tokenType})`);
   }
 
-  // Verify OTP and activate account (like Shopio's verifyOtp method)
-  async verifyOTP(email: string, otp: string): Promise<{ success: boolean; userId?: number; message: string }> {
+  // Verify OTP and activate account
+  // 🔥 CHANGED: Added `isPasswordReset` parameter
+  async verifyOTP(email: string, otp: string, isPasswordReset: boolean = false): Promise<{ success: boolean; userId?: number; message: string }> {
     email = ValidationUtils.sanitizeEmail(email);
 
     if (!ValidationUtils.isValidOTP(otp)) {
       return { success: false, message: 'Invalid OTP format' };
     }
 
-    // Find valid OTP (from Shopio's verification logic)
+    // 🔥 CHANGED: Dynamic token type based on flow
+    const tokenType = isPasswordReset ? 'password_reset' : 'email_verify';
+
+    // Find valid OTP
     const result = await query(
       `SELECT vt.id, vt.user_id, u.email, u.display_name
        FROM verification_tokens vt
        JOIN users u ON u.id = vt.user_id
        WHERE u.email = $1 
        AND vt.token = $2 
-       AND vt.token_type = 'email_verify'
+       AND vt.token_type = $3
        AND vt.expires_at > NOW()
        AND vt.used = false`,
-      [email, otp]
+      [email, otp, tokenType] // 🔥 CHANGED: passed tokenType
     );
 
     if (result.rows.length === 0) {
@@ -127,18 +127,21 @@ export class OTPService {
 
     const { id: tokenId, user_id: userId, display_name } = result.rows[0];
 
-    // Mark OTP as used (single-use OTP from Shopio)
+    // Mark OTP as used
     await query('UPDATE verification_tokens SET used = true WHERE id = $1', [tokenId]);
 
-    // Mark user as verified
-    await query('UPDATE users SET verified = true WHERE id = $1', [userId]);
+    // 🔥 CHANGED: Only mark user verified and send welcome email if it's a normal signup
+    if (!isPasswordReset) {
+      // Mark user as verified
+      await query('UPDATE users SET verified = true WHERE id = $1', [userId]);
 
-    // Send welcome email (non-blocking)
-    emailService.sendWelcomeEmail(email, display_name).catch(err => {
-      console.error('Failed to send welcome email:', err);
-    });
+      // Send welcome email (non-blocking)
+      emailService.sendWelcomeEmail(email, display_name).catch(err => {
+        console.error('Failed to send welcome email:', err);
+      });
 
-    console.log(`User ${email} verified successfully`);
+      console.log(`User ${email} verified successfully`);
+    }
 
     return {
       success: true,
@@ -147,20 +150,24 @@ export class OTPService {
     };
   }
 
-  // Resend OTP (with cooldown check)
-  async resendOTP(email: string): Promise<void> {
+  // Resend OTP
+  // 🔥 CHANGED: Added `isPasswordReset` parameter
+  async resendOTP(email: string, isPasswordReset: boolean = false): Promise<void> {
     email = ValidationUtils.sanitizeEmail(email);
+    
+    // 🔥 CHANGED: Dynamic token type
+    const tokenType = isPasswordReset ? 'password_reset' : 'email_verify';
 
-    // Check if last OTP was sent less than 1 minute ago (cooldown from Shopio)
+    // Check cooldown
     const lastOTP = await query(
       `SELECT vt.created_at 
        FROM verification_tokens vt
        JOIN users u ON u.id = vt.user_id
        WHERE u.email = $1 
-       AND vt.token_type = 'email_verify'
+       AND vt.token_type = $2
        ORDER BY vt.created_at DESC
        LIMIT 1`,
-      [email]
+      [email, tokenType] // 🔥 CHANGED: passed tokenType
     );
 
     if (lastOTP.rows.length > 0) {
@@ -174,7 +181,7 @@ export class OTPService {
     }
 
     // Send new OTP
-    await this.sendOTP(email);
+    await this.sendOTP(email, isPasswordReset); // 🔥 CHANGED: Pass the flag forward
   }
 }
 

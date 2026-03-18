@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
-import { Lock, Mail, LogIn, KeyRound, ArrowRight, ShieldCheck, Globe } from 'lucide-react';
+import { Lock, Mail, LogIn, KeyRound, ArrowRight, ShieldCheck, Globe, Eye, EyeOff } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
@@ -9,13 +9,14 @@ import { setAuthTokens } from '@/services/auth';
 export function DedicatedLoginScreen() {
     const navigate = useNavigate();
     const location = useLocation();
-  const colors = useThemeColors();
-  const { theme } = useTheme();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+    const colors = useThemeColors();
+    const { theme } = useTheme();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false); // <-- New state
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-  const isDark = theme === 'dark';
+    const isDark = theme === 'dark';
 
     // Login handler
     const handleLogin = async () => {
@@ -160,21 +161,34 @@ export function DedicatedLoginScreen() {
                 <div className="space-y-2">
                     <div className="flex justify-between items-center ml-1">
                         <label className={`text-sm font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Password</label>
-                        <button className="text-xs font-bold text-blue-500 hover:underline">Forgot?</button>
+                        <button className="text-xs font-bold text-blue-500 hover:underline" onClick={()=>{navigate('/forgot')}}>Forgot?</button>
                     </div>
                     <div className="relative group">
                         <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                         <input
-                            type="password"
+                            type={showPassword ? "text" : "password"} // <-- Changed
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="••••••••••••"
-                            className={`w-full pl-12 pr-4 py-4 rounded-xl border-2 font-medium transition-all outline-none
+                            className={`w-full pl-12 pr-12 py-4 rounded-xl border-2 font-medium transition-all outline-none
                                 ${isDark 
                                     ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' 
                                     : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500'
                                 }`}
                         />
+                        {/* <-- New Button --> */}
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className={`absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-md transition-colors outline-none focus:ring-2 focus:ring-blue-500
+                                ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            {showPassword ? (
+                                <EyeOff className="w-5 h-5" />
+                            ) : (
+                                <Eye className="w-5 h-5" />
+                            )}
+                        </button>
                     </div>
                 </div>
             </div>
