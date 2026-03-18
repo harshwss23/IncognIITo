@@ -14,9 +14,10 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const senderId = req.user!.userId;
-      const { receiverId, message } = req.body as { receiverId: number; message?: string };
+      const { message } = req.body;
+      const receiverId = Number(req.body.receiverId);
 
-      if (!receiverId || typeof receiverId !== "number") {
+      if (!receiverId || isNaN(receiverId)) {
         return res.status(400).json({ success: false, message: "receiverId is required" });
       }
 
@@ -73,9 +74,55 @@ router.get(
 
       const result = await query(
         `SELECT r.id, r.sender_id, r.receiver_id, r.status, r.message, r.created_at, r.responded_at,
-                u.email as sender_email, u.display_name as sender_display_name
+                u.email as sender_email,
+                u.display_name as sender_display_name,
+          sp.avatar_url as sender_avatar_url,
+                COALESCE(
+                  ARRAY(
+                    SELECT DISTINCT i
+                    FROM unnest(COALESCE(sp.interests, '{}'::text[])) AS i
+                    INTERSECT
+                    SELECT DISTINCT j
+                    FROM unnest(COALESCE(rp.interests, '{}'::text[])) AS j
+                  ),
+                  '{}'::text[]
+                ) AS "sharedTags",
+                COALESCE(
+                  (
+                    SELECT ROUND(
+                      CASE
+                        WHEN union_count.cnt = 0 THEN 0
+                        ELSE (intersection_count.cnt::numeric / union_count.cnt::numeric) * 100
+                      END
+                    )
+                    FROM
+                      (
+                        SELECT COUNT(*) AS cnt
+                        FROM (
+                          SELECT DISTINCT i
+                          FROM unnest(COALESCE(sp.interests, '{}'::text[])) AS i
+                          UNION
+                          SELECT DISTINCT j
+                          FROM unnest(COALESCE(rp.interests, '{}'::text[])) AS j
+                        ) AS union_items
+                      ) AS union_count,
+                      (
+                        SELECT COUNT(*) AS cnt
+                        FROM (
+                          SELECT DISTINCT i
+                          FROM unnest(COALESCE(sp.interests, '{}'::text[])) AS i
+                          INTERSECT
+                          SELECT DISTINCT j
+                          FROM unnest(COALESCE(rp.interests, '{}'::text[])) AS j
+                        ) AS intersection_items
+                      ) AS intersection_count
+                  ),
+                  0
+                )::int AS "matchScore"
          FROM connection_requests r
          JOIN users u ON u.id = r.sender_id
+         LEFT JOIN user_profiles sp ON sp.user_id = r.sender_id
+         LEFT JOIN user_profiles rp ON rp.user_id = r.receiver_id
          WHERE r.receiver_id = $1 AND r.status = $2
          ORDER BY r.created_at DESC`,
         [userId, status]

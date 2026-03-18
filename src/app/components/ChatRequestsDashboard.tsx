@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MessageCircle, MessageSquare, User, Check, Shield } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { authFetch } from '@/services/auth';
 
 export function ChatRequestsDashboard() {
   const colors = useThemeColors();
+  const navigate = useNavigate();
 
   const [connectionRequests, setConnectionRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -91,35 +93,32 @@ export function ChatRequestsDashboard() {
   return (
     <div className={`w-full h-full flex ${colors.bgSecondary} transition-colors duration-300`}>
 
-      {/* --- LEFT SIDEBAR (UNCHANGED UI) --- */}
-      <div className="w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-blue-500/20 p-6 flex flex-col transition-colors z-20">
+      {/* --- LEFT SIDEBAR --- */}
+      <div className="w-80 flex flex-col border-r z-20 transition-colors bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10">
 
-        <div className="mb-10 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/30">I</div>
+        <div className="h-24 flex items-center px-8">
           <h2 className="text-2xl font-bold tracking-tight">
             <span className="text-slate-900 dark:text-white">Incogn</span>
-            <span className="text-blue-600 dark:text-blue-400">IIT</span>
+            <span className="text-blue-500">IIT</span>
             <span className="text-slate-900 dark:text-white">o</span>
           </h2>
         </div>
 
-        <nav className="space-y-2 flex-1">
-          <button className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-blue-50 dark:bg-blue-600/10 border border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 shadow-sm">
-            <div className="relative">
-              <MessageCircle className="w-5 h-5" />
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center text-white shadow-md">
-                {connectionRequests.length}
-              </span>
+        <nav className="flex-1 px-4 space-y-2">
+          <button className="w-full flex items-center justify-between px-4 py-4 rounded-xl transition-all duration-300 group bg-blue-50 dark:bg-gradient-to-r dark:from-blue-600/20 dark:to-blue-500/10 border border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-white">
+            <div className="flex items-center gap-3">
+              <MessageCircle className="w-5 h-5 text-blue-500" />
+              <span className="font-medium">Chat Requests</span>
             </div>
-            <span className="font-semibold text-sm">Chat Requests</span>
+            <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold shadow-lg shadow-red-500/30">
+              {connectionRequests.length}
+            </span>
           </button>
 
-          <button className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-all group">
-            <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            <span className="font-medium text-sm">Current Chats</span>
-          </button>
-
-          <button className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-all group">
+          <button
+            onClick={() => navigate('/profile')}
+            className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 transition-all group"
+          >
             <User className="w-5 h-5 group-hover:scale-110 transition-transform" />
             <span className="font-medium text-sm">Profile</span>
           </button>
@@ -129,12 +128,12 @@ export function ChatRequestsDashboard() {
       {/* --- MAIN CONTENT (UI EXACT SAME) --- */}
       <div className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 relative overflow-hidden">
 
-        <div className="h-20 border-b border-slate-200 dark:border-white/10 px-8 flex items-center bg-white/80 dark:bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
+        <div className="h-24 px-10 flex items-center justify-between z-10 border-b backdrop-blur-sm bg-white/60 dark:bg-slate-900/50 border-slate-200 dark:border-white/10">
           <div>
-            <h3 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <h3 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
               Connection Requests
             </h3>
-            <p className="text-slate-500 dark:text-blue-200/60 text-sm">
+            <p className="text-sm mt-1 text-slate-500 dark:text-slate-400">
               Find your perfect study partner or project collaborator.
             </p>
           </div>
@@ -153,22 +152,30 @@ export function ChatRequestsDashboard() {
 
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="relative w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center border border-slate-200 dark:border-white/10">
-                        <Shield className="w-6 h-6 text-slate-400 dark:text-white/30" />
+                      <div className="relative w-12 h-12 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center border border-slate-200 dark:border-white/10 overflow-hidden">
+                        {request.sender_avatar_url ? (
+                          <img
+                            src={request.sender_avatar_url}
+                            alt="Profile"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Shield className="w-6 h-6 text-slate-400 dark:text-white/30" />
+                        )}
                       </div>
                       <div>
                         <h4 className="text-slate-900 dark:text-white font-bold text-sm">
-                          {request.sender_email || "Anonymous"}
+                          {request.sender_display_name || request.sender_email?.split('@')[0] || "Anonymous"}
                         </h4>
                         <p className="text-slate-400 dark:text-blue-300/50 text-xs font-mono">
-                          Anonymous
+                          {/* Anonymous */}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex flex-col items-end">
                       <span className="text-2xl font-black text-green-600 dark:text-green-400">
-                        {request.sender?.matchScore || 0}%
+                        {request.matchScore || 0}%
                       </span>
                       <span className="text-[10px] text-green-600/70 uppercase font-bold tracking-wider">
                         Match
