@@ -221,36 +221,6 @@ export function UserProfile() {
           <StatCard title="Interests" value={interests.length} isDark={isDark} />
         </div>
 
-        {/* Reputation */}
-        <div
-          className={`p-8 rounded-3xl border mb-8 flex items-center justify-between relative overflow-hidden
-          ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 shadow-xl'}`}
-        >
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg text-yellow-600">
-                <Award className="w-6 h-6" />
-              </div>
-              <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                Community Reputation
-              </h3>
-            </div>
-            <p className={`${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Calculated from community feedback and sessions.
-            </p>
-          </div>
-
-          <div className="text-right">
-            <div className={`text-7xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {rating.toFixed(1)}
-              <span className="text-4xl text-yellow-500 ml-2">★</span>
-            </div>
-            <div className="text-green-500 font-medium mt-1">
-              Excellent Standing
-            </div>
-          </div>
-        </div>
-
         {/* Interests */}
         <div
           className={`rounded-3xl border p-8
