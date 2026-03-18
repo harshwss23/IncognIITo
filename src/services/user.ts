@@ -64,3 +64,25 @@ export async function updateUserProfile(payload: UpdateUserProfileInput): Promis
     body: JSON.stringify(payload),
   });
 }
+
+// Upload profile picture to Cloudinary (via our backend)
+export async function uploadAvatar(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const response = await fetchJsonWithAuth<{ success: boolean; avatarUrl: string }>(
+    "/api/users/avatar",
+    {
+      method: "POST",
+      body: formData,
+      // Don't set Content-Type — browser sets it automatically with boundary for multipart
+    }
+  );
+
+  return response.avatarUrl;
+}
+
+// Remove profile picture
+export async function removeAvatar(): Promise<void> {
+  await fetchJsonWithAuth("/api/users/avatar", { method: "DELETE" });
+}
