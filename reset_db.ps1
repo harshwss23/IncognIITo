@@ -1,18 +1,45 @@
-Write-Host "Dropping existing database..." -ForegroundColor Yellow
-& psql -U postgres -c "DROP DATABASE IF EXISTS incogniito_db WITH (FORCE);"
+# setup-db.ps1
 
-Write-Host "Updating user password and recreating database..." -ForegroundColor Yellow
-# Delete karne ke bajaye, existing user ka password update kar rahe hain
-& psql -U postgres -c "ALTER USER incogniito_user WITH ENCRYPTED PASSWORD 'CS253_69_7';"
-& psql -U postgres -c "CREATE DATABASE incogniito_db OWNER incogniito_user;"
+$SqlFile = ".\schema.sql"
+$PgUser = "postgres" # Tumhara main superuser yahan daalo agar alag hai
 
-Write-Host "Granting schema privileges..." -ForegroundColor Yellow
-& psql -U postgres -d incogniito_db -c "GRANT ALL ON SCHEMA public TO incogniito_user; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO incogniito_user; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO incogniito_user;"
+Clear-Host
+Write-Host "🚀 Starting Database Setup for IncognIITo..." -ForegroundColor Cyan
 
-Write-Host "Applying new schema..." -ForegroundColor Yellow
-# Yeh temporary environment variable tumhe aakhri step mein password type karne se bacha lega
-$env:PGPASSWORD="CS253_69_7"
-& psql -U incogniito_user -d incogniito_db -f schema.sql
-$env:PGPASSWORD=""
+# Check if SQL file exists
+if (-Not (Test-Path $SqlFile)) {
+    Write-Host "❌ Error: '$SqlFile' not found in the current directory!" -ForegroundColor Red
+    Write-Host "Please make sure setup-db.ps1 and schema.sql are in the same folder." -ForegroundColor Yellow
+    exit
+}
 
-Write-Host "Clean reset complete! Database is ready." -ForegroundColor Green
+# Prompt for PostgreSQL superuser password securely
+Write-Host "🔑 We need the password for the PostgreSQL superuser ($PgUser) to run the script." -ForegroundColor Yellow
+$PgPassword = Read-Host "Enter Password" -AsSecureString
+
+# Convert SecureString to Plain Text to pass to psql environment variable
+$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($PgPassword)
+$UnsecurePassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+
+# Set the password in the environment variable so psql doesn't prompt you again mid-script
+$env:PGPASSWORD = $UnsecurePassword
+
+Write-Host "`n⏳ Running database migrations from schema.sql..." -ForegroundColor Cyan
+
+# Execute the psql command
+psql -U $PgUser -d postgres -f $SqlFile
+
+# Check if the command was successful
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "`n✅ Database setup completed successfully!" -ForegroundColor Green
+    Write-Host "👉 Database 'incogniito_db' and user 'incogniito_user' are ready." -ForegroundColor Green
+} else {
+    Write-Host "`n❌ Something went wrong! Please check the error messages above." -ForegroundColor Red
+    Write-Host "Make sure PostgreSQL is installed and added to your system PATH." -ForegroundColor Yellow
+}
+
+# Clean up the environment variable for security
+$env:PGPASSWORD = $null
+
+Write-Host "`nPress any key to exit..."
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")

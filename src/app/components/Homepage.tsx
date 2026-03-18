@@ -13,7 +13,7 @@ import {
 import { useThemeColors } from "@/app/hooks/useThemeColors";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, clearAuthTokens } from "@/services/auth";
-
+import { buildApiUrl } from "@/services/config";
 export function HomePageScreen() {
   const colors = useThemeColors();
   const { theme } = useTheme();
@@ -110,7 +110,7 @@ export function HomePageScreen() {
       }
 
       // Successfully joined queue, navigate to waiting screen
-      navigate("/match-waiting");
+      navigate("/matchmaking");
     } catch (err) {
       console.error("Join queue error:", err);
       setQueueError("Failed to connect to server");
