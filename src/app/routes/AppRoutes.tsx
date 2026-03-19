@@ -3,11 +3,14 @@ import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { AppShell } from "../layout/AppShell";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { AdminRoute } from "../components/AdminRoute";
+import { PublicRoute } from "../components/PublicRoute";
+
+// Icons & Services
+import { Loader2 } from "lucide-react";
 import { getAccessToken } from "@/services/auth";
 import { socket } from "@/services/socket";
-import { Loader2 } from "lucide-react";
 
-// Components
+// Components (your existing screens)
 import { FuturisticChatInterface } from "../components/FuturisticChatInterface";
 import { ChatRequestsDashboard } from "../components/ChatRequestsDashboard";
 import { MainDashboard } from "../components/MainDashboard";
@@ -23,15 +26,21 @@ import { ForgotPasswordScreen } from "../components/ForgptPassword";
 import { HomePageScreen } from "../components/Homepage";
 import { ActiveUsersScreen } from "../components/ActiveUsersScreen";
 import { MatchingBuffer } from "../components/MatchingBuffer";
+import { PublicUserProfile } from "../components/PublicUserProfile";
 
 // ─── SESSION BLOCKED SCREEN (WITH TAKEOVER LOGIC) ─────────────────────────────
 const SessionBlockedScreen = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const token = getAccessToken();
+
+  // 🚨 Agar user logged in hi nahi hai, toh seedha login (/) pe bhejo
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleUseHere = async () => {
     setIsLoading(true);
-    const token = getAccessToken();
 
     // 1. Purane tabs ko message bhejo ki wo apna socket disconnect kar lein
     const channel = new BroadcastChannel('incogniito_tabs');
@@ -43,28 +52,24 @@ const SessionBlockedScreen = () => {
 
     // 3. Backend states clear karo (Queue leave karo aur agar live match mein tha toh end karo)
     try {
-      if (token) {
-        // Leave Matchmaking Queue just in case
-        await fetch('http://localhost:5050/api/match/leave', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        }).catch(err => console.log("Leave queue info:", err));
-        
-        // Force End any active session
-        await fetch('http://localhost:5050/api/match/end', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        }).catch(err => console.log("End session info:", err));
-      }
+      // Leave Matchmaking Queue just in case
+      await fetch('http://localhost:5050/api/match/leave', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(err => console.log("Leave queue info:", err));
+      
+      // Force End any active session
+      await fetch('http://localhost:5050/api/match/end', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(err => console.log("End session info:", err));
     } catch (error) {
       console.error("Error clearing session:", error);
     }
 
     // 4. Apna socket wapas connect karo aur Homepage pe jao
-    if (token) {
-      socket.auth = { token };
-      socket.connect();
-    }
+    socket.auth = { token };
+    socket.connect();
     
     setIsLoading(false);
     navigate('/homepage', { replace: true });
@@ -97,14 +102,16 @@ const SessionBlockedScreen = () => {
 export default function AppRoutes() {
   return (
     <Routes>
+      {/* Global layout (background + theme toggle) */}
       <Route element={<AppShell />}>
-        {/* Public Routes */}
-        <Route path="/" element={<LandingAuthPortal />} />
-        <Route path="/register" element={<RegistrationScreen />} />
-        <Route path="/login" element={<DedicatedLoginScreen />} />
-        <Route path="/forgot" element={<ForgotPasswordScreen />} />
         
-        {/* The Error Route for Duplicate Tabs */}
+        {/* 🟢 Public Routes */}
+        <Route path="/" element={<PublicRoute><LandingAuthPortal /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><RegistrationScreen /></PublicRoute>} />
+        <Route path="/login" element={<PublicRoute><DedicatedLoginScreen /></PublicRoute>} />
+        <Route path="/forgot" element={<PublicRoute><ForgotPasswordScreen /></PublicRoute>} />
+
+        {/* 🔴 The Error Route for Duplicate Tabs */}
         <Route path="/blocked" element={<SessionBlockedScreen />} />
 
         {/* 🛡️ Protected Routes */}
@@ -114,15 +121,21 @@ export default function AppRoutes() {
         <Route path="/live" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
         <Route path="/live/:roomId" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
         <Route path="/matchmaking" element={<ProtectedRoute><MatchingBuffer /></ProtectedRoute>} />
+        <Route path="/match-waiting" element={<ProtectedRoute><MatchingBuffer /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+        
+        {/* Other person's profile */}
+        <Route path="/profile/:id" element={<ProtectedRoute><PublicUserProfile /></ProtectedRoute>} />
+        <Route path="/users/:id" element={<ProtectedRoute><PublicUserProfile /></ProtectedRoute>} />
+        
         <Route path="/session/:roomid" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
 
-        {/* Admin Route */}
+        {/* 👑 Admin Route */}
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
-        {/* Fallback */}
+        {/* ⚡ Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -136,7 +136,7 @@ export function MatchingBuffer() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        navigate('/');
+        navigate('/homepage');
       } else {
         setError(data.message || 'Failed to leave queue');
       }

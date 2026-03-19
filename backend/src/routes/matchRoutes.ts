@@ -9,25 +9,41 @@ import { authMiddleware } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// All match routes require valid JWT token
-// authMiddleware.authenticate reads the Bearer token and sets req.user
+/**
+ * MIDDLEWARE
+ * All match routes require a valid JWT token.
+ * authMiddleware.authenticate reads the Bearer token and sets req.user.
+ */
+const auth = authMiddleware.authenticate.bind(authMiddleware);
+
+// --- Static Routes ---
 
 // POST /api/match/join   → Join the matching queue
-router.post('/join', authMiddleware.authenticate.bind(authMiddleware), matchController.joinQueue.bind(matchController));
+router.post('/join', auth, matchController.joinQueue.bind(matchController));
 
 // POST /api/match/leave  → Leave the matching queue
-router.post('/leave', authMiddleware.authenticate.bind(authMiddleware), matchController.leaveQueue.bind(matchController));
+router.post('/leave', auth, matchController.leaveQueue.bind(matchController));
 
 // GET  /api/match/status → Check current state (idle / waiting / matched)
-router.get('/status', authMiddleware.authenticate.bind(authMiddleware), matchController.getStatus.bind(matchController));
+router.get('/status', auth, matchController.getStatus.bind(matchController));
 
 // POST /api/match/end    → End an active session
-router.post('/end', authMiddleware.authenticate.bind(authMiddleware), matchController.endSession.bind(matchController));
+router.post('/end', auth, matchController.endSession.bind(matchController));
 
-// ==========================================
-// GET /api/match/:roomId → Get match details for video call overlays (names, interests)
-// NOTE: This dynamic route MUST be at the bottom so it doesn't conflict with /status or /join.
-// ==========================================
-router.get('/:roomId', authMiddleware.authenticate.bind(authMiddleware), matchController.getMatchDetails.bind(matchController));
+// POST /api/match/rate   → Submit rating for a session
+router.post('/rate', auth, matchController.rateSession.bind(matchController));
+
+
+// --- Prefixed Dynamic Routes ---
+
+// GET  /api/match/session/:roomId → Get session participants
+router.get('/session/:roomId', auth, matchController.getSessionDetails.bind(matchController));
+
+
+// --- Catch-all Dynamic Routes ---
+// NOTE: Must be at the bottom to avoid conflicting with static routes.
+
+// GET /api/match/:roomId → Get match details (names, interests)
+router.get('/:roomId', auth, matchController.getMatchDetails.bind(matchController));
 
 export default router;

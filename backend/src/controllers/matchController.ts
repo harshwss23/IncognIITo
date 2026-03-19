@@ -1,9 +1,16 @@
 // FILE: src/controllers/matchController.ts
-// WHY: Frontend needs REST endpoints to join/leave queue + check status + get match details.
+// WHY: Frontend needs REST endpoints to join/leave queue, check status, and manage match data.
+// ENDPOINTS:
+//   POST /api/match/join       → Put user in queue
+//   POST /api/match/leave      → Remove user from queue
+//   GET  /api/match/status     → Are you in queue or in a session?
+//   POST /api/match/end        → End active session
+//   POST /api/match/rate       → Rate a completed match
+//   GET  /api/match/:roomId    → Get rich match details (me & them)
 
 import { Request, Response } from 'express';
 import { queueService } from '../services/queueService';
-import { query } from '../config/database';
+import { pool, query } from '../config/database';
 
 export class MatchController {
 
@@ -68,6 +75,7 @@ export class MatchController {
       const roomId = await queueService.getActiveSession(userId);
       if (roomId) {
         // Cross-validate: confirm DB also says this session is still active
+        // Prevents stale Redis keys (from crashes/restarts) from returning ghost roomIds
         const dbCheck = await query(
           `SELECT id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`,
           [roomId]
@@ -77,6 +85,7 @@ export class MatchController {
           // Redis says matched, but DB disagrees → stale key, self-heal
           await queueService.clearActiveSession(userId);
           console.log(`Cleared stale Redis session for user ${userId} (roomId: ${roomId} not active in DB)`);
+          // Fall through to idle below
         } else {
           res.status(200).json({
             success: true,
@@ -126,13 +135,13 @@ export class MatchController {
          WHERE room_id = $1 AND status = 'active'`,
         [roomId]
       );
-
+      
       if (sessionResult.rows.length > 0) {
         const session = sessionResult.rows[0];
         const partnerId = session.user1_id === userId
           ? session.user2_id
           : session.user1_id;
-
+          
         // Mark session as completed in PostgreSQL
         await query(
           `UPDATE matchmaking_sessions
@@ -140,7 +149,6 @@ export class MatchController {
            WHERE id = $1`,
           [session.id]
         );
-
         // Clear partner's session from Redis
         await queueService.clearActiveSession(partnerId);  
       }
@@ -151,20 +159,142 @@ export class MatchController {
     }
   }
 
-  // ==========================================
-  // NEW: GET /api/match/:roomId
-  // Gets the usernames and interests for the video call overlay
-  // ==========================================
- async getMatchDetails(req: Request, res: Response): Promise<void> {
+  // GET /api/match/session/:roomId (Example route, adjust if needed)
+  // Basic session details fetcher
+  async getSessionDetails(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const roomId = req.params.roomId;
+
+      const sessionResult = await query(
+        `SELECT s.id, s.user1_id, s.user2_id, 
+                u1.display_name as user1_name, u2.display_name as user2_name,
+                u1.email as user1_email, u2.email as user2_email
+         FROM matchmaking_sessions s
+         JOIN users u1 ON s.user1_id = u1.id
+         JOIN users u2 ON s.user2_id = u2.id
+         WHERE s.room_id = $1`,
+        [roomId]
+      );
+
+      if (sessionResult.rows.length === 0) {
+        res.status(404).json({ success: false, message: 'Session not found' });
+        return;
+      }
+
+      const session = sessionResult.rows[0];
+      
+      // Ensure the requesting user was part of this session
+      if (session.user1_id !== userId && session.user2_id !== userId) {
+         res.status(403).json({ success: false, message: 'Unauthorized access to session' });
+         return;
+      }
+
+      const partnerId = session.user1_id === userId ? session.user2_id : session.user1_id;
+      const partnerName = session.user1_id === userId ? session.user2_name : session.user1_name;
+      const partnerEmail = session.user1_id === userId ? session.user2_email : session.user1_email;
+
+      res.status(200).json({ 
+        success: true, 
+        partnerId, 
+        partnerName,
+        partnerEmail 
+      });
+    } catch (error) {
+      console.error('Get session details error:', error);
+      res.status(500).json({ success: false, message: 'Failed to get session details' });
+    }
+  }
+
+  // POST /api/match/rate
+  // Rate the session user just completed
+  async rateSession(req: Request, res: Response): Promise<void> {
+    const userId = req.user!.userId;
+    const { roomId, rating } = req.body as { roomId?: string; rating?: number };
+
+    if (!roomId || typeof roomId !== 'string') {
+      res.status(400).json({ success: false, message: 'roomId is required' });
+      return;
+    }
+
+    const numericRating = Number(rating);
+    if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+      res.status(400).json({ success: false, message: 'rating must be between 1 and 5' });
+      return;
+    }
+
+    try {
+      const sessionResult = await query(
+        `SELECT id, user1_id, user2_id, rated_by_user1, rated_by_user2
+         FROM matchmaking_sessions WHERE room_id = $1`,
+        [roomId]
+      );
+
+      if (sessionResult.rows.length === 0) {
+        res.status(404).json({ success: false, message: 'Session not found' });
+        return;
+      }
+
+      const session = sessionResult.rows[0];
+      const isUser1 = session.user1_id === userId;
+      const isUser2 = session.user2_id === userId;
+
+      if (!isUser1 && !isUser2) {
+        res.status(403).json({ success: false, message: 'You are not part of this session' });
+        return;
+      }
+
+      const alreadyRated = isUser1 ? session.rated_by_user1 : session.rated_by_user2;
+      if (alreadyRated) {
+        res.status(409).json({ success: false, message: 'Rating already submitted for this session' });
+        return;
+      }
+
+      const targetUserId = isUser1 ? session.user2_id : session.user1_id;
+      const flagColumn = isUser1 ? 'rated_by_user1' : 'rated_by_user2';
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`INSERT INTO user_profiles (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`, [targetUserId]);
+        
+        const sessionsUpdate = await client.query(
+          `UPDATE users SET sessions = COALESCE(sessions, 0) + 1 WHERE id = $1 RETURNING sessions`,
+          [targetUserId]
+        );
+
+        const newSessions = Number(sessionsUpdate.rows[0].sessions);
+        const ratingResult = await client.query(`SELECT rating_sum FROM user_profiles WHERE user_id = $1`, [targetUserId]);
+        const currentSum = Number(ratingResult.rows[0]?.rating_sum || 0);
+        const newSum = currentSum + numericRating;
+        const updatedRating = newSum / newSessions;
+
+        await client.query(`UPDATE user_profiles SET rating = $1, rating_sum = $2 WHERE user_id = $3`, [updatedRating, newSum, targetUserId]);
+        await client.query(`UPDATE matchmaking_sessions SET ${flagColumn} = TRUE WHERE id = $1`, [session.id]);
+        
+        await client.query('COMMIT');
+        res.status(200).json({ success: true, message: 'Rating submitted' });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error('Rate session error:', error);
+      res.status(500).json({ success: false, message: 'Failed to submit rating' });
+    }
+  }
+
+  // GET /api/match/:roomId
+  // Rich match details fetcher (includes 'me' and 'them' separation with interests)
+  async getMatchDetails(req: Request, res: Response): Promise<void> {
     try {
       const { roomId } = req.params;
-      const userId = Number(req.user!.userId); // 🚨 FIX: Force convert to Number
+      const userId = Number(req.user!.userId); 
 
-      // 1. Find the active match for this room
       const sessionResult = await query(
-        `SELECT user1_id, user2_id 
-         FROM matchmaking_sessions 
-         WHERE room_id = $1 AND status = 'active'`,
+        `SELECT user1_id, user2_id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`,
         [roomId]
       );
 
@@ -174,54 +304,34 @@ export class MatchController {
       }
 
       const session = sessionResult.rows[0];
-      const u1 = Number(session.user1_id); // 🚨 BIGINT to Number
-      const u2 = Number(session.user2_id); // 🚨 BIGINT to Number
+      const u1 = Number(session.user1_id); 
+      const u2 = Number(session.user2_id); 
 
-      // 2. Security Check: Ensure caller is in this match
       if (u1 !== userId && u2 !== userId) {
-        res.status(403).json({ success: false, message: 'Unauthorized to view this match' });
+        res.status(403).json({ success: false, message: 'Unauthorized' });
         return;
       }
 
-      // 3. Identify partner
       const partnerId = u1 === userId ? u2 : u1;
-
-      // 4. Fetch Display Names and Interests for BOTH users
       const profilesResult = await query(
-        `SELECT u.id, u.display_name, p.interests 
-         FROM users u
-         LEFT JOIN user_profiles p ON u.id = p.user_id
-         WHERE u.id IN ($1, $2)`,
+        `SELECT u.id, u.display_name, u.email, p.interests FROM users u
+         LEFT JOIN user_profiles p ON u.id = p.user_id WHERE u.id IN ($1, $2)`,
         [userId, partnerId]
       );
 
-      let me: any = null;
-      let them: any = null;
-
+      let me: any = null, them: any = null;
       profilesResult.rows.forEach(row => {
-        // Make sure interests array is formatted correctly
-        const userInterests = Array.isArray(row.interests) ? row.interests : [];
-
         const userData = {
+          id: Number(row.id),
           username: row.display_name || `IncognIITo User`, 
-          interests: userInterests
+          email: row.email,
+          interests: Array.isArray(row.interests) ? row.interests : []
         };
-
-        // 🚨 MAIN FIX: Compare safely as Numbers!
-        if (Number(row.id) === userId) {
-          me = userData;
-        } else {
-          them = userData;
-        }
+        if (Number(row.id) === userId) me = userData;
+        else them = userData;
       });
 
-      // 5. Send back the data for the frontend overlays
-      res.status(200).json({
-        success: true,
-        me,
-        them
-      });
-
+      res.status(200).json({ success: true, me, them });
     } catch (error) {
       console.error('Get match details error:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch match details' });
