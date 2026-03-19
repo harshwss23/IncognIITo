@@ -1,17 +1,49 @@
 import React, { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { Star, AlertTriangle, X, Check, ThumbsUp, UserPlus } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
+import { submitSessionRating } from '@/services/user';
 
 export function PostSessionModal() {
   const colors = useThemeColors();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+    const { roomid } = useParams<{ roomid: string }>();
   
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [requestSent, setRequestSent] = useState(false);
   const [reportMode, setReportMode] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSubmit = async () => {
+        if (!roomid) {
+            setError('Missing session identifier.');
+            return;
+        }
+        if (rating < 1 || rating > 5) {
+            setError('Select a rating between 1 and 5.');
+            return;
+        }
+
+        try {
+            setError(null);
+            setSubmitting(true);
+            await submitSessionRating(roomid, rating);
+            setSubmitted(true);
+        } catch (err: any) {
+            if (err?.status === 409) {
+                setError('You already submitted a rating for this session.');
+            } else {
+                setError('Failed to submit rating. Please retry.');
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
   return (
     // MAIN CONTAINER: Full Screen Overlay
@@ -118,12 +150,21 @@ export function PostSessionModal() {
             {/* Bottom Actions */}
             <div className="w-full max-w-md space-y-5">
                 {/* Submit Button */}
-                <button className={`w-full py-5 rounded-2xl font-black text-xl text-white shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
-                    ${isDark 
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-blue-500/20' 
-                        : 'bg-slate-900 hover:bg-slate-800 hover:shadow-2xl'}`}>
-                    Submit Feedback
+                <button
+                    onClick={handleSubmit}
+                    disabled={submitting || submitted}
+                    className={`w-full py-5 rounded-2xl font-black text-xl text-white shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
+                    ${(submitting || submitted)
+                        ? 'bg-slate-500 cursor-not-allowed'
+                        : isDark 
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-blue-500/20' 
+                            : 'bg-slate-900 hover:bg-slate-800 hover:shadow-2xl'}`}>
+                    {submitted ? 'Feedback Submitted' : submitting ? 'Submitting...' : 'Submit Feedback'}
                 </button>
+
+                {error && (
+                    <p className={`text-sm text-center ${isDark ? 'text-red-300' : 'text-red-600'}`}>{error}</p>
+                )}
 
                 {/* Report Link */}
                 <button 

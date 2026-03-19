@@ -9,7 +9,7 @@
 
 import { Request, Response } from 'express';
 import { queueService } from '../services/queueService';
-import { query } from '../config/database';
+import { pool, query } from '../config/database';
 
 export class MatchController {
 
@@ -196,6 +196,122 @@ export class MatchController {
     } catch (error) {
       console.error('End session error:', error);
       res.status(500).json({ success: false, message: 'Failed to end session' });
+    }
+  }
+
+  // POST /api/match/rate
+  async rateSession(req: Request, res: Response): Promise<void> {
+    const userId = req.user!.userId;
+    const { roomId, rating } = req.body as { roomId?: string; rating?: number };
+
+    if (!roomId || typeof roomId !== 'string') {
+      res.status(400).json({ success: false, message: 'roomId is required' });
+      return;
+    }
+
+    const numericRating = Number(rating);
+    if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
+      res.status(400).json({ success: false, message: 'rating must be between 1 and 5' });
+      return;
+    }
+
+    try {
+      const sessionResult = await query(
+        `SELECT id, user1_id, user2_id, rated_by_user1, rated_by_user2
+         FROM matchmaking_sessions
+         WHERE room_id = $1`,
+        [roomId]
+      );
+
+      if (sessionResult.rows.length === 0) {
+        res.status(404).json({ success: false, message: 'Session not found' });
+        return;
+      }
+
+      const session = sessionResult.rows[0];
+      const isUser1 = session.user1_id === userId;
+      const isUser2 = session.user2_id === userId;
+
+      if (!isUser1 && !isUser2) {
+        res.status(403).json({ success: false, message: 'You are not part of this session' });
+        return;
+      }
+
+      const alreadyRated = isUser1 ? session.rated_by_user1 : session.rated_by_user2;
+      if (alreadyRated) {
+        res.status(409).json({ success: false, message: 'Rating already submitted for this session' });
+        return;
+      }
+
+      const targetUserId = isUser1 ? session.user2_id : session.user1_id;
+      const flagColumn = isUser1 ? 'rated_by_user1' : 'rated_by_user2';
+
+      const client = await pool.connect();
+
+      try {
+        await client.query('BEGIN');
+
+        await client.query(
+          `INSERT INTO user_profiles (user_id) VALUES ($1)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [targetUserId]
+        );
+
+        const sessionsUpdate = await client.query(
+          `UPDATE users SET sessions = COALESCE(sessions, 0) + 1
+           WHERE id = $1 RETURNING sessions`,
+          [targetUserId]
+        );
+
+        if (sessionsUpdate.rowCount === 0) {
+          await client.query('ROLLBACK');
+          res.status(404).json({ success: false, message: 'Target user not found' });
+          return;
+        }
+
+        const newSessions: number = Number(sessionsUpdate.rows[0].sessions);
+        const previousSessions = newSessions - 1;
+
+        const ratingResult = await client.query(
+          `SELECT rating_sum, rating FROM user_profiles WHERE user_id = $1`,
+          [targetUserId]
+        );
+
+        const currentSum = ratingResult.rows.length > 0 ? Number(ratingResult.rows[0].rating_sum || 0) : 0;
+        const newSum = currentSum + numericRating;
+        const updatedRating = newSum / newSessions;
+
+        await client.query(
+          `UPDATE user_profiles SET rating = $1, rating_sum = $2 WHERE user_id = $3`,
+          [updatedRating, newSum, targetUserId]
+        );
+
+        await client.query(
+          `UPDATE matchmaking_sessions SET ${flagColumn} = TRUE WHERE id = $1`,
+          [session.id]
+        );
+
+        await client.query('COMMIT');
+
+        res.status(200).json({
+          success: true,
+          message: 'Rating submitted',
+          data: {
+            targetUserId,
+            rating: updatedRating,
+            sessions: newSessions,
+          },
+        });
+      } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Rate session error:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit rating' });
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error('Rate session error:', error);
+      res.status(500).json({ success: false, message: 'Failed to submit rating' });
     }
   }
 

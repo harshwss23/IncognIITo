@@ -24,8 +24,8 @@ GRANT ALL PRIVILEGES ON DATABASE incogniito_db TO incogniito_user;
 GRANT USAGE, CREATE ON SCHEMA public TO incogniito_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO incogniito_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO incogniito_user;
-ALTER DEFAULT PRIVILEGES FOR USER ombhartiya IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO incogniito_user;
-ALTER DEFAULT PRIVILEGES FOR USER ombhartiya IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO incogniito_user;
+-- ALTER DEFAULT PRIVILEGES FOR USER ombhartiya IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO incogniito_user;
+-- ALTER DEFAULT PRIVILEGES FOR USER ombhartiya IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO incogniito_user;
 
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -33,11 +33,14 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     display_name VARCHAR(100) DEFAULT '',
     verified BOOLEAN DEFAULT FALSE,
-    is_admin BOOLEAN NOT NULL DEFAULT FALSE
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    sessions INTEGER NOT NULL DEFAULT 0
 );
 
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS sessions INTEGER NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_verified ON users(verified);
@@ -77,6 +80,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     total_chats INTEGER DEFAULT 0,
     total_reports INTEGER DEFAULT 0,
     rating DECIMAL(3, 2) DEFAULT 0.00 CHECK (rating >= 0 AND rating <= 5),
+    rating_sum DECIMAL(10, 2) DEFAULT 0.00,
     is_banned BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -122,6 +126,8 @@ CREATE TABLE IF NOT EXISTS matchmaking_sessions (
     session_end TIMESTAMP,
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
     room_id VARCHAR(100) UNIQUE NOT NULL,
+    rated_by_user1 BOOLEAN NOT NULL DEFAULT FALSE,
+    rated_by_user2 BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT no_self_match CHECK (user1_id <> user2_id)
 );
@@ -288,6 +294,8 @@ CREATE TABLE IF NOT EXISTS users (
 
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS sessions INTEGER NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_verified ON users(verified);
@@ -327,10 +335,14 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     total_chats INTEGER DEFAULT 0,
     total_reports INTEGER DEFAULT 0,
     rating DECIMAL(3, 2) DEFAULT 0.00 CHECK (rating >= 0 AND rating <= 5),
+    rating_sum DECIMAL(10, 2) DEFAULT 0.00,
     is_banned BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE user_profiles
+    ADD COLUMN IF NOT EXISTS rating_sum DECIMAL(10, 2) DEFAULT 0.00;
 
 CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
 
@@ -375,6 +387,11 @@ CREATE TABLE IF NOT EXISTS matchmaking_sessions (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT no_self_match CHECK (user1_id <> user2_id)
 );
+
+ALTER TABLE matchmaking_sessions
+    ADD COLUMN IF NOT EXISTS rated_by_user1 BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE matchmaking_sessions
+    ADD COLUMN IF NOT EXISTS rated_by_user2 BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_matchmaking_sessions_status ON matchmaking_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_matchmaking_sessions_room_id ON matchmaking_sessions(room_id);
