@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Award, X, LogOut, Camera, Plus, Loader2, AlertCircle, Check, Search, Flag } from 'lucide-react';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { ApiError, clearAuthTokens } from '@/services/auth';
-import { getUserProfile, updateUserProfile, UserProfile as UserProfileModel } from '@/services/user';
+import { getUserProfile, updateUserProfile, uploadAvatar, UserProfile as UserProfileModel } from '@/services/user';
 import { INTERESTS } from '@/app/constants/interests';
 
 export function UserProfile() {
@@ -21,8 +21,10 @@ export function UserProfile() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const handleAuthFailure = (status: number) => {
     if (status === 401) {
@@ -96,6 +98,39 @@ export function UserProfile() {
     );
   };
 
+  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file');
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      setError('');
+      setSuccess('');
+
+      const avatarUrl = await uploadAvatar(file);
+      setProfile((prev) => (prev ? { ...prev, avatarUrl } : prev));
+      setSuccess('Profile picture updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: unknown) {
+      console.error('Avatar upload error:', err);
+      if (err instanceof ApiError) {
+        handleAuthFailure(err.status);
+        setError(err.message || 'Failed to upload profile picture');
+      } else {
+        setError('Failed to upload profile picture');
+      }
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = '';
+    }
+  };
+
   // Filtered lists for the new UI
   const availableInterests = INTERESTS.filter(
     (interest) => !interests.includes(interest) && interest.toLowerCase().includes(searchQuery.toLowerCase())
@@ -120,16 +155,37 @@ export function UserProfile() {
         
         {/* Cover & Avatar Area */}
         <div className="relative">
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarSelect}
+          />
           <div className="h-40 bg-gradient-to-br from-blue-600 to-indigo-700" />
           <div className="absolute -bottom-16 w-full flex justify-center">
             <div className={`w-32 h-32 rounded-full p-1.5 shadow-xl ${isDark ? 'bg-[#0F172A]' : 'bg-white'}`}>
-              <div className={`w-full h-full rounded-full relative flex items-center justify-center group cursor-pointer overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                <User className={`w-12 h-12 ${isDark ? 'text-slate-400' : 'text-slate-400'}`} />
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                className={`w-full h-full rounded-full relative flex items-center justify-center group cursor-pointer overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}
+              >
+                {profile?.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={displayName || 'Profile'} className="w-full h-full object-cover" />
+                ) : (
+                  <User className={`w-12 h-12 ${isDark ? 'text-slate-400' : 'text-slate-400'}`} />
+                )}
                 <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="w-6 h-6 mb-1" />
-                  <span className="text-xs font-bold">Edit</span>
+                  {avatarUploading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <>
+                      <Camera className="w-6 h-6 mb-1" />
+                      <span className="text-xs font-bold">Edit</span>
+                    </>
+                  )}
                 </div>
-              </div>
+              </button>
             </div>
           </div>
         </div>

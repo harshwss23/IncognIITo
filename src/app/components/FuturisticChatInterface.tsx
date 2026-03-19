@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { socket } from "@/services/socket";
-import { Send, MessageSquare, ShieldCheck } from "lucide-react";
+import { Send, MessageSquare, ShieldCheck, User } from "lucide-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, ensureValidAccessToken } from "@/services/auth";
 import { useNavigate } from "react-router-dom";
@@ -197,7 +197,13 @@ export function FuturisticChatInterface() {
             const active = activeFriend?.chat_id === f.chat_id;
             return (
               <button key={f.id} onClick={() => setActiveFriend(f)} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${active ? "bg-blue-600 text-white shadow-lg" : "hover:bg-blue-500/10"}`}>
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${active ? "bg-white/20" : "bg-blue-500/10 text-blue-500"}`}>{info.name[0]}</div>
+                <div className={`w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center ${active ? "bg-white/20" : "bg-blue-500/10"}`}>
+                  {info.avatarUrl ? (
+                    <img src={info.avatarUrl} alt={info.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className={`w-5 h-5 ${active ? "text-white" : "text-blue-500"}`} />
+                  )}
+                </div>
                 <div className="text-left truncate">
                   <p className="font-bold text-sm truncate">{info.name}</p>
                   <p className="text-[10px] opacity-60 truncate">{info.email}</p>
