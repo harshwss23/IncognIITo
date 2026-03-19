@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { socket } from "@/services/socket";
-import { Send, MessageSquare, ShieldCheck } from "lucide-react";
+import { Send, MessageSquare, ShieldCheck, User } from "lucide-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, ensureValidAccessToken } from "@/services/auth";
+import { useNavigate } from "react-router-dom";
 
 type ChatMsg = {
   id: string | number;
@@ -13,6 +14,7 @@ type ChatMsg = {
 };
 
 export function FuturisticChatInterface() {
+  const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
@@ -22,8 +24,10 @@ export function FuturisticChatInterface() {
   const [mutualFriends, setMutualFriends] = useState<any[]>([]);
   const [activeFriend, setActiveFriend] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [profileCardOpen, setProfileCardOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const profileCardRef = useRef<HTMLDivElement>(null);
 
   const safeStr = (v: any) => (v === null || v === undefined ? "" : String(v));
   const formatTime = (d: Date) =>
@@ -62,18 +66,36 @@ export function FuturisticChatInterface() {
 
   // 2. Identity Helper
   const getFriendDetails = (f: any) => {
-    if (!f || !myId) return { name: "User", email: "" };
+    if (!f) return { name: "User", email: "", avatarUrl: "" };
     const amISender = safeStr(f.sender_id) === myId;
     const rawName = amISender ? f.receiver_display_name : f.sender_display_name;
     const email = amISender ? f.receiver_email : f.sender_email;
+    const avatarUrl = amISender ? f.receiver_avatar_url : f.sender_avatar_url;
 
     return {
       name: safeStr(rawName).trim() || safeStr(email).split("@")[0] || "User",
-      email: safeStr(email)
+      email: safeStr(email),
+      avatarUrl: safeStr(avatarUrl),
     };
   };
 
   const activeInfo = useMemo(() => getFriendDetails(activeFriend), [activeFriend, myId]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!profileCardRef.current) return;
+      if (!profileCardRef.current.contains(event.target as Node)) {
+        setProfileCardOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    setProfileCardOpen(false);
+  }, [activeFriend?.chat_id]);
 
   // 3. Socket & History
   useEffect(() => {
@@ -175,7 +197,13 @@ export function FuturisticChatInterface() {
             const active = activeFriend?.chat_id === f.chat_id;
             return (
               <button key={f.id} onClick={() => setActiveFriend(f)} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${active ? "bg-blue-600 text-white shadow-lg" : "hover:bg-blue-500/10"}`}>
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold ${active ? "bg-white/20" : "bg-blue-500/10 text-blue-500"}`}>{info.name[0]}</div>
+                <div className={`w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center ${active ? "bg-white/20" : "bg-blue-500/10"}`}>
+                  {info.avatarUrl ? (
+                    <img src={info.avatarUrl} alt={info.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className={`w-5 h-5 ${active ? "text-white" : "text-blue-500"}`} />
+                  )}
+                </div>
                 <div className="text-left truncate">
                   <p className="font-bold text-sm truncate">{info.name}</p>
                   <p className="text-[10px] opacity-60 truncate">{info.email}</p>
@@ -184,13 +212,70 @@ export function FuturisticChatInterface() {
             );
           })}
         </div>
+
+        <div className={`p-6 border-t ${isDark ? "border-white/5" : "border-slate-200"} space-y-3`}>
+          <button
+            onClick={() => navigate('/homepage')}
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 border-2 transition-colors
+            ${isDark
+              ? 'border-blue-500/20 text-blue-300 hover:bg-blue-500/10'
+              : 'border-blue-100 text-blue-700 hover:bg-blue-50 hover:border-blue-200'
+            }`}
+          >
+            Back to Home
+          </button>
+        </div>
       </div>
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
         <div className={`h-20 px-8 flex items-center justify-between border-b ${isDark ? "border-white/5" : "border-slate-200"}`}>
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">{activeInfo.name[0]}</div>
+            <div className="relative" ref={profileCardRef}>
+              <button
+                type="button"
+                onClick={() => setProfileCardOpen((prev) => !prev)}
+                className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold overflow-hidden ring-2 ring-blue-500/20"
+              >
+                {activeInfo.avatarUrl ? (
+                  <img src={activeInfo.avatarUrl} alt={activeInfo.name} className="w-full h-full object-cover" />
+                ) : (
+                  activeInfo.name[0]
+                )}
+              </button>
+
+              {profileCardOpen && (
+                <div
+                  className={`absolute top-12 left-0 w-52 p-4 rounded-2xl border shadow-xl z-30 ${
+                    isDark
+                      ? "bg-slate-900 border-white/10"
+                      : "bg-white border-slate-200"
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-20 h-20 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
+                      {activeInfo.avatarUrl ? (
+                        <img src={activeInfo.avatarUrl} alt={activeInfo.name} className="w-full h-full object-cover" />
+                      ) : (
+                        activeInfo.name[0]
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetUserId = activeFriend?.other_user_id ?? activeFriend?.id;
+                        if (!targetUserId) return;
+                        setProfileCardOpen(false);
+                        navigate(`/users/${targetUserId}`);
+                      }}
+                      className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors"
+                    >
+                      View Profile
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <div>
               <h3 className="font-bold">{activeInfo.name}</h3>
               <span className="text-[10px] text-emerald-500 font-bold tracking-widest animate-pulse">SECURE_LINK_ACTIVE</span>

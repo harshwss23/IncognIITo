@@ -86,3 +86,12 @@ export async function uploadAvatar(file: File): Promise<string> {
 export async function removeAvatar(): Promise<void> {
   await fetchJsonWithAuth("/api/users/avatar", { method: "DELETE" });
 }
+
+// Submit rating for a finished session
+export async function submitSessionRating(roomId: string, rating: number): Promise<void> {
+  await fetchJsonWithAuth("/api/match/rate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId, rating }),
+  });
+}

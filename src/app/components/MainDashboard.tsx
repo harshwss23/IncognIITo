@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MessageCircle, MessageSquare, User, Video, Plus, Search, Bell, Settings, LogOut } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
@@ -7,6 +8,7 @@ export function MainDashboard() {
   const colors = useThemeColors();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('chats');
 
@@ -79,6 +81,19 @@ export function MainDashboard() {
                 </div>
                 <LogOut className={`w-4 h-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
             </div>
+        </div>
+
+        <div className="p-6 border-t space-y-3" style={{borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgb(226,232,240)'}}>
+          <button
+            onClick={() => navigate('/homepage')}
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 border-2 transition-colors
+            ${isDark
+              ? 'border-blue-500/20 text-blue-300 hover:bg-blue-500/10'
+              : 'border-blue-100 text-blue-700 hover:bg-blue-50 hover:border-blue-200'
+            }`}
+          >
+            Back to Home
+          </button>
         </div>
       </div>
 
