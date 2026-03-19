@@ -24,7 +24,11 @@ router.get('/status', authMiddleware.authenticate.bind(authMiddleware), matchCon
 // POST /api/match/end    → End an active session
 router.post('/end', authMiddleware.authenticate.bind(authMiddleware), matchController.endSession.bind(matchController));
 
-// GET  /api/match/session/:roomId → Get session participants
-router.get('/session/:roomId', authMiddleware.authenticate.bind(authMiddleware), matchController.getSessionDetails.bind(matchController));
+// ==========================================
+// GET /api/match/:roomId → Get match details (names, interests)
+// NOTE: Dynamic routes with parameters MUST be at the bottom 
+// to avoid conflicting with static routes like /status or /join.
+// ==========================================
+router.get('/:roomId', authMiddleware.authenticate.bind(authMiddleware), matchController.getMatchDetails.bind(matchController));
 
 export default router;

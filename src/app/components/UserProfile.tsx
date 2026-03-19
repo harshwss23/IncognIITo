@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Award, X, LogOut, Camera, Plus, Loader2, AlertCircle, Check, Search, Flag } from 'lucide-react';
+import { User, X, LogOut, Camera, Plus, Loader2, AlertCircle, Check, Search, Flag, MoreVertical, Eye, Trash2, ImagePlus } from 'lucide-react';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { ApiError, clearAuthTokens } from '@/services/auth';
-import { getUserProfile, updateUserProfile, UserProfile as UserProfileModel } from '@/services/user';
+import { getUserProfile, updateUserProfile, uploadAvatar, removeAvatar, UserProfile as UserProfileModel } from '@/services/user';
 import { INTERESTS } from '@/app/constants/interests';
 
 export function UserProfile() {
@@ -21,8 +21,13 @@ export function UserProfile() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const avatarMenuRef = useRef<HTMLDivElement>(null);
 
   const handleAuthFailure = (status: number) => {
     if (status === 401) {
@@ -58,6 +63,18 @@ export function UserProfile() {
 
   useEffect(() => {
     void loadProfile();
+  }, []);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!avatarMenuRef.current) return;
+      if (!avatarMenuRef.current.contains(event.target as Node)) {
+        setAvatarMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
   const handleSave = async () => {
@@ -96,10 +113,83 @@ export function UserProfile() {
     );
   };
 
+  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file');
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      setError('');
+      setSuccess('');
+
+      const avatarUrl = await uploadAvatar(file);
+      setProfile((prev) => (prev ? { ...prev, avatarUrl } : prev));
+      setSuccess('Profile picture updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      setAvatarMenuOpen(false);
+    } catch (err: unknown) {
+      console.error('Avatar upload error:', err);
+      if (err instanceof ApiError) {
+        handleAuthFailure(err.status);
+        setError(err.message || 'Failed to upload profile picture');
+      } else {
+        setError('Failed to upload profile picture');
+      }
+    } finally {
+      setAvatarUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    const confirmed = window.confirm('Delete your current profile picture?');
+    if (!confirmed) return;
+
+    try {
+      setAvatarUploading(true);
+      setError('');
+      setSuccess('');
+      await removeAvatar();
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: '' } : prev));
+      setSuccess('Profile picture removed successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+      setAvatarMenuOpen(false);
+      setAvatarViewerOpen(false);
+    } catch (err: unknown) {
+      console.error('Avatar remove error:', err);
+      if (err instanceof ApiError) {
+        handleAuthFailure(err.status);
+        setError(err.message || 'Failed to delete profile picture');
+      } else {
+        setError('Failed to delete profile picture');
+      }
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   // Filtered lists for the new UI
   const availableInterests = INTERESTS.filter(
     (interest) => !interests.includes(interest) && interest.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const hasRatings = rating > 0;
+  const ratingFeedback = !hasRatings
+    ? 'Not rated yet'
+    : rating > 4.5
+    ? 'Excellent'
+    : rating >= 4
+    ? 'Good'
+    : rating >= 3
+    ? 'Average'
+    : 'Try to improve';
+  const isHighReportRisk = totalReports > 10;
 
   if (loading) {
     return (
@@ -120,34 +210,113 @@ export function UserProfile() {
         
         {/* Cover & Avatar Area */}
         <div className="relative">
-          <div className="h-40 bg-gradient-to-br from-blue-600 to-indigo-700" />
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarSelect}
+          />
+          {/* MATH FIX: Changed h-40 to h-[188px] so the avatar top edge hits exactly 124px down */}
+          <div className="h-[188px] bg-gradient-to-br from-blue-600 to-indigo-700" />
           <div className="absolute -bottom-16 w-full flex justify-center">
-            <div className={`w-32 h-32 rounded-full p-1.5 shadow-xl ${isDark ? 'bg-[#0F172A]' : 'bg-white'}`}>
-              <div className={`w-full h-full rounded-full relative flex items-center justify-center group cursor-pointer overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                <User className={`w-12 h-12 ${isDark ? 'text-slate-400' : 'text-slate-400'}`} />
+            <div className={`w-32 h-32 rounded-full p-1.5 shadow-xl relative ${isDark ? 'bg-[#0F172A]' : 'bg-white'}`}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!profile?.avatarUrl) {
+                    avatarInputRef.current?.click();
+                  }
+                }}
+                className={`w-full h-full rounded-full relative flex items-center justify-center group cursor-pointer overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}
+              >
+                {profile?.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={displayName || 'Profile'} className="w-full h-full object-cover" />
+                ) : (
+                  <User className={`w-12 h-12 ${isDark ? 'text-slate-400' : 'text-slate-400'}`} />
+                )}
                 <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="w-6 h-6 mb-1" />
-                  <span className="text-xs font-bold">Edit</span>
+                  {avatarUploading ? (
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  ) : (
+                    <>
+                      <Camera className="w-6 h-6 mb-1" />
+                      <span className="text-xs font-bold">{profile?.avatarUrl ? 'Photo' : 'Set Photo'}</span>
+                    </>
+                  )}
                 </div>
-              </div>
+              </button>
+
+              {profile?.avatarUrl && (
+                <div ref={avatarMenuRef} className="absolute -right-2 top-2">
+                  <button
+                    type="button"
+                    onClick={() => setAvatarMenuOpen((prev) => !prev)}
+                    className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${
+                      isDark
+                        ? 'bg-slate-900/90 border-white/20 text-slate-200 hover:bg-slate-800'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                    aria-label="Avatar menu"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+
+                  {avatarMenuOpen && (
+                    <div
+                      className={`absolute right-0 mt-2 w-56 rounded-xl border shadow-xl z-30 overflow-hidden ${
+                        isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarViewerOpen(true);
+                          setAvatarMenuOpen(false);
+                        }}
+                        className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 ${
+                          isDark ? 'hover:bg-white/5 text-slate-200' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <Eye className="w-4 h-4" />
+                        View profile picture
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarMenuOpen(false);
+                          avatarInputRef.current?.click();
+                        }}
+                        className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 ${
+                          isDark ? 'hover:bg-white/5 text-slate-200' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <ImagePlus className="w-4 h-4" />
+                        Change profile picture
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        className={`w-full px-4 py-2.5 text-left text-sm flex items-center gap-2 ${
+                          isDark ? 'hover:bg-red-500/10 text-red-300' : 'hover:bg-red-50 text-red-600'
+                        }`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete profile picture
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* User Info Form */}
-        <div className="flex-1 px-8 pt-20 space-y-8 overflow-y-auto">
-          
-          {/* Subtle Stats in Sidebar */}
-          <div className="flex justify-center gap-6 pb-6 border-b border-dashed border-slate-300 dark:border-slate-700">
-            <div className="flex flex-col items-center">
-              <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total Reports</span>
-              <div className="flex items-center gap-1.5 mt-1">
-                <Flag className={`w-4 h-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-                <span className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{totalReports}</span>
-              </div>
-            </div>
-          </div>
-
+        {/* MATH FIX: Changed pt-20 to pt-24 to maintain proper spacing below the lowered avatar */}
+        <div className="flex-1 px-8 pt-24 space-y-8 overflow-y-auto">
           <div className="space-y-3">
             <label className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Display Name
@@ -227,28 +396,47 @@ export function UserProfile() {
           </div>
         )}
 
-        {/* Reputation Banner */}
-        <div className={`p-8 rounded-3xl border mb-10 flex items-center justify-between relative overflow-hidden
-          ${isDark ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-200 shadow-sm'}`}>
-          <div className="space-y-2 z-10">
-            <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${isDark ? 'bg-yellow-500/10 text-yellow-500' : 'bg-yellow-100 text-yellow-600'}`}>
-                <Award className="w-7 h-7" />
-              </div>
-              <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Community Reputation</h3>
+        {/* Rating And Reports Summary */}
+        <div className={`p-8 rounded-3xl border mb-10 grid grid-cols-1 lg:grid-cols-2 gap-6 ${isDark ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className={`rounded-2xl border p-6 ${isDark ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50'}`}>
+            <p className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Star Rating
+            </p>
+            <div className={`text-5xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              {rating.toFixed(1)}<span className="text-3xl text-yellow-500 ml-2">★</span>
             </div>
-            <p className={`text-base ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Calculated from community feedback and sessions.
+            <p className={`mt-3 text-sm font-bold uppercase tracking-wider ${
+              !hasRatings
+                ? isDark
+                  ? 'text-slate-400'
+                  : 'text-slate-500'
+                : rating > 4.5
+                ? 'text-emerald-500'
+                : rating >= 4
+                ? 'text-blue-500'
+                : rating >= 3
+                ? 'text-amber-500'
+                : 'text-red-500'
+            }`}>
+              {ratingFeedback}
             </p>
           </div>
 
-          <div className="text-right z-10">
-            <div className={`text-6xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              {rating.toFixed(1)}<span className="text-4xl text-yellow-500 ml-2">★</span>
+          <div className={`rounded-2xl border p-6 ${isDark ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="flex items-center gap-2">
+              <Flag className={`w-4 h-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+              <p className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Total Reports
+              </p>
             </div>
-            <div className="text-emerald-500 font-bold mt-2 text-sm uppercase tracking-wider">
-              Excellent Standing
+            <div className={`mt-3 text-5xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              {totalReports}
             </div>
+            <p className={`mt-3 text-sm ${isHighReportRisk ? 'text-red-500 font-semibold' : isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              {isHighReportRisk
+                ? 'Warning: High chance of getting banned if this keeps increasing.'
+                : 'Report count is currently within a safe range.'}
+            </p>
           </div>
         </div>
 
@@ -332,6 +520,26 @@ export function UserProfile() {
           </div>
         </div>
       </div>
+
+      {avatarViewerOpen && profile?.avatarUrl && (
+        <div className="fixed inset-0 z-40 bg-black/70 flex items-center justify-center p-6">
+          <div className={`max-w-xl w-full rounded-2xl border p-5 ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Profile Picture</h3>
+              <button
+                type="button"
+                onClick={() => setAvatarViewerOpen(false)}
+                className={`px-3 py-1.5 rounded-lg text-sm ${isDark ? 'bg-white/5 text-slate-200 hover:bg-white/10' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+              >
+                Close
+              </button>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/10">
+              <img src={profile.avatarUrl} alt={displayName || 'Profile'} className="w-full max-h-[70vh] object-contain bg-black/20" />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

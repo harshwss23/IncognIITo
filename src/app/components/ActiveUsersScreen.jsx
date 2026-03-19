@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, UserPlus } from "lucide-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch } from "@/services/auth";
@@ -6,6 +7,7 @@ import { authFetch } from "@/services/auth";
 export function ActiveUsersScreen() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const navigate = useNavigate();
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +87,19 @@ export function ActiveUsersScreen() {
 
   return (
     <div className={`min-h-screen p-10 ${isDark ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}`}>
-      <h1 className="text-3xl font-bold mb-6">Active Users</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Active Users</h1>
+        <button
+          onClick={() => navigate('/homepage')}
+          className={`py-3 px-6 rounded-xl font-bold flex items-center gap-2 border-2 transition-colors
+          ${isDark
+            ? 'border-blue-500/20 text-blue-300 hover:bg-blue-500/10'
+            : 'border-blue-100 text-blue-700 hover:bg-blue-50 hover:border-blue-200'
+          }`}
+        >
+          Back to Home
+        </button>
+      </div>
 
       {/* Search */}
       <div className="relative mb-6">

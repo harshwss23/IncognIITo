@@ -1,11 +1,5 @@
 // FILE: src/controllers/matchController.ts
-// WHY: Frontend needs REST endpoints to join/leave queue + check status.
-//      The actual match notification comes via WebSocket (not HTTP).
-// ENDPOINTS:
-//   POST /api/match/join     → Put user in queue
-//   POST /api/match/leave    → Remove user from queue
-//   GET  /api/match/status   → Are you in queue or in a session?
-//   POST /api/match/end      → End active session
+// WHY: Frontend needs REST endpoints to join/leave queue + check status + get match details.
 
 import { Request, Response } from 'express';
 import { queueService } from '../services/queueService';
@@ -74,7 +68,6 @@ export class MatchController {
       const roomId = await queueService.getActiveSession(userId);
       if (roomId) {
         // Cross-validate: confirm DB also says this session is still active
-        // Prevents stale Redis keys (from crashes/restarts) from returning ghost roomIds
         const dbCheck = await query(
           `SELECT id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`,
           [roomId]
@@ -84,7 +77,6 @@ export class MatchController {
           // Redis says matched, but DB disagrees → stale key, self-heal
           await queueService.clearActiveSession(userId);
           console.log(`Cleared stale Redis session for user ${userId} (roomId: ${roomId} not active in DB)`);
-          // Fall through to idle below
         } else {
           res.status(200).json({
             success: true,
@@ -114,53 +106,8 @@ export class MatchController {
     }
   }
 
-
   // POST /api/match/end
   // User ends the session (clicks "Next" or "Leave")
-  // async endSession(req: Request, res: Response): Promise<void> {
-  //   try {
-  //     const userId = req.user!.userId;
-
-  //     const roomId = await queueService.getActiveSession(userId);
-  //     if (!roomId) {
-  //       res.status(400).json({ success: false, message: 'No active session' });
-  //       return;
-  //     }
-
-  //     // Get session from DB to find the other user
-  //     const sessionResult = await query(
-  //       `SELECT id, user1_id, user2_id FROM matchmaking_sessions
-  //        WHERE room_id = $1 AND status = 'active'`,
-  //       [roomId]
-  //     );
-
-  //     if (sessionResult.rows.length > 0) {
-  //       const session = sessionResult.rows[0];
-  //       const partnerId = session.user1_id === userId
-  //         ? session.user2_id
-  //         : session.user1_id;
-
-  //       // Mark session as completed in PostgreSQL
-  //       await query(
-  //         `UPDATE matchmaking_sessions
-  //          SET status = 'completed', session_end = NOW()
-  //          WHERE id = $1`,
-  //         [session.id]
-  //       );
-
-  //       // Clear both users' session from Redis
-  //       await Promise.all([
-  //         queueService.clearActiveSession(userId),
-  //         queueService.clearActiveSession(partnerId),
-  //       ]);
-  //     }
-
-  //     res.status(200).json({ success: true, message: 'Session ended' });
-  //   } catch (error) {
-  //     console.error('End session error:', error);
-  //     res.status(500).json({ success: false, message: 'Failed to end session' });
-  //   }
-  // }
   async endSession(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user!.userId;
@@ -169,28 +116,33 @@ export class MatchController {
         res.status(400).json({ success: false, message: 'No active session' });
         return;
       }
+      
       // Always clear the caller's session from Redis immediately
-      await queueService.clearActiveSession(userId);  // ← MOVED OUT of the if block
+      await queueService.clearActiveSession(userId);  
+
       // Get session from DB to find the other user
       const sessionResult = await query(
         `SELECT id, user1_id, user2_id FROM matchmaking_sessions
-        WHERE room_id = $1 AND status = 'active'`,
+         WHERE room_id = $1 AND status = 'active'`,
         [roomId]
       );
+
       if (sessionResult.rows.length > 0) {
         const session = sessionResult.rows[0];
         const partnerId = session.user1_id === userId
           ? session.user2_id
           : session.user1_id;
+
         // Mark session as completed in PostgreSQL
         await query(
           `UPDATE matchmaking_sessions
-          SET status = 'completed', session_end = NOW()
-          WHERE id = $1`,
+           SET status = 'completed', session_end = NOW()
+           WHERE id = $1`,
           [session.id]
         );
+
         // Clear partner's session from Redis
-        await queueService.clearActiveSession(partnerId);  // ← Only partner here now
+        await queueService.clearActiveSession(partnerId);  
       }
       res.status(200).json({ success: true, message: 'Session ended' });
     } catch (error) {
@@ -199,52 +151,80 @@ export class MatchController {
     }
   }
 
-  async getSessionDetails(req: Request, res: Response): Promise<void> {
+  // GET /api/match/:roomId
+  // Gets usernames and interests for both users in the session
+  async getMatchDetails(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user!.userId;
-      const roomId = req.params.roomId;
+      const { roomId } = req.params;
+      const userId = Number(req.user!.userId); 
 
+      // 1. Find the active match for this room
       const sessionResult = await query(
-        `SELECT s.id, s.user1_id, s.user2_id, 
-                u1.display_name as user1_name, u2.display_name as user2_name,
-                u1.email as user1_email, u2.email as user2_email
-         FROM matchmaking_sessions s
-         JOIN users u1 ON s.user1_id = u1.id
-         JOIN users u2 ON s.user2_id = u2.id
-         WHERE s.room_id = $1`,
+        `SELECT user1_id, user2_id 
+         FROM matchmaking_sessions 
+         WHERE room_id = $1 AND status = 'active'`,
         [roomId]
       );
 
       if (sessionResult.rows.length === 0) {
-        res.status(404).json({ success: false, message: 'Session not found' });
+        res.status(404).json({ success: false, message: 'Active match not found' });
         return;
       }
 
       const session = sessionResult.rows[0];
-      
-      // Ensure the requesting user was part of this session
-      if (session.user1_id !== userId && session.user2_id !== userId) {
-         res.status(403).json({ success: false, message: 'Unauthorized access to session' });
-         return;
+      const u1 = Number(session.user1_id); 
+      const u2 = Number(session.user2_id); 
+
+      // 2. Security Check: Ensure caller is part of this match
+      if (u1 !== userId && u2 !== userId) {
+        res.status(403).json({ success: false, message: 'Unauthorized to view this match' });
+        return;
       }
 
-      const partnerId = session.user1_id === userId ? session.user2_id : session.user1_id;
-      const partnerName = session.user1_id === userId ? session.user2_name : session.user1_name;
-      const partnerEmail = session.user1_id === userId ? session.user2_email : session.user1_email;
+      // 3. Identify partner
+      const partnerId = u1 === userId ? u2 : u1;
 
-      res.status(200).json({ 
-        success: true, 
-        partnerId, 
-        partnerName,
-        partnerEmail 
+      // 4. Fetch Display Names and Interests for BOTH users
+      const profilesResult = await query(
+        `SELECT u.id, u.display_name, u.email, p.interests 
+         FROM users u
+         LEFT JOIN user_profiles p ON u.id = p.user_id
+         WHERE u.id IN ($1, $2)`,
+        [userId, partnerId]
+      );
+
+      let me: any = null;
+      let them: any = null;
+
+      profilesResult.rows.forEach(row => {
+        const userInterests = Array.isArray(row.interests) ? row.interests : [];
+
+        const userData = {
+          id: Number(row.id),
+          username: row.display_name || `IncognIITo User`, 
+          email: row.email,
+          interests: userInterests
+        };
+
+        if (Number(row.id) === userId) {
+          me = userData;
+        } else {
+          them = userData;
+        }
       });
+
+      // 5. Return data for frontend overlays
+      res.status(200).json({
+        success: true,
+        me,
+        them
+      });
+
     } catch (error) {
-      console.error('Get session details error:', error);
-      res.status(500).json({ success: false, message: 'Failed to get session details' });
+      console.error('Get match details error:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch match details' });
     }
   }
-
 }
 
 export const matchController = new MatchController();
-
