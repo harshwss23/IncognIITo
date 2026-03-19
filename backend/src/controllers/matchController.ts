@@ -151,14 +151,12 @@ export class MatchController {
     }
   }
 
-  // ==========================================
-  // NEW: GET /api/match/:roomId
-  // Gets the usernames and interests for the video call overlay
-  // ==========================================
- async getMatchDetails(req: Request, res: Response): Promise<void> {
+  // GET /api/match/:roomId
+  // Gets usernames and interests for both users in the session
+  async getMatchDetails(req: Request, res: Response): Promise<void> {
     try {
       const { roomId } = req.params;
-      const userId = Number(req.user!.userId); // 🚨 FIX: Force convert to Number
+      const userId = Number(req.user!.userId); 
 
       // 1. Find the active match for this room
       const sessionResult = await query(
@@ -174,10 +172,10 @@ export class MatchController {
       }
 
       const session = sessionResult.rows[0];
-      const u1 = Number(session.user1_id); // 🚨 BIGINT to Number
-      const u2 = Number(session.user2_id); // 🚨 BIGINT to Number
+      const u1 = Number(session.user1_id); 
+      const u2 = Number(session.user2_id); 
 
-      // 2. Security Check: Ensure caller is in this match
+      // 2. Security Check: Ensure caller is part of this match
       if (u1 !== userId && u2 !== userId) {
         res.status(403).json({ success: false, message: 'Unauthorized to view this match' });
         return;
@@ -188,7 +186,7 @@ export class MatchController {
 
       // 4. Fetch Display Names and Interests for BOTH users
       const profilesResult = await query(
-        `SELECT u.id, u.display_name, p.interests 
+        `SELECT u.id, u.display_name, u.email, p.interests 
          FROM users u
          LEFT JOIN user_profiles p ON u.id = p.user_id
          WHERE u.id IN ($1, $2)`,
@@ -199,15 +197,15 @@ export class MatchController {
       let them: any = null;
 
       profilesResult.rows.forEach(row => {
-        // Make sure interests array is formatted correctly
         const userInterests = Array.isArray(row.interests) ? row.interests : [];
 
         const userData = {
+          id: Number(row.id),
           username: row.display_name || `IncognIITo User`, 
+          email: row.email,
           interests: userInterests
         };
 
-        // 🚨 MAIN FIX: Compare safely as Numbers!
         if (Number(row.id) === userId) {
           me = userData;
         } else {
@@ -215,7 +213,7 @@ export class MatchController {
         }
       });
 
-      // 5. Send back the data for the frontend overlays
+      // 5. Return data for frontend overlays
       res.status(200).json({
         success: true,
         me,

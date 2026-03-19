@@ -25,8 +25,9 @@ router.get('/status', authMiddleware.authenticate.bind(authMiddleware), matchCon
 router.post('/end', authMiddleware.authenticate.bind(authMiddleware), matchController.endSession.bind(matchController));
 
 // ==========================================
-// GET /api/match/:roomId → Get match details for video call overlays (names, interests)
-// NOTE: This dynamic route MUST be at the bottom so it doesn't conflict with /status or /join.
+// GET /api/match/:roomId → Get match details (names, interests)
+// NOTE: Dynamic routes with parameters MUST be at the bottom 
+// to avoid conflicting with static routes like /status or /join.
 // ==========================================
 router.get('/:roomId', authMiddleware.authenticate.bind(authMiddleware), matchController.getMatchDetails.bind(matchController));
 
