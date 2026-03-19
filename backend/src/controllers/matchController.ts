@@ -337,6 +337,61 @@ export class MatchController {
       res.status(500).json({ success: false, message: 'Failed to fetch match details' });
     }
   }
+  // POST /api/match/force-disconnect
+  // Takes over the session by kicking out frozen/background tabs
+  async forceDisconnect(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      
+      // 1. Get the Socket.IO instance from Express app
+      const io = req.app.get("io"); 
+
+      if (io) {
+        // 2. Find all old sockets (frozen tabs) for this user
+        const globalUserRoom = `user_global_${userId}`;
+        const existingSockets = await io.in(globalUserRoom).fetchSockets();
+
+        // 3. Forcefully disconnect them from the server side
+        existingSockets.forEach((socket: any) => {
+          console.log(`🧨 Force disconnecting frozen socket ${socket.id} for user ${userId}`);
+          socket.emit("duplicate_session_detected");
+          socket.disconnect(true);
+        });
+      }
+
+      // 4. Clean up Queue & Matchmaking States
+      await queueService.leaveQueue(userId).catch(() => {});
+      
+      const roomId = await queueService.getActiveSession(userId);
+      if (roomId) {
+        // Tell the partner that the session ended
+        if (io) io.to(roomId).emit("session_ended", "Your partner's session was taken over by another device.");
+        
+        // Mark session as completed in PostgreSQL
+        const sessionResult = await query(
+          `SELECT id, user1_id, user2_id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`,
+          [roomId]
+        );
+
+        if (sessionResult.rows.length > 0) {
+          const session = sessionResult.rows[0];
+          await query(
+            `UPDATE matchmaking_sessions SET status = 'completed', session_end = NOW() WHERE id = $1`,
+            [session.id]
+          );
+          
+          // Clear Redis active sessions for both users
+          await queueService.clearActiveSession(session.user1_id);
+          await queueService.clearActiveSession(session.user2_id);
+        }
+      }
+
+      res.status(200).json({ success: true, message: "Old sessions forcefully terminated." });
+    } catch (error) {
+      console.error("Force disconnect error:", error);
+      res.status(500).json({ success: false, message: "Failed to force disconnect old sessions" });
+    }
+  }
 }
 
 export const matchController = new MatchController();

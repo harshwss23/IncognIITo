@@ -39,7 +39,9 @@ router.post('/rate', auth, matchController.rateSession.bind(matchController));
 // GET  /api/match/session/:roomId → Get session participants
 router.get('/session/:roomId', auth, matchController.getSessionDetails.bind(matchController));
 
-
+// matchRoutes.ts ke andar
+// POST /api/match/force-disconnect
+router.post('/force-disconnect', authMiddleware.authenticate.bind(authMiddleware), matchController.forceDisconnect.bind(matchController));
 // --- Catch-all Dynamic Routes ---
 // NOTE: Must be at the bottom to avoid conflicting with static routes.
 

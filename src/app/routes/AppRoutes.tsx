@@ -42,32 +42,38 @@ const SessionBlockedScreen = () => {
   const handleUseHere = async () => {
     setIsLoading(true);
 
-    // 1. Purane tabs ko message bhejo ki wo apna socket disconnect kar lein
+    // 1. Frontend Message: Active tabs ko turant hatane ke liye
     const channel = new BroadcastChannel('incogniito_tabs');
     channel.postMessage('TAKE_OVER');
     channel.close();
 
-    // 2. Wait for 500ms taaki purana tab (aur uska Live Room) properly destroy ho jaye
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // 3. Backend states clear karo (Queue leave karo aur agar live match mein tha toh end karo)
     try {
-      // Leave Matchmaking Queue just in case
+      // 2. 🚨 BACKEND STRIKE: Frozen/Background tabs ki taar server se kaato 🚨
+      // Ye naya REST API call hai jo humne banaya
+      await fetch('http://localhost:5050/api/match/force-disconnect', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(err => console.log("Force disconnect failed:", err));
+
+      // 3. Purani Matchmaking/Live call clear karo
       await fetch('http://localhost:5050/api/match/leave', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       }).catch(err => console.log("Leave queue info:", err));
       
-      // Force End any active session
       await fetch('http://localhost:5050/api/match/end', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       }).catch(err => console.log("End session info:", err));
+      
     } catch (error) {
-      console.error("Error clearing session:", error);
+      console.error("Error forcefully clearing session:", error);
     }
 
-    // 4. Apna socket wapas connect karo aur Homepage pe jao
+    // Server ko process karne ke liye ek tiny micro-delay do
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // 4. Apna naya socket connect karo (Ab rasta ekdum saaf hai)
     socket.auth = { token };
     socket.connect();
     
