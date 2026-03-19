@@ -70,6 +70,38 @@ router.get('/profile', async (req, res) => {
         });
     }
 });
+// GET /api/users/profile/:id - Get another user's public profile
+router.get('/profile/:id', async (req, res) => {
+    try {
+        const viewerId = req.user.userId;
+        const targetId = Number(req.params.id);
+        if (!targetId || Number.isNaN(targetId)) {
+            return res.status(400).json({ success: false, message: 'Invalid user id' });
+        }
+        if (viewerId === targetId) {
+            return res.status(400).json({ success: false, message: 'Use /api/users/profile for your own profile' });
+        }
+        const result = await (0, database_1.query)(`SELECT u.id, u.display_name, u.verified,
+              p.avatar_url, p.interests, p.total_chats, p.total_reports, p.rating
+       FROM users u
+       LEFT JOIN user_profiles p ON u.id = p.user_id
+       WHERE u.id = $1`, [targetId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        return res.status(200).json({
+            success: true,
+            data: { user: result.rows[0] },
+        });
+    }
+    catch (error) {
+        console.error('Get public profile error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to get user profile',
+        });
+    }
+});
 // PUT /api/users/profile - Update user profile
 router.put('/profile', async (req, res) => {
     try {

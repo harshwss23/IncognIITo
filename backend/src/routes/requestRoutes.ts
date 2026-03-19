@@ -155,11 +155,14 @@ router.get(
       const result = await query(
         `SELECT DISTINCT ON (u.id)
                 u.id, 
+          u.id as other_user_id,
                 c.id as chat_id,
                 u.email as sender_email, 
-                u.display_name as sender_display_name
+                u.display_name as sender_display_name,
+                up.avatar_url as sender_avatar_url
          FROM connection_requests r
          JOIN users u ON (u.id = r.sender_id OR u.id = r.receiver_id) AND u.id != $1
+         LEFT JOIN user_profiles up ON up.user_id = u.id
          JOIN chats c ON (c.user1_id = $1 AND c.user2_id = u.id) OR (c.user1_id = u.id AND c.user2_id = $1)
          WHERE (r.sender_id = $1 OR r.receiver_id = $1) AND r.status = $2
          ORDER BY u.id, r.created_at DESC`,
