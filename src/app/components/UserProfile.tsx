@@ -179,8 +179,16 @@ export function UserProfile() {
     (interest) => !interests.includes(interest) && interest.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const ratingFeedback =
-    rating > 4.5 ? 'Excellent' : rating >= 4 ? 'Good' : rating >= 3 ? 'Average' : 'Try to improve';
+  const hasRatings = rating > 0;
+  const ratingFeedback = !hasRatings
+    ? 'Not rated yet'
+    : rating > 4.5
+    ? 'Excellent'
+    : rating >= 4
+    ? 'Good'
+    : rating >= 3
+    ? 'Average'
+    : 'Try to improve';
   const isHighReportRisk = totalReports > 10;
 
   if (loading) {
@@ -398,7 +406,11 @@ export function UserProfile() {
               {rating.toFixed(1)}<span className="text-3xl text-yellow-500 ml-2">★</span>
             </div>
             <p className={`mt-3 text-sm font-bold uppercase tracking-wider ${
-              rating > 4.5
+              !hasRatings
+                ? isDark
+                  ? 'text-slate-400'
+                  : 'text-slate-500'
+                : rating > 4.5
                 ? 'text-emerald-500'
                 : rating >= 4
                 ? 'text-blue-500'
