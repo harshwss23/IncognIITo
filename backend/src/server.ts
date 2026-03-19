@@ -155,7 +155,7 @@ class Server {
 
         const decoded = (await tokenService.verifyToken(token)) as any;
         socket.data.userId = decoded.userId || decoded.id;
-
+        
         if (!socket.data.userId) {
           return next(new Error("Invalid token payload"));
         }
@@ -167,10 +167,28 @@ class Server {
       }
     });
 
-    // 🔌 2. CONNECTION EVENT
-    this.io.on("connection", (socket) => {
+    // 🔌 2. CONNECTION EVENT (Made Async for single-session check)
+    this.io.on("connection", async (socket) => {
       const userId = socket.data.userId;
       console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId})`);
+
+      // ─── 🛡️ THE "OLDEST SURVIVES" CHECK (NEW ADDITION) ──────────────
+      const globalUserRoom = `user_global_${userId}`;
+      const existingSockets = await this.io.in(globalUserRoom).fetchSockets();
+
+      if (existingSockets.length > 0) {
+        console.warn(`🚨 User ${userId} tried connecting from a new tab/device. Keeping oldest session, killing new one.`);
+        
+        socket.emit("multiple_tabs_error", "You already have an active session in another window or device.");
+        
+        socket.disconnect(true);
+        return; // Halt completely! Do not register any other events for this socket.
+      }
+
+      // ─── 🟢 FIRST / OLDEST CONNECTION ──────────────
+      socket.join(globalUserRoom);
+      console.log(`✅ User ${userId} claimed the primary session.`);
+      // ──────────────────────────────────────────────────────────────
 
       // ─── SECURE JOIN ROOM ──────────────
       socket.on("join_room", async (roomID) => {
