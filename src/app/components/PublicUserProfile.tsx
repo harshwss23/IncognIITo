@@ -8,7 +8,8 @@ import { authFetch } from "@/services/auth";
 
 type PublicUser = {
   id: number;
-  display_name: string;
+  email: string;
+  display_name: string | null;
   verified: boolean;
   avatar_url: string | null;
   interests: string[] | null;
@@ -61,8 +62,9 @@ export function PublicUserProfile() {
   }, [id]);
 
   const name = useMemo(() => {
-    const n = (profile?.display_name || "").trim();
-    return n || "User";
+    if (profile?.display_name) return profile.display_name.trim();
+    if (profile?.email) return profile.email.split("@")[0];
+    return "User";
   }, [profile]);
 
   const totalChats = useMemo(() => {
@@ -146,11 +148,10 @@ export function PublicUserProfile() {
         <div className="p-6 border-t border-inherit">
           <button
             onClick={() => navigate("/chat")}
-            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 border-2 transition-colors ${
-              isDark
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 border-2 transition-colors ${isDark
                 ? "border-blue-500/20 text-blue-300 hover:bg-blue-500/10"
                 : "border-blue-100 text-blue-700 hover:bg-blue-50 hover:border-blue-200"
-            }`}
+              }`}
           >
             <ArrowLeft className="w-5 h-5" />
             Back to Chat
@@ -167,9 +168,8 @@ export function PublicUserProfile() {
 
         {error ? (
           <div
-            className={`mb-6 rounded-xl p-4 text-sm font-medium border shadow-sm ${
-              isDark ? "bg-red-900/20 text-red-300 border-red-500/30" : "bg-red-50 text-red-700 border-red-200"
-            }`}
+            className={`mb-6 rounded-xl p-4 text-sm font-medium border shadow-sm ${isDark ? "bg-red-900/20 text-red-300 border-red-500/30" : "bg-red-50 text-red-700 border-red-200"
+              }`}
           >
             {error}
           </div>
@@ -216,9 +216,8 @@ export function PublicUserProfile() {
                     {interestList.map((interest) => (
                       <span
                         key={interest}
-                        className={`flex items-center gap-2 pl-4 pr-4 py-2.5 rounded-full border-2 ${
-                          isDark ? "bg-blue-600/10 border-blue-500/50 text-blue-100" : "bg-blue-50 border-blue-200 text-blue-800"
-                        }`}
+                        className={`flex items-center gap-2 pl-4 pr-4 py-2.5 rounded-full border-2 ${isDark ? "bg-blue-600/10 border-blue-500/50 text-blue-100" : "bg-blue-50 border-blue-200 text-blue-800"
+                          }`}
                       >
                         <span className="font-medium">{interest}</span>
                       </span>

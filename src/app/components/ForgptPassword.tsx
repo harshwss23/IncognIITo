@@ -10,7 +10,6 @@ export function ForgotPasswordScreen() {
   const isDark = theme === "dark";
   const navigate = useNavigate();
   
-  // States
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -18,14 +17,12 @@ export function ForgotPasswordScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [strength, setStrength] = useState(0);
   
-  // API States
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   const otpValid = otp.length === 6;
 
-  // Password Strength logic (Matched with Registration Screen)
   useEffect(() => {
     let score = 0;
     if (newPassword.length > 4) score++;
@@ -39,9 +36,6 @@ export function ForgotPasswordScreen() {
     setOtp(value.replace(/\D/g, "").slice(0, 6));
   };
 
-  // --- API INTEGRATIONS ---
-
-  // Step 1: Send OTP
   const handleRequestOTP = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!email) return setError("Please enter your IITK email.");
@@ -71,7 +65,6 @@ export function ForgotPasswordScreen() {
     }
   };
 
-  // Step 2: Verify OTP & Reset Password
   const handleResetPassword = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setError("");
@@ -103,7 +96,6 @@ export function ForgotPasswordScreen() {
     }
   };
 
-  // Resend OTP
   const handleResendOTP = async () => {
     setError("");
     setSuccessMsg("");
@@ -111,7 +103,6 @@ export function ForgotPasswordScreen() {
       const res = await fetch(buildApiUrl('/api/auth/resend-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Passing isPasswordReset flag to backend
         body: JSON.stringify({ email, isPasswordReset: true }) 
       });
       const data = await res.json().catch(() => null);
@@ -123,62 +114,96 @@ export function ForgotPasswordScreen() {
   };
 
   return (
-    <div className={`w-full min-h-screen flex overflow-hidden transition-colors duration-500 ${isDark ? "bg-slate-950" : "bg-slate-50"}`}>
+    <div
+      className={`w-full min-h-screen flex flex-col lg:flex-row overflow-hidden transition-colors duration-500 ${
+        isDark ? "bg-slate-950" : "bg-slate-50"
+      }`}
+    >
       {/* LEFT PANEL */}
-      <div className={`relative flex-[1.35] hidden lg:flex flex-col justify-center px-20 py-16 ${isDark ? "bg-[#020617]" : "bg-slate-100"}`}>
-        <div className={`absolute inset-0 pointer-events-none ${isDark ? "opacity-20" : "opacity-40"}`}
+      <div
+        className={`relative w-full lg:flex-[1.35] flex flex-col justify-center overflow-hidden
+          px-6 py-8 sm:px-8 sm:py-10 md:px-10 md:py-12 lg:px-16 lg:py-14 xl:px-20 xl:py-16
+          ${isDark ? "bg-[#020617]" : "bg-slate-100"}`}
+      >
+        <div
+          className={`absolute inset-0 pointer-events-none ${isDark ? "opacity-20" : "opacity-40"}`}
           style={{
             backgroundImage: `radial-gradient(${isDark ? "#3b82f6" : "#94a3b8"} 1px, transparent 1px)`,
             backgroundSize: "40px 40px",
           }}
         />
-        <div className={`absolute top-0 left-0 w-[800px] h-[800px] rounded-full blur-[120px] mix-blend-screen pointer-events-none opacity-50 ${isDark ? "bg-purple-600/20" : "bg-purple-400/30"}`} />
-        <div className={`absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full blur-[100px] mix-blend-screen pointer-events-none opacity-50 ${isDark ? "bg-blue-600/20" : "bg-blue-400/30"}`} />
+
+        <div
+          className={`absolute top-0 left-0 w-[260px] h-[260px] sm:w-[420px] sm:h-[420px] lg:w-[700px] lg:h-[700px] xl:w-[800px] xl:h-[800px] rounded-full blur-[80px] sm:blur-[100px] lg:blur-[120px] mix-blend-screen pointer-events-none opacity-50 ${
+            isDark ? "bg-purple-600/20" : "bg-purple-400/30"
+          }`}
+        />
+        <div
+          className={`absolute bottom-0 right-0 w-[220px] h-[220px] sm:w-[340px] sm:h-[340px] lg:w-[520px] lg:h-[520px] xl:w-[600px] xl:h-[600px] rounded-full blur-[70px] sm:blur-[90px] lg:blur-[100px] mix-blend-screen pointer-events-none opacity-50 ${
+            isDark ? "bg-blue-600/20" : "bg-blue-400/30"
+          }`}
+        />
 
         <div className="relative z-10 max-w-xl">
-          <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-10 shadow-2xl ${isDark ? "bg-gradient-to-br from-blue-600 to-purple-600" : "bg-white"}`}>
-            <Sparkles className={`w-10 h-10 ${isDark ? "text-white" : "text-blue-600"}`} />
+          <div
+            className={`w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-6 sm:mb-8 lg:mb-10 shadow-2xl ${
+              isDark ? "bg-gradient-to-br from-blue-600 to-purple-600" : "bg-white"
+            }`}
+          >
+            <Sparkles className={`w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 ${isDark ? "text-white" : "text-blue-600"}`} />
           </div>
-          <h1 className={`text-7xl font-black tracking-tight leading-[1.05] mb-8 ${isDark ? "text-white" : "text-slate-900"}`}>
-            Reset Your<br />
+
+          <h1
+            className={`text-4xl sm:text-5xl md:text-6xl lg:text-6xl xl:text-7xl font-black tracking-tight leading-[1.05] mb-4 sm:mb-6 lg:mb-8 ${
+              isDark ? "text-white" : "text-slate-900"
+            }`}
+          >
+            Reset Your
+            <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">
               Password
             </span>
           </h1>
-          <p className={`${isDark ? "text-slate-400" : "text-slate-500"} text-xl leading-relaxed`}>
-            {step === 1 
-              ? "Enter your registered IITK email to receive a secure password reset link." 
+
+          <p className={`${isDark ? "text-slate-400" : "text-slate-500"} text-sm sm:text-base lg:text-lg xl:text-xl leading-relaxed`}>
+            {step === 1
+              ? "Enter your registered IITK email to receive a secure password reset link."
               : "A 6-digit verification code has been sent to your registered IITK email."}
           </p>
         </div>
       </div>
 
       {/* RIGHT PANEL */}
-      <div className={`flex-1 relative z-10 shadow-2xl ${isDark ? "bg-slate-900" : "bg-white"}`}>
-        <div className="min-h-screen flex items-center justify-center px-10 sm:px-14 lg:px-16 py-14 overflow-y-auto">
+      <div className={`w-full lg:flex-1 relative z-10 shadow-2xl ${isDark ? "bg-slate-900" : "bg-white"}`}>
+        <div className="min-h-[auto] lg:min-h-screen flex items-center justify-center px-6 py-10 sm:px-8 sm:py-12 md:px-10 lg:px-14 xl:px-16 overflow-y-auto">
           <div className="w-full max-w-md">
-            
             {/* Header */}
             <div className="mb-8">
-              <h2 className={`text-4xl font-extrabold mb-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+              <h2 className={`text-3xl sm:text-4xl font-extrabold mb-2 ${isDark ? "text-white" : "text-slate-900"}`}>
                 {step === 1 ? "Forgot Password" : "Verify & Reset"}
               </h2>
-              <p className={`${isDark ? "text-slate-400" : "text-slate-500"} text-base`}>
+              <p className={`${isDark ? "text-slate-400" : "text-slate-500"} text-sm sm:text-base`}>
                 {step === 1 ? "We'll send you an OTP to verify it's you." : "Enter the OTP and create a new password."}
               </p>
             </div>
 
-            {/* Error / Success Messages */}
-            {error && <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium">{error}</div>}
-            {successMsg && <div className="mb-4 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-sm font-medium">{successMsg}</div>}
+            {error && (
+              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium">
+                {error}
+              </div>
+            )}
+            {successMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 text-sm font-medium">
+                {successMsg}
+              </div>
+            )}
 
-            {/* Form */}
             <div className="space-y-6">
-              
-              {/* --- STEP 1: EMAIL INPUT --- */}
               {step === 1 && (
                 <div className="space-y-3">
-                  <label className={`text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>IITK Email</label>
+                  <label className={`text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                    IITK Email
+                  </label>
                   <div className="relative group">
                     <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
                     <input
@@ -186,44 +211,71 @@ export function ForgotPasswordScreen() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="username@iitk.ac.in"
-                      className={`w-full pl-12 pr-4 py-4 rounded-2xl border-2 font-medium transition-all outline-none
-                        ${isDark ? "bg-slate-950 border-slate-800 text-white focus:border-blue-500" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500"}`}
+                      className={`w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-2xl border-2 font-medium transition-all outline-none text-sm sm:text-base
+                        ${
+                          isDark
+                            ? "bg-slate-950 border-slate-800 text-white focus:border-blue-500"
+                            : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500"
+                        }`}
                     />
                   </div>
                   <button
                     onClick={handleRequestOTP}
                     disabled={loading || !email}
-                    className={`w-full mt-4 relative overflow-hidden rounded-2xl p-4 transition-all duration-300 font-bold text-white
-                      ${loading || !email ? (isDark ? "bg-slate-800 text-white/60" : "bg-slate-200 text-slate-500") : (isDark ? "bg-gradient-to-r from-blue-600 to-purple-600" : "bg-slate-900 hover:bg-slate-800")}`}
+                    className={`w-full mt-4 relative overflow-hidden rounded-2xl px-4 py-3.5 sm:py-4 transition-all duration-300 font-bold text-white
+                      ${
+                        loading || !email
+                          ? isDark
+                            ? "bg-slate-800 text-white/60"
+                            : "bg-slate-200 text-slate-500"
+                          : isDark
+                          ? "bg-gradient-to-r from-blue-600 to-purple-600"
+                          : "bg-slate-900 hover:bg-slate-800"
+                      }`}
                   >
                     {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : "Send Reset OTP"}
                   </button>
                 </div>
               )}
 
-              {/* --- STEP 2: OTP & PASSWORD --- */}
               {step === 2 && (
                 <>
                   <div className="space-y-3">
-                    <label className={`text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>6-Digit OTP</label>
+                    <label className={`text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                      6-Digit OTP
+                    </label>
                     <input
                       value={otp}
                       onChange={(e) => handleOtpChange(e.target.value)}
                       inputMode="numeric"
                       placeholder="••••••"
-                      className={`w-full py-4 px-4 rounded-2xl border-2 outline-none text-center tracking-[0.45em] font-extrabold text-lg transition-all
-                        ${isDark ? "bg-slate-950 border-slate-800 text-white focus:border-blue-500" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500"}`}
+                      className={`w-full py-3.5 sm:py-4 px-4 rounded-2xl border-2 outline-none text-center tracking-[0.3em] sm:tracking-[0.45em] font-extrabold text-base sm:text-lg transition-all
+                        ${
+                          isDark
+                            ? "bg-slate-950 border-slate-800 text-white focus:border-blue-500"
+                            : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500"
+                        }`}
                     />
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={isDark ? "text-slate-500" : "text-slate-400"}>{otp.length}/6 digits</span>
-                      <button type="button" onClick={handleResendOTP} className={`font-bold underline underline-offset-4 transition-opacity hover:opacity-80 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                    <div className="flex items-center justify-between gap-4 text-xs">
+                      <span className={`${isDark ? "text-slate-500" : "text-slate-400"} whitespace-nowrap`}>
+                        {otp.length}/6 digits
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleResendOTP}
+                        className={`font-bold underline underline-offset-4 transition-opacity hover:opacity-80 text-right ${
+                          isDark ? "text-slate-300" : "text-slate-700"
+                        }`}
+                      >
                         Resend OTP
                       </button>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <label className={`text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>New Password</label>
+                    <label className={`text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                      New Password
+                    </label>
                     <div className="relative group">
                       <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
                       <input
@@ -231,8 +283,12 @@ export function ForgotPasswordScreen() {
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         placeholder="Min. 8 characters"
-                        className={`w-full pl-12 pr-12 py-4 rounded-2xl border-2 outline-none font-medium transition-all
-                          ${isDark ? "bg-slate-950 border-slate-800 text-white focus:border-blue-500" : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500"}`}
+                        className={`w-full pl-12 pr-12 py-3.5 sm:py-4 rounded-2xl border-2 outline-none font-medium transition-all text-sm sm:text-base
+                          ${
+                            isDark
+                              ? "bg-slate-950 border-slate-800 text-white focus:border-blue-500"
+                              : "bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500"
+                          }`}
                       />
                       <button
                         type="button"
@@ -240,45 +296,58 @@ export function ForgotPasswordScreen() {
                         className={`absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-md transition-colors outline-none focus:ring-2 focus:ring-blue-500
                           ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
                       >
-                        {showPassword ? (
-                            <EyeOff className="w-5 h-5" />
-                        ) : (
-                            <Eye className="w-5 h-5" />
-                        )}
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
                     </div>
                   </div>
 
-                  {/* 🔥 UPDATED PASSWORD STRENGTH METER 🔥 */}
                   <div className="space-y-2 pt-1">
-                      <div className="flex gap-2 h-1.5">
-                          {[1, 2, 3, 4].map((step) => (
-                              <div key={step} className={`flex-1 rounded-full transition-all duration-300
-                                  ${strength >= step 
-                                      ? (strength < 2 ? 'bg-red-500' : strength < 4 ? 'bg-yellow-500' : 'bg-green-500') 
-                                      : (isDark ? 'bg-slate-800' : 'bg-slate-200')}`} 
-                              />
-                          ))}
-                      </div>
-                      <div className="flex justify-between text-xs px-1 font-medium">
-                          <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Password Strength</span>
-                          <span className={`
-                              ${strength < 2 ? 'text-red-500' : strength < 4 ? 'text-yellow-500' : 'text-green-500'}
-                          `}>
-                              {strength === 0 ? 'Too Weak' : strength < 2 ? 'Weak' : strength < 4 ? 'Medium' : 'Strong'}
-                          </span>
-                      </div>
+                    <div className="flex gap-2 h-1.5">
+                      {[1, 2, 3, 4].map((step) => (
+                        <div
+                          key={step}
+                          className={`flex-1 rounded-full transition-all duration-300
+                            ${
+                              strength >= step
+                                ? strength < 2
+                                  ? 'bg-red-500'
+                                  : strength < 4
+                                  ? 'bg-yellow-500'
+                                  : 'bg-green-500'
+                                : isDark
+                                ? 'bg-slate-800'
+                                : 'bg-slate-200'
+                            }`}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex justify-between text-xs px-1 font-medium gap-4">
+                      <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Password Strength</span>
+                      <span
+                        className={`whitespace-nowrap ${
+                          strength < 2 ? 'text-red-500' : strength < 4 ? 'text-yellow-500' : 'text-green-500'
+                        }`}
+                      >
+                        {strength === 0 ? 'Too Weak' : strength < 2 ? 'Weak' : strength < 4 ? 'Medium' : 'Strong'}
+                      </span>
+                    </div>
                   </div>
 
                   <button
                     onClick={handleResetPassword}
                     disabled={!otpValid || newPassword.length < 8 || loading}
-                    className={`w-full group relative overflow-hidden rounded-2xl p-4 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] disabled:hover:scale-100 disabled:active:scale-100
-                      ${!otpValid || newPassword.length < 8 || loading
-                        ? (isDark ? "bg-slate-800 text-white/60 cursor-not-allowed" : "bg-slate-200 text-slate-500 cursor-not-allowed")
-                        : (isDark ? "bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-500/20" : "bg-slate-900 text-white shadow-xl hover:bg-slate-800")}`}
+                    className={`w-full group relative overflow-hidden rounded-2xl px-4 py-3.5 sm:py-4 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] disabled:hover:scale-100 disabled:active:scale-100
+                      ${
+                        !otpValid || newPassword.length < 8 || loading
+                          ? isDark
+                            ? "bg-slate-800 text-white/60 cursor-not-allowed"
+                            : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                          : isDark
+                          ? "bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-500/20"
+                          : "bg-slate-900 text-white shadow-xl hover:bg-slate-800"
+                      }`}
                   >
-                    <div className="flex items-center justify-center gap-2 font-extrabold text-base text-white">
+                    <div className="flex items-center justify-center gap-2 font-extrabold text-sm sm:text-base text-white">
                       {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Reset Password</span>}
                       {!loading && <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
                     </div>
@@ -286,29 +355,29 @@ export function ForgotPasswordScreen() {
                 </>
               )}
 
-              {/* Back to login */}
               <button
                 type="button"
                 onClick={() => {
-                  if (step === 2) setStep(1); 
-                  else navigate("/login");    
+                  if (step === 2) setStep(1);
+                  else navigate("/login");
                 }}
-                className={`w-full p-4 rounded-2xl font-extrabold flex items-center justify-center gap-2 border-2 transition-all mt-4
+                className={`w-full px-4 py-3.5 sm:py-4 rounded-2xl font-extrabold flex items-center justify-center gap-2 border-2 transition-all mt-4
                   ${isDark ? "border-white/10 hover:bg-white/5 text-white" : "border-slate-200 hover:bg-slate-50 text-slate-700"}`}
               >
                 <RotateCcw className="w-5 h-5" />
                 <span>{step === 2 ? "Back to Email" : "Back to Login"}</span>
               </button>
-
             </div>
-            
-            {/* Footer hint */}
+
             {step === 2 && (
-              <p className={`text-center text-xs mt-10 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                If you didn’t receive an OTP, check Spam or click <span onClick={handleResendOTP} className="underline cursor-pointer">Resend OTP</span>.
+              <p className={`text-center text-xs mt-8 sm:mt-10 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                If you didn’t receive an OTP, check Spam or click{" "}
+                <span onClick={handleResendOTP} className="underline cursor-pointer">
+                  Resend OTP
+                </span>
+                .
               </p>
             )}
-
           </div>
         </div>
       </div>

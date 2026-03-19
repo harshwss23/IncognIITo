@@ -19,20 +19,16 @@ const router = Router();
 // All user routes require authentication
 router.use(authMiddleware.authenticate.bind(authMiddleware));
 
-// GET /api/users/profile - Get user profile
+// GET /api/users - Get all users (useful for user discovery/active users)
 router.get(
   "/",
   async (req: Request, res: Response) => {
     try {
-      // ✅ Optional: only verified users can access
-      // if (!req.user?.verified) {
-      //   return res.status(403).json({ success: false, message: "Email verification required" });
-      // }
-
       const result = await query(
-        `SELECT id, email, display_name, verified
-         FROM users
-         ORDER BY id DESC`
+        `SELECT u.id, u.email, u.display_name, u.verified, p.avatar_url
+         FROM users u
+         LEFT JOIN user_profiles p ON u.id = p.user_id
+         ORDER BY u.id DESC`
       );
 
       return res.status(200).json({
@@ -48,6 +44,8 @@ router.get(
     }
   }
 );
+
+// This route is handled separately below as /profile/:id
 
 router.get('/profile', async (req: Request, res: Response) => {
   try {
@@ -86,19 +84,15 @@ router.get('/profile', async (req: Request, res: Response) => {
 // GET /api/users/profile/:id - Get another user's public profile
 router.get('/profile/:id', async (req: Request, res: Response) => {
   try {
-    const viewerId = req.user!.userId;
     const targetId = Number(req.params.id);
 
     if (!targetId || Number.isNaN(targetId)) {
       return res.status(400).json({ success: false, message: 'Invalid user id' });
     }
 
-    if (viewerId === targetId) {
-      return res.status(400).json({ success: false, message: 'Use /api/users/profile for your own profile' });
-    }
-
+    console.log(`[DEBUG] Fetching public profile for ID: ${targetId}`);
     const result = await query(
-      `SELECT u.id, u.display_name, u.verified,
+      `SELECT u.id, u.email, u.display_name, u.verified,
               p.avatar_url, p.interests, p.total_chats, p.total_reports, p.rating
        FROM users u
        LEFT JOIN user_profiles p ON u.id = p.user_id
@@ -107,9 +101,11 @@ router.get('/profile/:id', async (req: Request, res: Response) => {
     );
 
     if (result.rows.length === 0) {
+      console.log(`[DEBUG] User not found for ID: ${targetId}`);
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    console.log(`[DEBUG] Found user: ${JSON.stringify(result.rows[0])}`);
     return res.status(200).json({
       success: true,
       data: { user: result.rows[0] },

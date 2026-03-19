@@ -50,6 +50,7 @@ export default function AppRoutes() {
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
         <Route path="/match-waiting" element={<ProtectedRoute><MatchingBuffer /></ProtectedRoute>} />
+        <Route path="/user/:id" element={<ProtectedRoute><PublicUserProfile /></ProtectedRoute>} />
 
         {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

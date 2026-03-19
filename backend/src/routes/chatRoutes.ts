@@ -14,13 +14,15 @@ router.get("/", authMiddleware.authenticate.bind(authMiddleware), async (req: Re
           c.id as chat_id,
           u.id as other_user_id,
           u.display_name,
-          u.email
+          u.email,
+          p.avatar_url
        FROM chats c
        JOIN users u 
          ON u.id = CASE 
              WHEN c.user1_id = $1 THEN c.user2_id
              ELSE c.user1_id
          END
+       LEFT JOIN user_profiles p ON u.id = p.user_id
        WHERE c.user1_id = $1 OR c.user2_id = $1
        ORDER BY c.created_at DESC`,
       [userId]
