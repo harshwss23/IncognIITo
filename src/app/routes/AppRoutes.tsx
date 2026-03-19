@@ -21,6 +21,7 @@ import { ForgotPasswordScreen } from "../components/ForgptPassword";
 import { HomePageScreen } from "../components/Homepage";
 import { ActiveUsersScreen } from "../components/ActiveUsersScreen";
 import { MatchingBuffer } from "../components/MatchingBuffer";
+import { PublicUserProfile } from "../components/PublicUserProfile";
 
 export default function AppRoutes() {
   return (
@@ -41,6 +42,9 @@ export default function AppRoutes() {
         <Route path="/live/:roomId" element={<ProtectedRoute><LiveInteractionRoom /></ProtectedRoute>} />
         <Route path="/matchmaking" element={<ProtectedRoute><MatchingBuffer /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+        {/* Other person's profile */}
+        <Route path="/profile/:id" element={<ProtectedRoute><PublicUserProfile /></ProtectedRoute>} />
+        <Route path="/users/:id" element={<ProtectedRoute><PublicUserProfile /></ProtectedRoute>} />
         <Route path="/session/:roomid" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
