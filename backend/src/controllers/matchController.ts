@@ -199,6 +199,51 @@ export class MatchController {
     }
   }
 
+  async getSessionDetails(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const roomId = req.params.roomId;
+
+      const sessionResult = await query(
+        `SELECT s.id, s.user1_id, s.user2_id, 
+                u1.display_name as user1_name, u2.display_name as user2_name,
+                u1.email as user1_email, u2.email as user2_email
+         FROM matchmaking_sessions s
+         JOIN users u1 ON s.user1_id = u1.id
+         JOIN users u2 ON s.user2_id = u2.id
+         WHERE s.room_id = $1`,
+        [roomId]
+      );
+
+      if (sessionResult.rows.length === 0) {
+        res.status(404).json({ success: false, message: 'Session not found' });
+        return;
+      }
+
+      const session = sessionResult.rows[0];
+      
+      // Ensure the requesting user was part of this session
+      if (session.user1_id !== userId && session.user2_id !== userId) {
+         res.status(403).json({ success: false, message: 'Unauthorized access to session' });
+         return;
+      }
+
+      const partnerId = session.user1_id === userId ? session.user2_id : session.user1_id;
+      const partnerName = session.user1_id === userId ? session.user2_name : session.user1_name;
+      const partnerEmail = session.user1_id === userId ? session.user2_email : session.user1_email;
+
+      res.status(200).json({ 
+        success: true, 
+        partnerId, 
+        partnerName,
+        partnerEmail 
+      });
+    } catch (error) {
+      console.error('Get session details error:', error);
+      res.status(500).json({ success: false, message: 'Failed to get session details' });
+    }
+  }
+
 }
 
 export const matchController = new MatchController();
