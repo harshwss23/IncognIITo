@@ -67,6 +67,32 @@ export function setAuthTokens(tokens: Tokens): void {
 }
 
 export function clearAuthTokens(): void {
+  // 1. Storage clear karne se pehle current tokens nikal lo
+  const currentToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const currentRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+  // 2. Fire-and-forget API calls (Bina await kiye raw fetch call karna hai taaki app na ruke aur na hi loop bane)
+  if (currentToken) {
+    const headers = {
+      "Authorization": `Bearer ${currentToken}`,
+      "Content-Type": "application/json"
+    };
+
+    // Match leave & end triggers
+    fetch(buildApiUrl("/api/match/leave"), { method: "POST", headers }).catch(() => {});
+    fetch(buildApiUrl("/api/match/end"), { method: "POST", headers }).catch(() => {});
+    
+    // Optional but recommended: Invalidate session in backend too
+    if (currentRefreshToken) {
+      fetch(buildApiUrl("/api/auth/logout"), { 
+        method: "POST", 
+        headers,
+        body: JSON.stringify({ refreshToken: currentRefreshToken }) 
+      }).catch(() => {});
+    }
+  }
+
+  // 3. Immediately clear local storage (Synchronous)
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
