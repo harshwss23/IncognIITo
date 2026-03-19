@@ -83,6 +83,46 @@ router.get('/profile', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/users/profile/:id - Get another user's public profile
+router.get('/profile/:id', async (req: Request, res: Response) => {
+  try {
+    const viewerId = req.user!.userId;
+    const targetId = Number(req.params.id);
+
+    if (!targetId || Number.isNaN(targetId)) {
+      return res.status(400).json({ success: false, message: 'Invalid user id' });
+    }
+
+    if (viewerId === targetId) {
+      return res.status(400).json({ success: false, message: 'Use /api/users/profile for your own profile' });
+    }
+
+    const result = await query(
+      `SELECT u.id, u.display_name, u.verified,
+              p.avatar_url, p.interests, p.total_chats, p.total_reports, p.rating
+       FROM users u
+       LEFT JOIN user_profiles p ON u.id = p.user_id
+       WHERE u.id = $1`,
+      [targetId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { user: result.rows[0] },
+    });
+  } catch (error) {
+    console.error('Get public profile error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get user profile',
+    });
+  }
+});
+
 // PUT /api/users/profile - Update user profile
 router.put('/profile', async (req: Request, res: Response) => {
   try {
@@ -158,6 +198,63 @@ router.delete('/account', async (req: Request, res: Response) => {
       success: false,
       message: 'Failed to delete account',
     });
+  }
+});
+
+// POST /api/users/report - Report a user
+router.post('/report', async (req: Request, res: Response) => {
+  try {
+    const reporterId = req.user!.userId;
+    const { targetId, reason, description } = req.body;
+
+    if (!targetId || !reason) {
+      res.status(400).json({ success: false, message: 'Target ID and reason are required' });
+      return;
+    }
+
+    if (reporterId === targetId) {
+      res.status(400).json({ success: false, message: 'You cannot report yourself' });
+      return;
+    }
+
+    // Check for existing report
+    const existingReport = await query(
+      `SELECT id FROM reports WHERE reporter_id = $1 AND target_id = $2`,
+      [reporterId, targetId]
+    );
+
+    if (existingReport.rows.length > 0) {
+      res.status(400).json({ success: false, message: 'You have already reported this user' });
+      return;
+    }
+
+    // Insert report into reports table
+    await query(
+      `INSERT INTO reports (reporter_id, target_id, reason, description)
+       VALUES ($1, $2, $3, $4)`,
+      [reporterId, targetId, reason, description || null]
+    );
+
+    // Block the user so they don't match again
+    await query(
+      `INSERT INTO user_blocks (blocker_id, blocked_id, reason)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (blocker_id, blocked_id) DO NOTHING`,
+      [reporterId, targetId, reason]
+    );
+
+    // Increment total_reports for the reported user
+    await query(
+      `INSERT INTO user_profiles (user_id, total_reports)
+       VALUES ($1, 1)
+       ON CONFLICT (user_id) DO UPDATE SET total_reports = user_profiles.total_reports + 1`,
+      [targetId]
+    );
+
+    res.status(200).json({ success: true, message: 'User reported successfully' });
+  } catch (error) {
+    console.error('Report user error:', error);
+    res.status(500).json({ success: false, message: 'Failed to report user' });
   }
 });
 

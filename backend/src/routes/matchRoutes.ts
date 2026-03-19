@@ -27,4 +27,11 @@ router.post('/end', authMiddleware.authenticate.bind(authMiddleware), matchContr
 // POST /api/match/rate   → Submit rating for a session
 router.post('/rate', authMiddleware.authenticate.bind(authMiddleware), matchController.rateSession.bind(matchController));
 
+// ==========================================
+// GET /api/match/:roomId → Get match details (names, interests)
+// NOTE: Dynamic routes with parameters MUST be at the bottom 
+// to avoid conflicting with static routes like /status or /join.
+// ==========================================
+router.get('/:roomId', authMiddleware.authenticate.bind(authMiddleware), matchController.getMatchDetails.bind(matchController));
+
 export default router;
