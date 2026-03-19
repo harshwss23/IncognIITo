@@ -2,10 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, MessageSquare, User, Check, Shield } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
+import { useTheme } from '@/app/contexts/ThemeContext';
 import { authFetch } from '@/services/auth';
 
 export function ChatRequestsDashboard() {
   const colors = useThemeColors();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const navigate = useNavigate();
 
   const [connectionRequests, setConnectionRequests] = useState([]);
@@ -123,6 +126,19 @@ export function ChatRequestsDashboard() {
             <span className="font-medium text-sm">Profile</span>
           </button>
         </nav>
+
+        <div className="p-6 border-t border-slate-200 dark:border-white/10 space-y-3">
+          <button
+            onClick={() => navigate('/homepage')}
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 border-2 transition-colors
+            ${isDark
+              ? 'border-blue-500/20 text-blue-300 hover:bg-blue-500/10'
+              : 'border-blue-100 text-blue-700 hover:bg-blue-50 hover:border-blue-200'
+            }`}
+          >
+            Back to Home
+          </button>
+        </div>
       </div>
 
       {/* --- MAIN CONTENT (UI EXACT SAME) --- */}

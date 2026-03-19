@@ -25,39 +25,35 @@ GRANT USAGE, CREATE ON SCHEMA public TO incogniito_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO incogniito_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO incogniito_user;
 
--- -- 👇 Yahan mahirj23 kar diya hai
--- ALTER DEFAULT PRIVILEGES FOR USER mahirj23 IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO incogniito_user;
--- ALTER DEFAULT PRIVILEGES FOR USER mahirj23 IN SCHEMA public GRANT ALL PRIVILEGES ON SEQUENCES TO incogniito_user;
-
+-- Main User Table
 CREATE TABLE IF NOT EXISTS users (
-    id BIGSERIAL PRIMARY KEY, -- 👇 BIGSERIAL for consistency with foreign keys
+    id BIGSERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     display_name VARCHAR(100) DEFAULT '',
     verified BOOLEAN DEFAULT FALSE,
-    is_admin BOOLEAN NOT NULL DEFAULT FALSE
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    sessions INTEGER NOT NULL DEFAULT 0
 );
-
-ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_verified ON users(verified);
 
+-- Verification / Reset Tokens
 CREATE TABLE IF NOT EXISTS verification_tokens (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token VARCHAR(255) UNIQUE NOT NULL,
     token_type VARCHAR(50) NOT NULL CHECK (token_type IN ('email_verify', 'password_reset')),
-    expires_at TIMESTAMPTZ NOT NULL, -- 👇 Timezones fixed everywhere
+    expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     used BOOLEAN DEFAULT FALSE
 );
 
 CREATE INDEX IF NOT EXISTS idx_verification_tokens_token ON verification_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_verification_tokens_user_id ON verification_tokens(user_id);
-CREATE INDEX IF NOT EXISTS idx_verification_tokens_expires_at ON verification_tokens(expires_at);
 
+-- Session Management
 CREATE TABLE IF NOT EXISTS sessions (
     id BIGSERIAL PRIMARY KEY,
     session_id VARCHAR(255) UNIQUE NOT NULL,
@@ -67,10 +63,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     last_activity TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_sessions_session_id ON sessions(session_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 
+-- Extended User Profiles
 CREATE TABLE IF NOT EXISTS user_profiles (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -79,6 +74,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     total_chats INTEGER DEFAULT 0,
     total_reports INTEGER DEFAULT 0,
     rating DECIMAL(3, 2) DEFAULT 0.00 CHECK (rating >= 0 AND rating <= 5),
+    rating_sum DECIMAL(10, 2) DEFAULT 0.00,
     is_banned BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -86,6 +82,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
 
+-- Reporting System
 CREATE TABLE IF NOT EXISTS reports (
     id BIGSERIAL PRIMARY KEY,
     reporter_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -101,8 +98,8 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
-CREATE INDEX IF NOT EXISTS idx_reports_target_id ON reports(target_id);
 
+-- Matchmaking Queue
 CREATE TABLE IF NOT EXISTS matchmaking_queue (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -112,9 +109,7 @@ CREATE TABLE IF NOT EXISTS matchmaking_queue (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_queue_status ON matchmaking_queue(status);
-CREATE INDEX IF NOT EXISTS idx_queue_joined_at ON matchmaking_queue(joined_at);
-
+-- Matchmaking Sessions (Video/Audio)
 CREATE TABLE IF NOT EXISTS matchmaking_sessions (
     id BIGSERIAL PRIMARY KEY,
     user1_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -124,15 +119,13 @@ CREATE TABLE IF NOT EXISTS matchmaking_sessions (
     session_end TIMESTAMPTZ,
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
     room_id VARCHAR(100) UNIQUE NOT NULL,
+    rated_by_user1 BOOLEAN NOT NULL DEFAULT FALSE,
+    rated_by_user2 BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT no_self_match CHECK (user1_id <> user2_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_matchmaking_sessions_status ON matchmaking_sessions(status);
-CREATE INDEX IF NOT EXISTS idx_matchmaking_sessions_room_id ON matchmaking_sessions(room_id);
-CREATE INDEX IF NOT EXISTS idx_matchmaking_sessions_user1 ON matchmaking_sessions(user1_id);
-CREATE INDEX IF NOT EXISTS idx_matchmaking_sessions_user2 ON matchmaking_sessions(user2_id);
-
+-- Blocking System
 CREATE TABLE IF NOT EXISTS user_blocks (
     id BIGSERIAL PRIMARY KEY,
     blocker_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -143,9 +136,7 @@ CREATE TABLE IF NOT EXISTS user_blocks (
     UNIQUE(blocker_id, blocked_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_blocks_blocker ON user_blocks(blocker_id);
-CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON user_blocks(blocked_id);
-
+-- Permanent Chat Connections
 CREATE TABLE IF NOT EXISTS connection_requests (
     id BIGSERIAL PRIMARY KEY,
     sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -186,6 +177,11 @@ CREATE TABLE IF NOT EXISTS messages (
 
 CREATE INDEX IF NOT EXISTS idx_messages_chat_time ON messages(chat_id, created_at DESC);
 
+-- ============================================
+-- Triggers and Functions
+-- ============================================
+
+-- Function to update 'updated_at' timestamp automatically
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -194,6 +190,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Profile/Report Triggers
 DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
 CREATE TRIGGER update_user_profiles_updated_at
     BEFORE UPDATE ON user_profiles
@@ -206,6 +203,7 @@ CREATE TRIGGER update_reports_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Function to auto-create a profile when a user registers
 CREATE OR REPLACE FUNCTION create_user_profile()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -222,22 +220,22 @@ CREATE TRIGGER auto_create_profile
     FOR EACH ROW
     EXECUTE FUNCTION create_user_profile();
 
+-- Cleanup Helpers
 CREATE OR REPLACE FUNCTION cleanup_expired_tokens()
 RETURNS void AS $$
 BEGIN
-    DELETE FROM verification_tokens
-    WHERE expires_at < CURRENT_TIMESTAMP;
+    DELETE FROM verification_tokens WHERE expires_at < CURRENT_TIMESTAMP;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
 RETURNS void AS $$
 BEGIN
-    DELETE FROM sessions
-    WHERE expires_at < CURRENT_TIMESTAMP;
+    DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Final Permissions
 GRANT ALL ON SCHEMA public TO incogniito_user;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO incogniito_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO incogniito_user;
