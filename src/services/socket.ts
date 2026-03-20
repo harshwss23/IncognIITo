@@ -10,11 +10,24 @@ export const socket = io(socketUrl, {
   transports: ["websocket"],
 });
 
+// ─── 🛡️ GLOBAL SESSION ENFORCER ──────────────────────────────
+// Ye react render hone se pehle hi event catch kar lega
+socket.on("multiple_tabs_error", (message) => {
+  console.warn("🚨 Session blocked by server:", message);
+  
+  // 1. Connection turant kaato taaki infinite reconnect loop na bane
+  socket.disconnect(); 
+
+  // 2. Hard redirect to blocked page
+  if (window.location.pathname !== "/blocked") {
+    window.location.href = "/blocked";
+  }
+});
+// ────────────────────────────────────────────────────────────
+
 // Listener for matchmaking events
-// This is called when the backend matches two users
 socket.on("matched", (payload: { roomId: string; matchScore: number; event: string }) => {
   console.log("✅ Matched event received:", payload);
-  // The MatchingBuffer component will listen for this event and navigate to live room
 });
 
 // Listener for connection errors

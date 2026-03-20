@@ -52,8 +52,8 @@ router.get('/profile', async (req: Request, res: Response) => {
     const userId = req.user!.userId;
 
     const result = await query(
-      `SELECT u.id, u.email, u.display_name, u.verified,
-              p.interests, p.avatar_url, p.total_chats, p.total_reports, p.rating, p.is_banned
+      `SELECT u.id, u.email, u.display_name, u.verified, u.sessions as total_chats,
+              p.interests, p.avatar_url, p.total_reports, p.rating, p.is_banned
        FROM users u
        LEFT JOIN user_profiles p ON u.id = p.user_id
        WHERE u.id = $1`,
@@ -90,10 +90,9 @@ router.get('/profile/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Invalid user id' });
     }
 
-    console.log(`[DEBUG] Fetching public profile for ID: ${targetId}`);
     const result = await query(
-      `SELECT u.id, u.email, u.display_name, u.verified,
-              p.avatar_url, p.interests, p.total_chats, p.total_reports, p.rating
+      `SELECT u.id, u.email, u.display_name, u.verified, u.sessions as total_chats,
+              p.avatar_url, p.interests, p.total_reports, p.rating
        FROM users u
        LEFT JOIN user_profiles p ON u.id = p.user_id
        WHERE u.id = $1`,
@@ -101,11 +100,9 @@ router.get('/profile/:id', async (req: Request, res: Response) => {
     );
 
     if (result.rows.length === 0) {
-      console.log(`[DEBUG] User not found for ID: ${targetId}`);
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    console.log(`[DEBUG] Found user: ${JSON.stringify(result.rows[0])}`);
     return res.status(200).json({
       success: true,
       data: { user: result.rows[0] },

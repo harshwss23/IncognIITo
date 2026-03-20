@@ -91,7 +91,7 @@ class Server {
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
       },
     });
-
+    this.app.set("io", this.io);
     this.matchingService = new MatchingService(this.io);
 
     this.initializeMiddlewares();
@@ -155,7 +155,7 @@ class Server {
 
         const decoded = (await tokenService.verifyToken(token)) as any;
         socket.data.userId = decoded.userId || decoded.id;
-
+        
         if (!socket.data.userId) {
           return next(new Error("Invalid token payload"));
         }
@@ -167,10 +167,75 @@ class Server {
       }
     });
 
-    // 🔌 2. CONNECTION EVENT
-    this.io.on("connection", (socket) => {
+    // 🔌 2. CONNECTION EVENT (Made Async for single-session check)
+    this.io.on("connection", async (socket) => {
       const userId = socket.data.userId;
       console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId})`);
+
+      // ─── 🛡️ THE "OLDEST SURVIVES" CHECK (NEW ADDITION) ──────────────
+      const globalUserRoom = `user_global_${userId}`;
+      const existingSockets = await this.io.in(globalUserRoom).fetchSockets();
+
+      if (existingSockets.length > 0) {
+        console.warn(`🚨 User ${userId} tried connecting from a new tab/device. Keeping oldest session, killing new one.`);
+        
+        socket.emit("multiple_tabs_error", "You already have an active session in another window or device.");
+        
+        socket.disconnect(true);
+        return; // Halt completely! Do not register any other events for this socket.
+      }
+
+      // ─── 🟢 FIRST / OLDEST CONNECTION ──────────────
+      socket.join(globalUserRoom);
+      console.log(`✅ User ${userId} claimed the primary session.`);
+      socket.on("force_takeover", async () => {
+        console.log(`🔥 User ${userId} requested a FORCE TAKEOVER.`);
+        
+        // 1. Us user ke saare current active sockets (purane tabs) ko dhundho
+        const existingSockets = await this.io.in(globalUserRoom).fetchSockets();
+        
+        // 2. Un sabko ek silent death signal do aur server se disconnect kar do
+        existingSockets.forEach((oldSocket) => {
+          // Khud ko disconnect mat karna (though naya socket abhi tak is room mein nahi hai)
+          if (oldSocket.id !== socket.id) {
+            console.log(`Killing old socket ${oldSocket.id} for user ${userId}`);
+            oldSocket.emit("duplicate_session_detected"); 
+            oldSocket.disconnect(true);
+          }
+        });
+
+        // 3. Queue aur Active sessions database se clear karo
+        try {
+          await queueService.leaveQueue(userId).catch(() => {});
+          
+          const roomId = await queueService.getActiveSession(userId);
+          if (roomId) {
+            this.io.to(roomId).emit("session_ended", "Your partner disconnected (Session Taken Over).");
+            
+            const sessionResult = await pool.query(
+              `SELECT id, user1_id, user2_id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`,
+              [roomId]
+            );
+
+            if (sessionResult.rows.length > 0) {
+              const session = sessionResult.rows[0];
+              await pool.query(
+                `UPDATE matchmaking_sessions SET status = 'completed', session_end = NOW() WHERE id = $1`,
+                [session.id]
+              );
+              await queueService.clearActiveSession(session.user1_id);
+              await queueService.clearActiveSession(session.user2_id);
+            }
+          }
+        } catch (error) {
+          console.error("Error clearing session during takeover:", error);
+        }
+
+        // 4. Ab naye tab ko primary session dedo
+        socket.join(globalUserRoom);
+        socket.emit("takeover_success");
+      });
+      // ──────────────────────────────────────────────────────────────
 
       // ─── SECURE JOIN ROOM ──────────────
       socket.on("join_room", async (roomID) => {
