@@ -130,12 +130,12 @@ router.put('/profile', async (req: Request, res: Response) => {
     const interestsProvided = Array.isArray(interests);
     const sanitizedInterests = interestsProvided
       ? Array.from(
-          new Set(
-            (interests as unknown[])
-              .map((i) => (typeof i === 'string' ? i.trim() : ''))
-              .filter((i) => i && allowedInterests.has(i))
-          )
+        new Set(
+          (interests as unknown[])
+            .map((i) => (typeof i === 'string' ? i.trim() : ''))
+            .filter((i) => i && allowedInterests.has(i))
         )
+      )
       : null;
 
     // Ensure profile row exists so updates don't noop
@@ -281,7 +281,7 @@ router.post('/avatar', upload.single('avatar'), async (req: Request, res: Respon
             resolve(result as { secure_url: string; public_id: string });
           }
         );
-        stream.end(req.file!.buffer); 
+        stream.end(req.file!.buffer);
       }
     );
 
@@ -316,7 +316,7 @@ router.delete('/avatar', async (req: Request, res: Response) => {
     const userId = req.user!.userId;
 
     // Optional: also delete from Cloudinary storage
-    await cloudinary.uploader.destroy(`incogniito/avatars/user_${userId}`).catch(() => {});
+    await cloudinary.uploader.destroy(`incogniito/avatars/user_${userId}`).catch(() => { });
 
     await query(
       `UPDATE user_profiles SET avatar_url = NULL WHERE user_id = $1`,
