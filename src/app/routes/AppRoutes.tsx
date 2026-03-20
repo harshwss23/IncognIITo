@@ -137,6 +137,7 @@ export default function AppRoutes() {
         <Route path="/session/:roomid" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
         <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
+        <Route path="/user/:id" element={<ProtectedRoute><PublicUserProfile /></ProtectedRoute>} />
 
         {/* 👑 Admin Route */}
         <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

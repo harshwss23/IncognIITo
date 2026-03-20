@@ -113,27 +113,67 @@ export function ActiveUsersScreen() {
       </div>
 
       {loading ? (
-        <p>Loading users...</p>
+        <div className="flex flex-col items-center justify-center py-20 gap-4">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="font-medium animate-pulse">Finding active users...</p>
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="text-center py-20 border-2 border-dashed rounded-3xl border-slate-200 dark:border-slate-800">
+           <p className="text-slate-500">No other users found matching your search.</p>
+        </div>
       ) : (
-        <div className="space-y-4">
-          {filteredUsers.map((u) => (
-            <div
-              key={u.id}
-              className="flex justify-between items-center p-4 rounded-xl border bg-white dark:bg-slate-900"
-            >
-              <div>
-                <p className="font-bold">{u.email}</p>
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredUsers.map((u) => {
+             const displayName = u.display_name || u.email.split('@')[0];
+             const initials = (displayName.charAt(0) || 'U').toUpperCase();
 
-              <button
-                onClick={() => sendRequest(u.id)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600"
+             return (
+              <div
+                key={u.id}
+                className="group relative flex flex-col p-6 rounded-3xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-white/5 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300"
               >
-                <UserPlus size={16} />
-                Send Request
-              </button>
-            </div>
-          ))}
+                <div 
+                  className="flex items-center gap-4 mb-6 cursor-pointer"
+                  onClick={() => navigate(`/profile/${u.id}`)}
+                >
+                  <div className="relative shrink-0">
+                    {u.avatar_url ? (
+                      <img src={u.avatar_url} alt={displayName} className="w-14 h-14 rounded-2xl object-cover shadow-lg" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg">
+                        {initials}
+                      </div>
+                    )}
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-white dark:border-slate-900" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-black text-lg truncate group-hover:text-blue-500 transition-colors">
+                      {displayName}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {u.email}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-auto flex gap-3">
+                  <button
+                    onClick={() => navigate(`/profile/${u.id}`)}
+                    className="flex-1 py-2.5 rounded-xl border border-blue-500/30 text-blue-500 font-bold text-sm hover:bg-blue-500/10 transition-colors"
+                  >
+                    View Profile
+                  </button>
+                  <button
+                    onClick={() => sendRequest(u.id)}
+                    className="flex-[2] py-2.5 rounded-xl bg-blue-600 text-white font-bold text-sm shadow-lg shadow-blue-500/20 hover:bg-blue-500 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2"
+                  >
+                    <UserPlus size={16} />
+                    Connect
+                  </button>
+                </div>
+              </div>
+             );
+          })}
         </div>
       )}
     </div>
