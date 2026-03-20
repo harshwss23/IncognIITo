@@ -259,11 +259,11 @@ export class MatchController {
         await client.query(`INSERT INTO user_profiles (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`, [targetUserId]);
         
         const sessionsUpdate = await client.query(
-          `UPDATE users SET sessions = COALESCE(sessions, 0) + 1 WHERE id = $1 RETURNING sessions`,
+          `UPDATE user_profiles SET total_chats = COALESCE(total_chats, 0) + 1 WHERE user_id = $1 RETURNING total_chats`,
           [targetUserId]
         );
 
-        const newSessions = Number(sessionsUpdate.rows[0].sessions);
+        const newSessions = Number(sessionsUpdate.rows[0].total_chats);
         const ratingResult = await client.query(`SELECT rating_sum FROM user_profiles WHERE user_id = $1`, [targetUserId]);
         const currentSum = Number(ratingResult.rows[0]?.rating_sum || 0);
         const newSum = currentSum + numericRating;
