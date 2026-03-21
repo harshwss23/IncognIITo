@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, ArrowLeft, ShieldCheck, MessageCircle, Award, Flag, User } from "lucide-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch } from "@/services/auth";
+import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
 
 type PublicUser = {
   id: number;
@@ -96,10 +97,13 @@ export function PublicUserProfile() {
   }
 
   return (
-    <div className={`w-full h-full flex overflow-hidden transition-colors duration-500 ${isDark ? "bg-[#020617]" : "bg-slate-50"}`}>
-      <div className={`w-[380px] flex flex-col border-r shadow-sm z-10 ${isDark ? "bg-[#0F172A] border-white/5" : "bg-white border-slate-200"}`}>
-        <div className="relative">
-          <div className="h-40 bg-gradient-to-br from-blue-600 to-indigo-700" />
+    // FIX 1: Changed h-full to h-[100dvh] for strict viewport locking
+    <div className={`w-full h-[100dvh] flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden transition-colors duration-500 ${isDark ? "bg-[#020617]" : "bg-slate-50"}`}>
+      
+      {/* Sidebar / Top Profile Summary */}
+      <div className={`w-full lg:w-[380px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r shadow-sm z-10 ${isDark ? "bg-[#0F172A] border-white/5" : "bg-white border-slate-200"}`}>
+        <div className="relative shrink-0">
+          <div className="h-32 lg:h-40 bg-gradient-to-br from-blue-600 to-indigo-700" />
           <div className="absolute -bottom-16 w-full flex justify-center">
             <div className={`w-32 h-32 rounded-full p-1.5 shadow-xl ${isDark ? "bg-[#0F172A]" : "bg-white"}`}>
               <div className={`w-full h-full rounded-full relative flex items-center justify-center overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
@@ -113,7 +117,8 @@ export function PublicUserProfile() {
           </div>
         </div>
 
-        <div className="flex-1 px-8 pt-20 space-y-8 overflow-y-auto">
+        {/* FIX 2: Added min-h-0 here to ensure the inner sidebar scrolls safely on desktop */}
+        <div className="flex-1 min-h-0 px-4 sm:px-8 pt-20 pb-6 lg:pb-0 space-y-6 lg:space-y-8 lg:overflow-y-auto no-scrollbar">
           <div className="space-y-2 text-center pb-6 border-b border-dashed border-slate-300 dark:border-slate-700">
             <h2 className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
               {name}
@@ -126,7 +131,7 @@ export function PublicUserProfile() {
             </div>
           </div>
 
-          <div className="flex justify-center gap-8 pb-6 border-b border-dashed border-slate-300 dark:border-slate-700">
+          <div className="flex justify-center gap-4 sm:gap-8 pb-6 border-b border-dashed border-slate-300 dark:border-slate-700">
             <div className="flex flex-col items-center">
               <span className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Total Chats</span>
               <div className="flex items-center gap-1.5 mt-1">
@@ -145,7 +150,7 @@ export function PublicUserProfile() {
           </div>
         </div>
 
-        <div className="p-6 border-t border-inherit">
+        <div className="p-4 sm:p-6 border-t border-inherit mt-auto shrink-0">
           <button
             onClick={() => navigate("/chat")}
             className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 border-2 transition-colors ${isDark
@@ -159,64 +164,66 @@ export function PublicUserProfile() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col p-10 overflow-y-auto relative">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className={`text-3xl font-black ${isDark ? "text-white" : "text-slate-900"}`}>
+      {/* Main Content Area */}
+      {/* FIX 3: Added min-h-0 here to protect flex-1 stretching limits */}
+      <div className="flex-1 min-h-0 flex flex-col p-4 sm:p-6 lg:p-10 overflow-visible lg:overflow-y-auto relative no-scrollbar">
+        <div className="flex items-center justify-between mb-6 lg:mb-8 shrink-0">
+          <h1 className={`text-2xl sm:text-3xl font-black ${isDark ? "text-white" : "text-slate-900"}`}>
             Profile Overview
           </h1>
         </div>
 
         {error ? (
           <div
-            className={`mb-6 rounded-xl p-4 text-sm font-medium border shadow-sm ${isDark ? "bg-red-900/20 text-red-300 border-red-500/30" : "bg-red-50 text-red-700 border-red-200"
+            className={`mb-6 rounded-xl p-4 text-sm font-medium border shadow-sm shrink-0 ${isDark ? "bg-red-900/20 text-red-300 border-red-500/30" : "bg-red-50 text-red-700 border-red-200"
               }`}
           >
             {error}
           </div>
         ) : (
           <>
-            <div className={`p-8 rounded-3xl border mb-10 flex items-center justify-between relative overflow-hidden ${isDark ? "bg-slate-900 border-white/5" : "bg-white border-slate-200 shadow-sm"}`}>
+            <div className={`p-6 sm:p-8 rounded-3xl border mb-6 lg:mb-10 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative overflow-hidden ${isDark ? "bg-slate-900 border-white/5" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="space-y-2 z-10">
                 <div className="flex items-center gap-3">
                   <div className={`p-2.5 rounded-xl ${isDark ? "bg-yellow-500/10 text-yellow-500" : "bg-yellow-100 text-yellow-600"}`}>
-                    <Award className="w-7 h-7" />
+                    <Award className="w-6 h-6 sm:w-7 sm:h-7" />
                   </div>
-                  <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Community Reputation</h3>
+                  <h3 className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Community Reputation</h3>
                 </div>
-                <p className={`text-base ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                <p className={`text-sm sm:text-base ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                   Calculated from community feedback and sessions.
                 </p>
               </div>
 
-              <div className="text-right z-10">
-                <div className={`text-6xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-                  {ratingValue.toFixed(1)}<span className="text-4xl text-yellow-500 ml-2">★</span>
+              <div className="text-left sm:text-right z-10">
+                <div className={`text-5xl sm:text-6xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {ratingValue.toFixed(1)}<span className="text-3xl sm:text-4xl text-yellow-500 ml-2">★</span>
                 </div>
-                <div className="text-emerald-500 font-bold mt-2 text-sm uppercase tracking-wider">
+                <div className="text-emerald-500 font-bold mt-2 text-xs sm:text-sm uppercase tracking-wider">
                   Public Standing
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-8 flex-1">
-              <div className={`rounded-3xl border p-8 flex flex-col ${isDark ? "bg-slate-900 border-white/5" : "bg-white border-slate-200 shadow-sm"}`}>
-                <div className="flex items-center justify-between mb-6">
+            <div className="grid grid-cols-1 gap-8 shrink-0 mb-8">
+              <div className={`rounded-3xl border p-6 sm:p-8 flex flex-col ${isDark ? "bg-slate-900 border-white/5" : "bg-white border-slate-200 shadow-sm"}`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                   <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Interests</h3>
-                  <span className={`text-sm font-semibold px-3 py-1 rounded-full ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}>
+                  <span className={`text-sm font-semibold px-3 py-1 rounded-full w-fit ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}>
                     {interestList.length} Selected
                   </span>
                 </div>
 
                 {interestList.length === 0 ? (
-                  <div className={`flex-1 flex items-center justify-center border-2 border-dashed rounded-2xl ${isDark ? "border-slate-800 text-slate-500" : "border-slate-200 text-slate-400"}`}>
+                  <div className={`flex-1 flex items-center justify-center border-2 border-dashed rounded-2xl p-8 text-center ${isDark ? "border-slate-800 text-slate-500" : "border-slate-200 text-slate-400"}`}>
                     <p>No interests added yet.</p>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-2 sm:gap-3">
                     {interestList.map((interest) => (
                       <span
                         key={interest}
-                        className={`flex items-center gap-2 pl-4 pr-4 py-2.5 rounded-full border-2 ${isDark ? "bg-blue-600/10 border-blue-500/50 text-blue-100" : "bg-blue-50 border-blue-200 text-blue-800"
+                        className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full border-2 text-sm sm:text-base ${isDark ? "bg-blue-600/10 border-blue-500/50 text-blue-100" : "bg-blue-50 border-blue-200 text-blue-800"
                           }`}
                       >
                         <span className="font-medium">{interest}</span>

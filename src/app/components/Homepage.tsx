@@ -11,8 +11,6 @@ import {
   LogOut,
   ChevronRight,
   Sparkles,
-  Activity,
-  UserCheck,
   LayoutGrid,
   PanelLeftClose,
   PanelLeftOpen,
@@ -21,6 +19,7 @@ import { useThemeColors } from "@/app/hooks/useThemeColors";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, clearAuthTokens } from "@/services/auth";
 import { buildApiUrl } from "@/services/config";
+import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
 
 export function HomePageScreen() {
   const colors = useThemeColors();
@@ -35,7 +34,14 @@ export function HomePageScreen() {
   const [user, setUser] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // Naya Logic: Mobile par by default sidebar band rahega
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -169,15 +175,26 @@ export function HomePageScreen() {
 
   return (
     <div
-      className={`w-full min-h-screen flex overflow-hidden transition-colors duration-500 ${
+      className={`w-full h-[100dvh] flex overflow-hidden transition-colors duration-500 relative ${
         isDark ? "bg-slate-950" : "bg-slate-50"
       }`}
     >
+      {/* --- MOBILE SIDEBAR BACKDROP --- */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* --- LEFT SIDEBAR --- */}
       <div
-        className={`${
-          sidebarOpen ? "w-80" : "w-24"
-        } shrink-0 flex flex-col border-r relative z-20 transition-all duration-300
+        className={`fixed lg:relative inset-y-0 left-0 shrink-0 flex flex-col border-r z-50 transition-all duration-300 ease-in-out
+          ${
+            sidebarOpen
+              ? "w-[280px] lg:w-80 translate-x-0"
+              : "w-[280px] -translate-x-full lg:translate-x-0 lg:w-24"
+          }
           ${isDark ? "bg-slate-900 border-white/10" : "bg-white border-slate-200"}`}
       >
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -194,15 +211,19 @@ export function HomePageScreen() {
         </div>
 
         {/* Logo */}
-        <div className={`h-24 flex items-center relative z-10 ${sidebarOpen ? "px-8" : "justify-center px-2"}`}>
+        <div
+          className={`h-16 md:h-24 flex items-center relative z-10 transition-all duration-300 ${
+            sidebarOpen ? "px-6 lg:px-8" : "justify-center px-2"
+          }`}
+        >
           {sidebarOpen ? (
             <div>
-              <h2 className="text-2xl font-black tracking-tight">
+              <h2 className="text-xl md:text-2xl font-black tracking-tight">
                 <span className={isDark ? "text-white" : "text-slate-900"}>Incogn</span>
                 <span className="text-blue-500">IIT</span>
                 <span className={isDark ? "text-white" : "text-slate-900"}>o</span>
               </h2>
-              <p className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+              <p className={`text-[10px] md:text-xs mt-0.5 md:mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
                 IITK anonymous network
               </p>
             </div>
@@ -214,58 +235,71 @@ export function HomePageScreen() {
           )}
         </div>
 
-        {/* Quick profile card */}
-        <div className={`relative z-10 ${sidebarOpen ? "px-4 pb-4" : "px-3 pb-4"}`}>
-          <div
-            className={`rounded-2xl border transition-colors ${
-              isDark ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"
-            } ${sidebarOpen ? "p-4" : "p-3"}`}
+        {/* Quick profile card - Naya Clickable Logic */}
+        <div className={`relative z-10 transition-all duration-300 ${sidebarOpen ? "px-4 pb-4" : "px-3 pb-4"}`}>
+          <button
+            onClick={() => {
+              if (window.innerWidth < 1024) setSidebarOpen(false);
+              navigate("/profile");
+            }}
+            className={`w-full text-left rounded-2xl border transition-all hover:-translate-y-0.5 ${
+              isDark
+                ? "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+                : "bg-slate-50 border-slate-200 hover:bg-white hover:shadow-md hover:border-slate-300"
+            } ${sidebarOpen ? "p-3 md:p-4" : "p-3"}`}
           >
             <div className={`flex items-center ${sidebarOpen ? "gap-3" : "justify-center"}`}>
               {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
                 <img
                   src={user?.avatarUrl || user?.avatar_url || user?.avatar}
                   alt="Profile"
-                  className="w-12 h-12 rounded-full object-cover shrink-0"
+                  className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover shrink-0"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-base shrink-0">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm md:text-base shrink-0 shadow-inner">
                   {profileLoading ? "…" : avatarLetter}
                 </div>
               )}
 
               {sidebarOpen && (
                 <div className="min-w-0">
-                  <p className={`font-bold truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                  <p className={`font-bold text-sm md:text-base truncate ${isDark ? "text-white" : "text-slate-900"}`}>
                     {profileLoading ? "Loading..." : displayName}
                   </p>
-                  <p className="text-xs text-blue-500 font-semibold">Verified IITK</p>
+                  <p className="text-[10px] md:text-xs text-blue-500 font-semibold">Verified IITK</p>
                 </div>
               )}
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 space-y-2 relative z-10">
+        <nav className="flex-1 px-3 md:px-4 space-y-1.5 md:space-y-2 relative z-10 overflow-y-auto no-scrollbar">
           <button
-            onClick={() => setActiveTab("home")}
+            onClick={() => {
+              setActiveTab("home");
+              if (window.innerWidth < 1024) setSidebarOpen(false);
+            }}
             className={`w-full flex items-center ${
               sidebarOpen ? "justify-between px-4" : "justify-center px-2"
-            } py-4 rounded-xl transition-all duration-300 group
+            } py-3.5 rounded-xl transition-all duration-300 group
               ${
                 activeTab === "home"
                   ? isDark
-                    ? "bg-gradient-to-r from-blue-600/20 to-blue-500/10 border border-blue-500/30 text-white"
-                    : "bg-blue-50 border border-blue-200 text-blue-700"
+                    ? "bg-gradient-to-r from-blue-600/20 to-blue-500/10 border border-blue-500/30 text-white shadow-sm"
+                    : "bg-blue-50 border border-blue-200 text-blue-700 shadow-sm"
                   : isDark
-                  ? "text-slate-400 hover:bg-white/5 hover:text-white"
-                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                  ? "border border-transparent text-slate-400 hover:bg-white/5 hover:text-white"
+                  : "border border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900"
               }`}
           >
             <div className="flex items-center gap-3 min-w-0">
-              <LayoutGrid className={`w-5 h-5 shrink-0 ${activeTab === "home" ? "text-blue-500" : ""}`} />
-              {sidebarOpen && <span className="font-medium truncate">Overview</span>}
+              <LayoutGrid
+                className={`w-5 h-5 shrink-0 transition-transform group-hover:scale-110 ${
+                  activeTab === "home" ? "text-blue-500" : ""
+                }`}
+              />
+              {sidebarOpen && <span className="font-medium text-sm md:text-base truncate">Overview</span>}
             </div>
           </button>
 
@@ -273,39 +307,32 @@ export function HomePageScreen() {
             <button
               key={item.id}
               onClick={() => {
-                if (item.id === "people") {
-                  navigate("/active-users");
-                  return;
-                }
-
-                if (item.id === "requests") {
-                  navigate("/requests");
-                  return;
-                }
-
-                if (item.id === "chats") {
-                  navigate("/chat");
-                  return;
-                }
-
+                if (window.innerWidth < 1024) setSidebarOpen(false);
+                if (item.id === "people") return navigate("/active-users");
+                if (item.id === "requests") return navigate("/requests");
+                if (item.id === "chats") return navigate("/chat");
                 setActiveTab(item.id);
               }}
               className={`w-full flex items-center ${
                 sidebarOpen ? "justify-between px-4" : "justify-center px-2"
-              } py-4 rounded-xl transition-all duration-300 group
+              } py-3.5 rounded-xl transition-all duration-300 group
                 ${
                   activeTab === item.id
                     ? isDark
-                      ? "bg-gradient-to-r from-blue-600/20 to-blue-500/10 border border-blue-500/30 text-white"
-                      : "bg-blue-50 border border-blue-200 text-blue-700"
+                      ? "bg-gradient-to-r from-blue-600/20 to-blue-500/10 border border-blue-500/30 text-white shadow-sm"
+                      : "bg-blue-50 border border-blue-200 text-blue-700 shadow-sm"
                     : isDark
-                    ? "text-slate-400 hover:bg-white/5 hover:text-white"
-                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                    ? "border border-transparent text-slate-400 hover:bg-white/5 hover:text-white"
+                    : "border border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                 }`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <item.icon className={`w-5 h-5 shrink-0 ${activeTab === item.id ? "text-blue-500" : ""}`} />
-                {sidebarOpen && <span className="font-medium truncate">{item.label}</span>}
+                <item.icon
+                  className={`w-5 h-5 shrink-0 transition-transform group-hover:scale-110 ${
+                    activeTab === item.id ? "text-blue-500" : ""
+                  }`}
+                />
+                {sidebarOpen && <span className="font-medium text-sm md:text-base truncate">{item.label}</span>}
               </div>
 
               {sidebarOpen &&
@@ -314,7 +341,11 @@ export function HomePageScreen() {
                     {item.count}
                   </span>
                 ) : (
-                  <ChevronRight className={`w-4 h-4 ${isDark ? "text-slate-600" : "text-slate-400"}`} />
+                  <ChevronRight
+                    className={`w-4 h-4 transition-transform group-hover:translate-x-0.5 ${
+                      isDark ? "text-slate-600 group-hover:text-slate-400" : "text-slate-400 group-hover:text-slate-500"
+                    }`}
+                  />
                 ))}
             </button>
           ))}
@@ -329,27 +360,27 @@ export function HomePageScreen() {
             } font-semibold transition-all
               ${
                 isDark
-                  ? "bg-white/5 hover:bg-white/10 text-red-400"
-                  : "bg-slate-100 hover:bg-slate-200 text-red-600"
+                  ? "bg-white/5 hover:bg-red-500/20 text-red-400 hover:text-red-300"
+                  : "bg-slate-100 hover:bg-red-50 text-red-600 hover:text-red-700"
               }`}
           >
             <LogOut className="w-4 h-4 shrink-0" />
-            {sidebarOpen && <span>Log Out</span>}
+            {sidebarOpen && <span className="text-sm md:text-base">Log Out</span>}
           </button>
         </div>
       </div>
 
       {/* --- RIGHT CONTENT --- */}
-      <div className="flex-1 flex flex-col relative overflow-hidden isolate">
+      <div className="flex-1 min-h-0 flex flex-col relative overflow-hidden isolate w-full min-w-0">
         {/* ambient bg */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div
-            className={`absolute top-[-120px] right-[-120px] w-[520px] h-[520px] rounded-full blur-[120px] opacity-20 ${
+            className={`absolute top-[-10%] right-[-10%] w-[300px] md:w-[520px] h-[300px] md:h-[520px] rounded-full blur-[80px] md:blur-[120px] opacity-20 ${
               isDark ? "bg-blue-600/30" : "bg-blue-200"
             }`}
           />
           <div
-            className={`absolute bottom-[-100px] left-[10%] w-[420px] h-[420px] rounded-full blur-[110px] opacity-20 ${
+            className={`absolute bottom-[-10%] left-[5%] w-[250px] md:w-[420px] h-[250px] md:h-[420px] rounded-full blur-[80px] md:blur-[110px] opacity-20 ${
               isDark ? "bg-purple-600/20" : "bg-purple-200"
             }`}
           />
@@ -357,26 +388,26 @@ export function HomePageScreen() {
 
         {/* Header */}
         <div
-          className={`h-24 px-10 flex items-center justify-between z-30 border-b backdrop-blur-sm
-            ${isDark ? "bg-slate-900/60 border-white/10" : "bg-white/70 border-slate-200"}`}
+          className={`h-16 md:h-20 lg:h-24 px-4 sm:px-6 lg:px-10 flex items-center justify-between z-30 border-b backdrop-blur-md
+            ${isDark ? "bg-slate-900/70 border-white/10" : "bg-white/80 border-slate-200"}`}
         >
-          <div className="flex items-center gap-4 min-w-0">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
               onClick={() => setSidebarOpen((prev) => !prev)}
-              className={`w-11 h-11 rounded-xl border flex items-center justify-center transition-all shrink-0 ${
+              className={`w-10 h-10 md:w-11 md:h-11 rounded-xl border flex items-center justify-center transition-all shrink-0 ${
                 isDark
                   ? "bg-white/5 border-white/10 text-white hover:bg-white/10"
                   : "bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100"
               }`}
             >
-              {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+              {sidebarOpen ? <PanelLeftClose className="w-4 h-4 md:w-5 md:h-5" /> : <PanelLeftOpen className="w-4 h-4 md:w-5 md:h-5" />}
             </button>
 
             <div className="min-w-0">
-              <h3 className={`text-3xl font-black tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+              <h3 className={`text-lg sm:text-xl lg:text-3xl font-black tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
                 {title}
               </h3>
-              <p className={`text-sm mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+              <p className={`hidden sm:block text-xs md:text-sm mt-0.5 lg:mt-1 truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                 {activeTab === "home"
                   ? "Quick overview of your campus-only anonymous network."
                   : "Understand this section and proceed."}
@@ -388,7 +419,7 @@ export function HomePageScreen() {
           <div className="relative z-[100]" ref={menuRef}>
             <button
               onClick={() => setHeaderMenuOpen(!headerMenuOpen)}
-              className={`w-14 h-14 rounded-full ring-2 ring-offset-2 transition-all focus:outline-none flex items-center justify-center shadow-lg
+              className={`w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full ring-2 ring-offset-2 transition-all focus:outline-none flex items-center justify-center shadow-md
                 ${
                   isDark
                     ? "ring-offset-slate-900 ring-transparent hover:ring-blue-500"
@@ -402,7 +433,7 @@ export function HomePageScreen() {
                   className="w-full h-full rounded-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xl">
+                <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl">
                   {profileLoading ? "…" : avatarLetter}
                 </div>
               )}
@@ -410,14 +441,14 @@ export function HomePageScreen() {
 
             {headerMenuOpen && (
               <div
-                className={`absolute right-0 mt-4 w-80 rounded-3xl shadow-2xl border overflow-hidden z-[200] transition-all transform origin-top-right
-                  ${isDark ? "bg-slate-800 border-white/10 shadow-black/50" : "bg-white border-slate-200 shadow-2xl"}`}
+                className={`absolute right-0 top-full mt-2 lg:mt-4 w-72 sm:w-80 rounded-3xl shadow-2xl border overflow-hidden z-[200] transition-all transform origin-top-right backdrop-blur-xl
+                  ${isDark ? "bg-slate-800/95 border-white/10 shadow-black/50" : "bg-white/95 border-slate-200 shadow-2xl"}`}
               >
                 <div
-                  className={`p-8 border-b flex flex-col items-center ${isDark ? "border-white/10" : "border-slate-100"}`}
+                  className={`p-6 sm:p-8 border-b flex flex-col items-center ${isDark ? "border-white/10" : "border-slate-100"}`}
                 >
                   <div
-                    className={`w-40 h-40 rounded-full mb-6 shadow-lg ring-4 ${
+                    className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full mb-4 sm:mb-6 shadow-lg ring-4 ${
                       isDark ? "ring-slate-700" : "ring-slate-50"
                     }`}
                   >
@@ -428,21 +459,21 @@ export function HomePageScreen() {
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-6xl">
+                      <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-4xl sm:text-5xl">
                         {avatarLetter}
                       </div>
                     )}
                   </div>
 
                   <p
-                    className={`font-extrabold text-xl text-center truncate w-full ${
+                    className={`font-extrabold text-lg sm:text-xl text-center truncate w-full ${
                       isDark ? "text-white" : "text-slate-900"
                     }`}
                   >
                     {displayName}
                   </p>
                   <p
-                    className={`text-base text-center truncate w-full mt-2 mb-2 ${
+                    className={`text-sm sm:text-base text-center truncate w-full mt-1 sm:mt-2 mb-1 sm:mb-2 ${
                       isDark ? "text-slate-400" : "text-slate-500"
                     }`}
                   >
@@ -450,16 +481,16 @@ export function HomePageScreen() {
                   </p>
                 </div>
 
-                <div className="p-4 space-y-3">
+                <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
                   <button
                     onClick={() => {
                       setHeaderMenuOpen(false);
                       navigate("/profile");
                     }}
-                    className={`w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl text-base font-semibold transition-colors
+                    className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
                       ${isDark ? "hover:bg-white/10 text-white" : "hover:bg-slate-50 text-slate-800"}`}
                   >
-                    <User className="w-5 h-5 text-blue-500" />
+                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
                     Edit Profile
                   </button>
                   <button
@@ -467,10 +498,10 @@ export function HomePageScreen() {
                       setHeaderMenuOpen(false);
                       logout();
                     }}
-                    className={`w-full flex items-center justify-center gap-3 px-4 py-4 rounded-xl text-base font-semibold transition-colors
+                    className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
                       ${isDark ? "hover:bg-white/10 text-red-400" : "hover:bg-red-50 text-red-600"}`}
                   >
-                    <LogOut className="w-5 h-5" />
+                    <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
                     Log Out
                   </button>
                 </div>
@@ -480,77 +511,77 @@ export function HomePageScreen() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-y-auto p-10 relative z-10">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-10 relative z-10 no-scrollbar">
           {activeTab === "home" ? (
-            <div className="space-y-8">
+            <div className="space-y-6 lg:space-y-8 max-w-7xl mx-auto">
               {/* Hero */}
               <div
-                className={`relative overflow-hidden rounded-[32px] border p-8 lg:p-10
+                className={`relative overflow-hidden rounded-3xl lg:rounded-[32px] border p-6 sm:p-8 lg:p-10 shadow-sm
                   ${isDark ? "bg-slate-900/60 border-white/10" : "bg-white border-slate-200"}`}
               >
                 <div className="absolute inset-0 pointer-events-none">
                   <div
-                    className={`absolute top-0 right-0 w-72 h-72 rounded-full blur-3xl opacity-25 ${
+                    className={`absolute top-0 right-0 w-48 h-48 sm:w-72 sm:h-72 rounded-full blur-3xl opacity-25 ${
                       isDark ? "bg-blue-600/30" : "bg-blue-200"
                     }`}
                   />
                   <div
-                    className={`absolute bottom-0 left-20 w-60 h-60 rounded-full blur-3xl opacity-20 ${
+                    className={`absolute bottom-0 left-10 sm:left-20 w-40 h-40 sm:w-60 sm:h-60 rounded-full blur-3xl opacity-20 ${
                       isDark ? "bg-purple-600/25" : "bg-purple-200"
                     }`}
                   />
                 </div>
 
-                <div className="relative z-10 grid grid-cols-1 xl:grid-cols-[1.3fr_0.7fr] gap-8 items-center">
+                <div className="relative z-10 grid grid-cols-1 xl:grid-cols-[1.3fr_0.7fr] gap-8 lg:gap-12 items-center">
                   <div>
                     <div
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] sm:text-xs font-bold
                         ${
                           isDark
                             ? "border-white/10 bg-white/5 text-slate-200"
                             : "border-slate-200 bg-slate-50 text-slate-700"
                         }`}
                     >
-                      <Sparkles className="w-4 h-4 text-blue-500" />
+                      <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" />
                       Private. Campus-only. Anonymous.
                     </div>
 
                     <h1
-                      className={`text-4xl lg:text-5xl font-black mt-5 leading-tight ${
+                      className={`text-3xl sm:text-4xl lg:text-5xl font-black mt-4 sm:mt-5 leading-[1.15] ${
                         isDark ? "text-white" : "text-slate-900"
                       }`}
                     >
                       IncognIITo — Anonymous Connections,
-                      <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">
+                      <span className="block mt-1 text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">
                         Real Conversations.
                       </span>
                     </h1>
 
                     <p
-                      className={`text-base lg:text-lg mt-5 leading-relaxed max-w-2xl ${
+                      className={`text-sm sm:text-base lg:text-lg mt-4 sm:mt-5 leading-relaxed max-w-2xl ${
                         isDark ? "text-slate-400" : "text-slate-600"
                       }`}
                     >
                       {desc}
                     </p>
 
-                    <div className="flex flex-wrap gap-4 mt-8">
+                    <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 mt-6 sm:mt-8">
                       <button
                         onClick={() => setActiveTab("match")}
-                        className="group rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-4 text-white font-bold shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        className="group rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-3.5 sm:py-4 text-white font-bold shadow-lg shadow-blue-500/25 transition-all hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center w-full sm:w-auto"
                       >
                         <div className="flex items-center gap-2">
                           <span>Start Matching</span>
-                          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                          <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1.5 transition-transform" />
                         </div>
                       </button>
 
                       <button
                         onClick={() => navigate("/chat")}
-                        className={`rounded-2xl px-6 py-4 font-bold border transition-all ${
+                        className={`rounded-2xl px-6 py-3.5 sm:py-4 font-bold border transition-all flex items-center justify-center w-full sm:w-auto ${
                           isDark
-                            ? "bg-white/5 border-white/10 text-white hover:bg-white/10"
-                            : "bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100"
+                            ? "bg-white/5 border-white/10 text-white hover:bg-white/10 hover:shadow-md"
+                            : "bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100 hover:shadow-md"
                         }`}
                       >
                         Open Chats
@@ -558,7 +589,7 @@ export function HomePageScreen() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3 sm:gap-4">
                     <StatGlassCard
                       isDark={isDark}
                       icon={Users}
@@ -584,22 +615,22 @@ export function HomePageScreen() {
               {/* Main content blocks */}
               <div className="grid grid-cols-1 xl:grid-cols-[1.3fr_0.7fr] gap-6">
                 <div
-                  className={`rounded-3xl border p-6 ${
+                  className={`rounded-3xl border p-5 sm:p-6 shadow-sm ${
                     isDark ? "bg-slate-900/40 border-white/10" : "bg-white border-slate-200"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-4 mb-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-5 sm:mb-6">
                     <div>
-                      <h3 className={`text-2xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                      <h3 className={`text-xl sm:text-2xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                         Platform Highlights
                       </h3>
-                      <p className={`text-sm mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                      <p className={`text-xs sm:text-sm mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                         Explore what makes the experience feel safe, useful, and comfortable.
                       </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <FeatureCard
                       isDark={isDark}
                       icon={Tag}
@@ -629,14 +660,14 @@ export function HomePageScreen() {
 
                 <div className="space-y-6">
                   <div
-                    className={`rounded-3xl border p-6 ${
+                    className={`rounded-3xl border p-5 sm:p-6 shadow-sm ${
                       isDark ? "bg-slate-900/40 border-white/10" : "bg-white border-slate-200"
                     }`}
                   >
-                    <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    <h3 className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                       Quick Actions
                     </h3>
-                    <div className="space-y-3 mt-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3 mt-4 sm:mt-5">
                       <QuickActionButton
                         isDark={isDark}
                         icon={Users}
@@ -667,33 +698,33 @@ export function HomePageScreen() {
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-6 max-w-5xl mx-auto">
               <div
-                className={`rounded-3xl border p-8 transition-colors
+                className={`rounded-3xl border p-6 sm:p-8 lg:p-10 transition-colors shadow-sm
                   ${isDark ? "bg-slate-900/40 border-white/10" : "bg-white border-slate-200"}`}
               >
                 <div
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] sm:text-xs font-bold
                     ${
                       isDark
                         ? "border-white/10 bg-white/5 text-slate-200"
                         : "border-slate-200 bg-slate-50 text-slate-700"
                     }`}
                 >
-                  <ShieldCheck className="w-4 h-4 text-blue-500" />
+                  <ShieldCheck className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" />
                   Verified IITK-only access
                 </div>
 
-                <h1 className={`text-4xl font-black mt-5 ${isDark ? "text-white" : "text-slate-900"}`}>
+                <h1 className={`text-3xl sm:text-4xl lg:text-5xl font-black mt-4 sm:mt-5 leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>
                   {title}
                 </h1>
 
-                <p className={`text-base mt-4 leading-relaxed max-w-3xl ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                <p className={`text-sm sm:text-base lg:text-lg mt-3 sm:mt-4 leading-relaxed max-w-3xl ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                   {desc}
                 </p>
 
-                <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6 mt-8">
-                  <div className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6 lg:gap-8 mt-6 sm:mt-8">
+                  <div className="space-y-3 sm:space-y-4">
                     <MiniStep isDark={isDark} n="01" t="Read the details" d="Understand what this section controls." />
                     <MiniStep isDark={isDark} n="02" t="Take action" d="Accept/decline, open chats, or join queue." />
                     <MiniStep isDark={isDark} n="03" t="Stay safe" d="Use report/block if anything feels wrong." />
@@ -712,18 +743,18 @@ export function HomePageScreen() {
                   </div>
 
                   <div
-                    className={`rounded-3xl border p-6 ${
+                    className={`rounded-3xl border p-5 sm:p-6 ${
                       isDark ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"
                     }`}
                   >
-                    <h3 className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    <h3 className={`text-lg sm:text-xl font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                       Ready to proceed?
                     </h3>
-                    <p className={`text-sm mt-2 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    <p className={`text-xs sm:text-sm mt-2 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                       Continue to move into the next action for this section. For matching, this will place you in the queue and take you to the waiting screen.
                     </p>
 
-                    <div className="mt-6 grid grid-cols-2 gap-3">
+                    <div className="mt-5 sm:mt-6 grid grid-cols-2 gap-3">
                       <SmallInfoCard isDark={isDark} title="Privacy" value="On" />
                       <SmallInfoCard isDark={isDark} title="Access" value="Verified" />
                       <SmallInfoCard isDark={isDark} title="Mode" value={activeTab === "match" ? "Queue" : "Action"} />
@@ -733,12 +764,12 @@ export function HomePageScreen() {
                     <button
                       onClick={handleContinueClick}
                       disabled={isJoiningQueue}
-                      className="mt-6 w-full group relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-4 text-white font-bold text-sm shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="mt-5 sm:mt-6 w-full group relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-4 text-white font-bold text-sm sm:text-base shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
                       <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
                       <div className="relative flex items-center justify-center gap-2">
                         <span>{isJoiningQueue ? "Joining..." : "Continue"}</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1.5 transition-transform" />
                       </div>
                     </button>
                   </div>
@@ -752,131 +783,129 @@ export function HomePageScreen() {
   );
 }
 
-function FeatureCard({ isDark, icon: Icon, title, text }) {
+function FeatureCard({ isDark, icon: Icon, title, text }: any) {
   return (
     <div
-      className={`rounded-2xl border p-5 transition-all
+      className={`rounded-2xl border p-4 sm:p-5 transition-all
         ${
           isDark
             ? "bg-slate-900/40 border-white/5 hover:bg-white/5 hover:border-white/10"
-            : "bg-white border-slate-200 hover:border-blue-300 hover:shadow-lg"
+            : "bg-white border-slate-200 hover:border-blue-300 hover:shadow-md"
         }`}
     >
       <div className="flex items-center gap-3">
         <div
-          className={`w-11 h-11 rounded-xl flex items-center justify-center
-            ${isDark ? "bg-gradient-to-br from-blue-600 to-purple-600" : "bg-gradient-to-br from-blue-500 to-indigo-500"}`}
+          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0
+            ${isDark ? "bg-gradient-to-br from-blue-600 to-purple-600 shadow-inner" : "bg-gradient-to-br from-blue-500 to-indigo-500 shadow-sm"}`}
         >
-          <Icon className="w-5 h-5 text-white" />
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
         </div>
-        <h4 className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{title}</h4>
+        <h4 className={`font-bold text-sm sm:text-base ${isDark ? "text-white" : "text-slate-900"}`}>{title}</h4>
       </div>
-      <p className={`text-sm mt-3 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>{text}</p>
+      <p className={`text-xs sm:text-sm mt-3 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>{text}</p>
     </div>
   );
 }
 
-function MiniStep({ isDark, n, t, d }) {
+function MiniStep({ isDark, n, t, d }: any) {
   return (
     <div
-      className={`flex items-start gap-4 rounded-2xl border p-5
-        ${isDark ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"}`}
+      className={`flex items-start gap-3 sm:gap-4 rounded-2xl border p-4 sm:p-5 transition-colors
+        ${isDark ? "bg-white/5 border-white/10 hover:bg-white/10" : "bg-slate-50 border-slate-200 hover:bg-white"}`}
     >
-      <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center font-bold text-blue-500">
+      <div className="w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center font-bold text-blue-500 text-sm sm:text-base">
         {n}
       </div>
       <div>
-        <div className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{t}</div>
-        <div className={`text-sm mt-1 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>{d}</div>
+        <div className={`font-bold text-sm sm:text-base ${isDark ? "text-white" : "text-slate-900"}`}>{t}</div>
+        <div className={`text-xs sm:text-sm mt-1 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>{d}</div>
       </div>
     </div>
   );
 }
 
-function MetricCard({ isDark, icon: Icon, title, value, sub }) {
+function MetricCard({ isDark, icon: Icon, title, value, sub }: any) {
   return (
     <div
-      className={`rounded-2xl border p-5 ${
-        isDark ? "bg-slate-900/40 border-white/10" : "bg-white border-slate-200"
+      className={`rounded-2xl border p-4 sm:p-5 transition-all ${
+        isDark ? "bg-slate-900/40 border-white/10 hover:bg-slate-800" : "bg-white border-slate-200 hover:shadow-md"
       }`}
     >
       <div className="flex items-center justify-between">
         <div
-          className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0 ${
             isDark ? "bg-white/5" : "bg-slate-100"
           }`}
         >
-          <Icon className="w-5 h-5 text-blue-500" />
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
         </div>
       </div>
-      <div className={`mt-4 text-sm font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>{title}</div>
-      <div className={`mt-1 text-2xl font-black ${isDark ? "text-white" : "text-slate-900"}`}>{value}</div>
-      <div className={`mt-1 text-sm ${isDark ? "text-slate-500" : "text-slate-500"}`}>{sub}</div>
+      <div className={`mt-3 sm:mt-4 text-xs sm:text-sm font-semibold ${isDark ? "text-slate-400" : "text-slate-500"}`}>{title}</div>
+      <div className={`mt-1 text-xl sm:text-2xl font-black ${isDark ? "text-white" : "text-slate-900"}`}>{value}</div>
+      <div className={`mt-1 text-xs sm:text-sm ${isDark ? "text-slate-500" : "text-slate-500"}`}>{sub}</div>
     </div>
   );
 }
 
-function StatGlassCard({ isDark, icon: Icon, value, label }) {
+function StatGlassCard({ isDark, icon: Icon, value, label }: any) {
   return (
     <div
-      className={`rounded-2xl border p-5 backdrop-blur-sm ${
-        isDark ? "bg-white/5 border-white/10" : "bg-white/70 border-slate-200"
+      className={`rounded-2xl border p-4 sm:p-5 backdrop-blur-md transition-all hover:-translate-y-0.5 ${
+        isDark ? "bg-white/5 border-white/10 hover:bg-white/10" : "bg-white/80 border-slate-200 hover:shadow-md hover:bg-white"
       }`}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         <div
-          className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-            isDark ? "bg-gradient-to-br from-blue-600 to-purple-600" : "bg-gradient-to-br from-blue-500 to-indigo-500"
+          className={`w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-2xl flex items-center justify-center ${
+            isDark ? "bg-gradient-to-br from-blue-600 to-purple-600 shadow-inner" : "bg-gradient-to-br from-blue-500 to-indigo-500 shadow-sm"
           }`}
         >
-          <Icon className="w-5 h-5 text-white" />
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
         </div>
-        <div>
-          <div className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{value}</div>
-          <div className={`text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>{label}</div>
+        <div className="min-w-0">
+          <div className={`font-bold text-sm sm:text-base truncate ${isDark ? "text-white" : "text-slate-900"}`}>{value}</div>
+          <div className={`text-xs sm:text-sm truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>{label}</div>
         </div>
       </div>
     </div>
   );
 }
 
-function QuickActionButton({ isDark, icon: Icon, label, onClick }) {
+function QuickActionButton({ isDark, icon: Icon, label, onClick }: any) {
   return (
     <button
       onClick={onClick}
-      className={`w-full rounded-2xl px-4 py-4 flex items-center justify-between transition-all border
+      className={`w-full group rounded-2xl px-3 py-3 sm:px-4 sm:py-4 flex items-center justify-between transition-all border
         ${
           isDark
-            ? "bg-white/5 border-white/10 text-white hover:bg-white/10"
-            : "bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100"
+            ? "bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20"
+            : "bg-slate-50 border-slate-200 text-slate-900 hover:bg-white hover:shadow-md hover:border-slate-300"
         }`}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <div
-          className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            isDark ? "bg-white/5" : "bg-white"
+          className={`w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-xl flex items-center justify-center transition-colors ${
+            isDark ? "bg-white/5 group-hover:bg-blue-500/20" : "bg-white group-hover:bg-blue-50 shadow-sm"
           }`}
         >
-          <Icon className="w-5 h-5 text-blue-500" />
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
         </div>
-        <span className="font-semibold">{label}</span>
+        <span className="font-semibold text-sm sm:text-base truncate">{label}</span>
       </div>
-      <ChevronRight className={`w-4 h-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
+      <ChevronRight className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform group-hover:translate-x-1 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
     </button>
   );
 }
 
-function SmallInfoCard({ isDark, title, value }) {
+function SmallInfoCard({ isDark, title, value }: any) {
   return (
     <div
-      className={`rounded-2xl border p-4 ${
-        isDark ? "bg-slate-900/50 border-white/10" : "bg-white border-slate-200"
+      className={`rounded-2xl border p-3 sm:p-4 transition-colors ${
+        isDark ? "bg-slate-900/50 border-white/10 hover:bg-slate-800" : "bg-white border-slate-200 hover:bg-slate-50"
       }`}
     >
-      <div className={`text-xs font-semibold ${isDark ? "text-slate-500" : "text-slate-400"}`}>{title}</div>
-      <div className={`mt-1 font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{value}</div>
+      <div className={`text-[10px] sm:text-xs font-semibold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>{title}</div>
+      <div className={`mt-1 text-sm sm:text-base font-bold truncate ${isDark ? "text-white" : "text-slate-900"}`}>{value}</div>
     </div>
   );
 }
-
-// this is my current code  give whole code only relative to chnage asked  dont change other existing parts of code , give full code so that i can directly replace and work
