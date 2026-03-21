@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Loader, AlertCircle } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
@@ -20,9 +20,12 @@ export function MatchingBuffer() {
   const [error, setError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  // Fetch initial status when component mounts
+  // Track if we are already in the process of joining to avoid race conditions
+  const isJoinedRef = useRef(false);
+
+  // --- 1. INITIALIZATION: Check status and Auto-Join if needed ---
   useEffect(() => {
-    const checkStatus = async () => {
+    const initMatchmaking = async () => {
       try {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -30,45 +33,61 @@ export function MatchingBuffer() {
           return;
         }
 
+        // Check current status
         const res = await fetch(buildApiUrl('/api/match/status'), {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
-
         const data = await res.json();
 
         if (!res.ok || !data.success) {
-          setError(data.message || 'Failed to check status');
+          setError(data.message || 'Failed to verify status');
           setLoading(false);
           return;
         }
 
         if (data.status === 'waiting') {
           setQueueSize(data.queueSize || 0);
-          setQueuePosition(Math.max(1, (data.queueSize || 0)));
+          setQueuePosition(Math.max(1, data.queueSize || 0));
           setLoading(false);
         } else if (data.status === 'matched') {
-          // 🚨 FIX: Added skipCleanup before navigation
           skipCleanup();
           navigate(`/live/${data.roomId}`);
         } else {
-          setError('Unexpected status');
-          setLoading(false);
+          // Status is 'idle' or unknown -> Join the queue
+          const joinRes = await fetch(buildApiUrl('/api/match/join'), {
+            method: 'POST',
+            headers: { 
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json' 
+            }
+          });
+          const joinData = await joinRes.json();
+
+          if (joinData.success) {
+            // Re-fetch status once to get correct queue numbers after joining
+            const finalCheck = await fetch(buildApiUrl('/api/match/status'), {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const finalData = await finalCheck.json();
+            setQueueSize(finalData.queueSize || 0);
+            setQueuePosition(Math.max(1, finalData.queueSize || 0));
+            setLoading(false);
+          } else {
+            setError(joinData.message || 'Failed to join matchmaking queue');
+            setLoading(false);
+          }
         }
       } catch (err) {
-        console.error('Status check error:', err);
+        console.error('Matchmaking init error:', err);
         setError('Failed to connect to server');
         setLoading(false);
       }
     };
 
-    checkStatus();
+    initMatchmaking();
   }, [navigate, skipCleanup]);
 
-  // Poll status every 2 seconds
+  // --- 2. POLLING: Update queue position while waiting ---
   useEffect(() => {
     if (loading || error) return;
 
@@ -90,9 +109,8 @@ export function MatchingBuffer() {
         if (data.success) {
           if (data.status === 'waiting') {
             setQueueSize(data.queueSize || 0);
-            setQueuePosition(Math.max(1, (data.queueSize || 0)));
+            setQueuePosition(Math.max(1, data.queueSize || 0));
           } else if (data.status === 'matched') {
-            // 🚨 FIX: Added skipCleanup before navigation
             skipCleanup();
             navigate(`/live/${data.roomId}`);
           }
@@ -105,30 +123,25 @@ export function MatchingBuffer() {
     return () => clearInterval(pollInterval);
   }, [loading, error, navigate, skipCleanup]);
 
-  // Listen for matched event from socket
+  // --- 3. SOCKET: Real-time match notification ---
   useEffect(() => {
     const handleMatched = (payload: { roomId: string; matchScore: number }) => {
-      console.log('Matched event received:', payload);
-      skipCleanup(); // This was already correct
+      skipCleanup();
       navigate(`/live/${payload.roomId}`);
     };
 
     socket.on('matched', handleMatched);
-
     return () => {
       socket.off('matched', handleMatched);
     };
   }, [navigate, skipCleanup]);
 
-  // Handle cancel - leave queue
+  // --- 4. ACTIONS: Leave Queue ---
   const handleCancel = async () => {
     setIsCancelling(true);
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        setError('Authentication token not found');
-        return;
-      }
+      if (!token) return;
 
       const res = await fetch(buildApiUrl('/api/match/leave'), {
         method: 'POST',
@@ -138,21 +151,20 @@ export function MatchingBuffer() {
         }
       });
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
+      if (res.ok) {
         navigate('/homepage');
       } else {
+        const data = await res.json();
         setError(data.message || 'Failed to leave queue');
       }
     } catch (err) {
-      console.error('Cancel error:', err);
       setError('Failed to cancel matching');
     } finally {
       setIsCancelling(false);
     }
   };
 
+  // Rendering logic
   if (loading) {
     return (
       <div className={`w-full h-[100dvh] flex items-center justify-center p-4 transition-colors duration-500 overflow-y-auto no-scrollbar ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}>
@@ -181,7 +193,7 @@ export function MatchingBuffer() {
           </div>
           <p className={`text-sm sm:text-base mb-6 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{error}</p>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/homepage')}
             className={`w-full py-3.5 sm:py-4 rounded-xl text-sm sm:text-base font-bold transition-all
               ${isDark ? 'bg-white text-slate-900 hover:bg-slate-200' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
           >
@@ -194,32 +206,26 @@ export function MatchingBuffer() {
 
   return (
     <div className={`w-full h-[100dvh] overflow-y-auto no-scrollbar flex flex-col p-4 sm:p-8 relative transition-colors duration-500 ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}>
-      
-      {/* Background glowing orbs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div className={`absolute top-0 right-0 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] rounded-full blur-[80px] sm:blur-[120px] mix-blend-screen opacity-50 sm:opacity-30 transition-colors ${isDark ? 'bg-blue-600' : 'bg-blue-300'}`} />
         <div className={`absolute bottom-0 left-0 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] rounded-full blur-[80px] sm:blur-[120px] mix-blend-screen opacity-50 sm:opacity-20 transition-colors ${isDark ? 'bg-purple-600' : 'bg-purple-300'}`} />
       </div>
 
-      {/* Main Content Card */}
       <div className="flex-grow shrink-0 flex items-center justify-center relative z-10 w-full">
         <div className={`w-full max-w-md my-auto rounded-[2rem] sm:rounded-[2.5rem] border p-8 sm:p-10 text-center shadow-2xl backdrop-blur-xl transition-all
           ${isDark ? 'bg-slate-900/60 border-white/10 shadow-black/50' : 'bg-white/80 border-slate-200 shadow-blue-900/5'}`}>
           
-          {/* Animated Loader */}
           <div className="flex flex-col items-center justify-center mb-8 sm:mb-10">
             <div className="relative flex items-center justify-center w-24 h-24 sm:w-28 sm:h-28 mb-6">
               <div className={`absolute inset-0 rounded-full blur-xl opacity-50 animate-pulse ${isDark ? 'bg-blue-500' : 'bg-blue-400'}`} />
               <div className={`absolute inset-0 rounded-full border-[3px] border-transparent border-t-blue-500 animate-spin`} style={{ animationDuration: '1.5s' }} />
               <div className={`absolute inset-2 rounded-full border-[3px] border-transparent border-b-cyan-400 animate-spin`} style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
-              
               <div className="relative flex gap-1.5 sm:gap-2">
                 <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0s' }}></div>
                 <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '0.15s' }}></div>
                 <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0.3s' }}></div>
               </div>
             </div>
-
             <h2 className={`text-2xl sm:text-3xl font-black mb-3 tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Finding Your Match
             </h2>
@@ -228,7 +234,6 @@ export function MatchingBuffer() {
             </p>
           </div>
 
-          {/* Queue Position Card */}
           <div className={`rounded-2xl border p-5 sm:p-6 mb-8 transition-colors ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`}>
             <p className={`text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Position in Queue
@@ -243,7 +248,6 @@ export function MatchingBuffer() {
             </div>
           </div>
 
-          {/* Status Messages */}
           <div className="flex flex-col gap-3 mb-8 text-left bg-black/5 dark:bg-black/20 p-4 rounded-2xl">
             <div className="flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-green-500"></div>
@@ -265,7 +269,6 @@ export function MatchingBuffer() {
             </div>
           </div>
 
-          {/* Cancel Button */}
           <button
             onClick={handleCancel}
             disabled={isCancelling}
@@ -281,6 +284,7 @@ export function MatchingBuffer() {
           </button>
         </div>
       </div>
+      <div className="flex-grow shrink-0"></div>
     </div>
   );
 }
