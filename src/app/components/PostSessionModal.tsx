@@ -5,6 +5,7 @@ import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { fetchJsonWithAuth } from '@/services/auth';
 import { submitSessionRating } from '@/services/user';
+import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -21,7 +22,12 @@ export function PostSessionModal() {
     const { theme } = useTheme();
     const isDark = theme === 'dark';
     const navigate = useNavigate();
+    // FIX: Match parameter casing typically used in routing (roomId vs roomid)
+    const { roomId } = useParams<{ roomId: string }>();
+    
+    // Fallback if URL param is weirdly cased in your setup
     const { roomid } = useParams<{ roomid: string }>();
+    const activeRoomId = roomId || roomid; 
 
     // Rating states
     const [rating, setRating] = useState(0);
@@ -55,8 +61,12 @@ export function PostSessionModal() {
 
     // Fetch session details
     useEffect(() => {
-        if (!roomid) return;
-        fetchJsonWithAuth(`/api/match/session/${roomid}`)
+        if (!activeRoomId) {
+            setTargetName("Unknown Session");
+            return;
+        }
+        
+        fetchJsonWithAuth(`/api/match/session/${activeRoomId}`)
             .then((data: any) => {
                 if (data.success) {
                     setTargetId(data.partnerId || data.them?.id);
@@ -67,7 +77,7 @@ export function PostSessionModal() {
                 console.error("Failed to fetch session details", err);
                 setTargetName("Unknown User");
             });
-    }, [roomid]);
+    }, [activeRoomId]);
 
     const handleSendConnectionRequest = async () => {
         if (!targetId || sendingRequest || requestSent || connectionExists) return;
@@ -84,7 +94,6 @@ export function PostSessionModal() {
         } catch (err: any) {
             const status = err?.status || err?.statusCode;
             if (status === 409) {
-                // Duplicate — request already pending or connection already exists
                 setConnectionExists(true);
                 showToast('A connection with this user already exists.', 'info');
             } else {
@@ -96,7 +105,7 @@ export function PostSessionModal() {
     };
 
     const handleSubmitRating = async () => {
-        if (!roomid) {
+        if (!activeRoomId) {
             setError('Missing session identifier.');
             return;
         }
@@ -108,7 +117,7 @@ export function PostSessionModal() {
         try {
             setError(null);
             setSubmitting(true);
-            await submitSessionRating(roomid, rating);
+            await submitSessionRating(activeRoomId, rating);
             setSubmitted(true);
         } catch (err: any) {
             if (err?.status === 409) {
@@ -146,8 +155,8 @@ export function PostSessionModal() {
 
     // Determine connection button appearance
     const connBtnLabel = () => {
-        if (connectionExists) return 'Connection Already Exists';
-        if (requestSent) return 'Connection Request Sent';
+        if (connectionExists) return 'Connection Exists';
+        if (requestSent) return 'Request Sent';
         if (sendingRequest) return 'Sending...';
         return 'Send Connection Request';
     };
@@ -155,7 +164,7 @@ export function PostSessionModal() {
     const connBtnIcon = () => {
         if (sendingRequest) return <Loader2 className="w-5 h-5 animate-spin" />;
         if (requestSent || connectionExists) return <Check className="w-5 h-5" />;
-        return <UserPlus className="w-6 h-6" />;
+        return <UserPlus className="w-5 h-5 sm:w-6 sm:h-6" />;
     };
 
     const connBtnColors = () => {
@@ -163,34 +172,34 @@ export function PostSessionModal() {
             return isDark ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-700';
         if (connectionExists)
             return isDark ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-blue-50 border-blue-200 text-blue-700';
-        return isDark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400';
+        return isDark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400 hover:bg-slate-50';
     };
 
     return (
-        <div className={`w-full h-full flex items-center justify-center relative overflow-hidden backdrop-blur-md z-50 font-sans transition-colors duration-500
-            ${isDark ? 'bg-slate-950/90' : 'bg-slate-100/90'}`}>
+        <div className={`fixed inset-0 w-full min-h-[100dvh] flex flex-col p-4 sm:p-6 md:p-10 z-[100] overflow-y-auto no-scrollbar backdrop-blur-md transition-colors duration-500
+            ${isDark ? 'bg-slate-950/90' : 'bg-slate-900/60'}`}>
             
             {/* Toast Notifications */}
-            <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
+            <div className="fixed top-4 left-4 right-4 sm:left-auto sm:top-6 sm:right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
                 {toasts.map((toast) => (
                     <div
                         key={toast.id}
-                        className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl text-sm font-semibold pointer-events-auto
-                            animate-in slide-in-from-right-5 fade-in duration-300
+                        className={`flex items-center gap-3 px-4 py-3 sm:px-5 sm:py-4 rounded-2xl shadow-2xl border backdrop-blur-xl text-sm font-semibold pointer-events-auto
+                            animate-in slide-in-from-top-5 sm:slide-in-from-right-5 fade-in duration-300
                             ${toast.type === 'success'
                                 ? isDark
-                                    ? 'bg-emerald-900/80 border-emerald-500/30 text-emerald-300 shadow-emerald-900/40'
-                                    : 'bg-emerald-50 border-emerald-200 text-emerald-800 shadow-emerald-100'
+                                    ? 'bg-emerald-900/90 border-emerald-500/30 text-emerald-300 shadow-emerald-900/40'
+                                    : 'bg-emerald-50/95 border-emerald-200 text-emerald-800 shadow-emerald-100'
                                 : toast.type === 'error'
                                     ? isDark
-                                        ? 'bg-red-900/80 border-red-500/30 text-red-300 shadow-red-900/40'
-                                        : 'bg-red-50 border-red-200 text-red-800 shadow-red-100'
+                                        ? 'bg-red-900/90 border-red-500/30 text-red-300 shadow-red-900/40'
+                                        : 'bg-red-50/95 border-red-200 text-red-800 shadow-red-100'
                                     : isDark
-                                        ? 'bg-blue-900/80 border-blue-500/30 text-blue-300 shadow-blue-900/40'
-                                        : 'bg-blue-50 border-blue-200 text-blue-800 shadow-blue-100'
+                                        ? 'bg-blue-900/90 border-blue-500/30 text-blue-300 shadow-blue-900/40'
+                                        : 'bg-blue-50/95 border-blue-200 text-blue-800 shadow-blue-100'
                             }`}
                     >
-                        <span className="text-lg">
+                        <span className="text-lg shrink-0">
                             {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
                         </span>
                         <span>{toast.message}</span>
@@ -198,51 +207,52 @@ export function PostSessionModal() {
                 ))}
             </div>
 
-            {/* Background FX Grid */}
-            <div className={`absolute inset-0 pointer-events-none ${isDark ? 'opacity-[0.03]' : 'opacity-[0.05]'}`}
+            {/* Background FX Grid (absolute to the viewport) */}
+            <div className={`fixed inset-0 pointer-events-none ${isDark ? 'opacity-[0.03]' : 'opacity-[0.08]'}`}
                 style={{
                     backgroundImage: `linear-gradient(0deg, transparent 24%, ${isDark ? '#FFF' : '#000'} 25%, ${isDark ? '#FFF' : '#000'} 26%, transparent 27%, transparent 74%, ${isDark ? '#FFF' : '#000'} 75%, ${isDark ? '#FFF' : '#000'} 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, ${isDark ? '#FFF' : '#000'} 25%, ${isDark ? '#FFF' : '#000'} 26%, transparent 27%, transparent 74%, ${isDark ? '#FFF' : '#000'} 75%, ${isDark ? '#FFF' : '#000'} 76%, transparent 77%, transparent)`,
                     backgroundSize: '80px 80px'
                 }}
             />
 
-            <div className={`relative z-10 w-[800px] rounded-[3rem] overflow-hidden border shadow-2xl transition-all duration-300 transform
-                ${isDark ? 'bg-[#0B1120] border-white/10 shadow-black/60' : 'bg-white border-white shadow-slate-300/50'}`}>
+            {/* Main Modal Card */}
+            <div className={`relative z-10 w-full max-w-2xl my-auto mx-auto rounded-[2rem] sm:rounded-[3rem] overflow-hidden border shadow-2xl transition-all duration-300
+                ${isDark ? 'bg-[#0B1120] border-white/10 shadow-black/60' : 'bg-white border-white shadow-slate-400/30'}`}>
                 
-                <div className="h-2 w-full bg-gradient-to-r from-blue-600 via-violet-600 to-cyan-500"></div>
+                <div className="h-1.5 sm:h-2 w-full bg-gradient-to-r from-blue-600 via-violet-600 to-cyan-500"></div>
 
                 <button 
                     onClick={() => navigate('/homepage')}
-                    className={`absolute top-8 right-8 p-3 rounded-full transition-all duration-200 z-20
-                    ${isDark ? 'bg-white/5 hover:bg-white/10 text-white/50' : 'bg-slate-100 hover:bg-slate-200 text-slate-400'}`}>
-                    <X className="w-6 h-6" />
+                    className={`absolute top-4 right-4 sm:top-6 sm:right-6 md:top-8 md:right-8 p-2.5 sm:p-3 rounded-full transition-all duration-200 z-20
+                    ${isDark ? 'bg-white/5 hover:bg-white/10 text-white/50 hover:text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600'}`}>
+                    <X className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
 
-                <div className="px-16 py-14 text-center flex flex-col items-center">
+                <div className="px-6 py-10 sm:px-12 sm:py-14 md:px-16 md:py-16 text-center flex flex-col items-center">
                     
-                    <div className={`w-32 h-32 rounded-[2rem] flex items-center justify-center mb-10 shadow-xl border transform transition-transform hover:scale-105 duration-300
+                    <div className={`w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl sm:rounded-[2rem] flex items-center justify-center mb-6 sm:mb-8 md:mb-10 shadow-xl border transform transition-transform hover:scale-105 duration-300 shrink-0
                         ${isDark ? 'bg-gradient-to-br from-white/10 text-blue-400 border-white/10' : 'bg-gradient-to-br from-slate-50 text-blue-600 border-slate-100'}`}>
-                        <ThumbsUp className="w-14 h-14" />
+                        <ThumbsUp className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14" />
                     </div>
 
-                    <h2 className={`text-5xl font-black tracking-tight mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    <h2 className={`text-3xl sm:text-4xl md:text-5xl font-black tracking-tight mb-3 sm:mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         Session Ended
                     </h2>
-                    <p className={`text-xl max-w-lg leading-relaxed mb-12 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                        How was your conversation with <span className={`font-bold px-3 py-1 rounded-lg ${isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-900'}`}>{targetName}</span>?
+                    <p className={`text-sm sm:text-lg md:text-xl max-w-lg leading-relaxed mb-8 sm:mb-10 md:mb-12 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        How was your conversation with <span className={`font-bold px-2 py-1 rounded-lg break-words ${isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-900'}`}>{targetName}</span>?
                     </p>
 
                     {/* Rating Stars */}
-                    <div className="flex justify-center gap-6 mb-12">
+                    <div className="flex justify-center gap-2 sm:gap-4 md:gap-6 mb-8 sm:mb-10 md:mb-12 w-full max-w-sm mx-auto">
                         {[1, 2, 3, 4, 5].map((star) => (
                             <button
                                 key={star}
                                 onClick={() => setRating(star)}
                                 onMouseEnter={() => setHoveredRating(star)}
                                 onMouseLeave={() => setHoveredRating(0)}
-                                className="transition-transform hover:scale-125 active:scale-90 p-2"
+                                className="transition-transform hover:scale-110 sm:hover:scale-125 active:scale-95 p-1 sm:p-2 outline-none"
                             >
-                                <Star className={`w-16 h-16 transition-all duration-300 filter drop-shadow-lg
+                                <Star className={`w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 transition-all duration-300 filter drop-shadow-md sm:drop-shadow-lg
                                     ${star <= (hoveredRating || rating) 
                                         ? 'fill-yellow-400 text-yellow-400' 
                                         : (isDark ? 'text-slate-800 fill-slate-800/50' : 'text-slate-200 fill-slate-50')
@@ -256,67 +266,67 @@ export function PostSessionModal() {
                     <button
                         onClick={handleSendConnectionRequest}
                         disabled={sendingRequest || requestSent || connectionExists}
-                        className={`w-full max-w-md py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 mb-8 transition-all duration-300 border-2
+                        className={`w-full max-w-sm py-4 sm:py-5 rounded-2xl font-bold text-base sm:text-lg flex items-center justify-center gap-2 sm:gap-3 mb-6 sm:mb-8 transition-all duration-300 border-2 shadow-sm hover:shadow-md active:scale-[0.98]
                             ${connBtnColors()}
-                            ${(requestSent || connectionExists) ? 'cursor-default' : ''}
+                            ${(requestSent || connectionExists) ? 'cursor-default hover:scale-100' : ''}
                             ${sendingRequest ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
                         {connBtnIcon()}
-                        <span>{connBtnLabel()}</span>
+                        <span className="truncate px-2">{connBtnLabel()}</span>
                     </button>
 
-                    <div className="w-full max-w-md">
+                    <div className="w-full max-w-md mx-auto">
                         {reportMode ? (
-                            <div className={`p-8 rounded-[2rem] border relative overflow-hidden text-left mt-2 shadow-2xl transition-all duration-500 animate-in fade-in zoom-in-95 fill-mode-forwards
-                                ${isDark ? 'bg-[#0F172A] border-red-500/20 shadow-red-900/10' : 'bg-red-50/90 border-red-200 shadow-red-200/50'}`}>
+                            <div className={`p-6 sm:p-8 rounded-3xl sm:rounded-[2rem] border relative overflow-hidden text-left mt-2 shadow-2xl transition-all duration-500 animate-in fade-in zoom-in-95 fill-mode-forwards
+                                ${isDark ? 'bg-[#0F172A] border-red-500/20 shadow-red-900/10' : 'bg-red-50/95 border-red-200 shadow-red-200/50 backdrop-blur-sm'}`}>
                                 
                                 {reportState === 'success' ? (
-                                    <div className="flex flex-col items-center justify-center py-6 text-center animate-in fade-in zoom-in duration-500">
-                                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600'}`}>
-                                            <Check className="w-8 h-8" />
+                                    <div className="flex flex-col items-center justify-center py-4 sm:py-6 text-center animate-in fade-in zoom-in duration-500">
+                                        <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-4 ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600'}`}>
+                                            <Check className="w-7 h-7 sm:w-8 sm:h-8" />
                                         </div>
-                                        <h4 className={`font-black text-2xl mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Report Submitted</h4>
-                                        <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                                            You will no longer match with <b className={isDark ? "text-white" : "text-black"}>{targetName}</b>.
+                                        <h4 className={`font-black text-xl sm:text-2xl mb-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>Report Submitted</h4>
+                                        <p className={`text-xs sm:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                                            You will no longer match with <b className={isDark ? "text-white break-words" : "text-black break-words"}>{targetName}</b>.
                                         </p>
                                     </div>
                                 ) : (
                                     <>
-                                        <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-500/20 rounded-full blur-[50px] pointer-events-none"></div>
-                                        <h4 className={`font-black text-xl mb-2 flex items-center gap-3 ${isDark ? 'text-red-400' : 'text-red-600'}`}>
-                                            <AlertTriangle className="w-6 h-6 animate-pulse" /> 
+                                        <div className="absolute -top-10 -right-10 w-32 h-32 sm:w-40 sm:h-40 bg-red-500/20 rounded-full blur-[40px] sm:blur-[50px] pointer-events-none"></div>
+                                        <h4 className={`font-black text-lg sm:text-xl mb-2 flex items-center gap-2 sm:gap-3 ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                                            <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse shrink-0" /> 
                                             <span>Report User</span>
                                         </h4>
-                                        <p className={`text-sm mb-5 leading-relaxed font-medium ${isDark ? 'text-red-300/80' : 'text-red-800'}`}>
-                                            Reporting will block further matches with <b className={isDark ? "text-white" : "text-slate-900"}>{targetName}</b>.
+                                        <p className={`text-xs sm:text-sm mb-4 sm:mb-5 leading-relaxed font-medium ${isDark ? 'text-red-300/80' : 'text-red-800'}`}>
+                                            Reporting will block further matches with <b className={isDark ? "text-white break-words" : "text-slate-900 break-words"}>{targetName}</b>.
                                         </p>
                                         <textarea 
                                             rows={3}
                                             placeholder="Tell us what happened (optional)..."
                                             value={reportReason}
                                             onChange={(e) => setReportReason(e.target.value)}
-                                            className={`w-full px-5 py-4 rounded-2xl text-sm outline-none border-2 focus:ring-4 focus:ring-red-500/20 transition-all resize-none shadow-inner mb-4
+                                            className={`w-full px-4 sm:px-5 py-3 sm:py-4 rounded-xl sm:rounded-2xl text-xs sm:text-sm outline-none border-2 focus:ring-4 focus:ring-red-500/20 transition-all resize-none shadow-inner mb-3 sm:mb-4
                                                 ${isDark 
                                                     ? 'bg-[#0B1120] border-white/5 text-white placeholder-red-300/30 focus:border-red-500/50' 
                                                     : 'bg-white border-red-200 text-slate-900 placeholder-red-300 focus:border-red-400'}`}
                                         />
                                         
-                                        {reportState === 'duplicate' && <p className="text-xs font-bold mb-3 text-yellow-500">Already reported.</p>}
-                                        {reportState === 'error' && <p className="text-xs font-bold mb-3 text-red-500">Error submitting report.</p>}
+                                        {reportState === 'duplicate' && <p className="text-[10px] sm:text-xs font-bold mb-3 text-yellow-500">Already reported.</p>}
+                                        {reportState === 'error' && <p className="text-[10px] sm:text-xs font-bold mb-3 text-red-500">Error submitting report.</p>}
 
-                                        <div className="flex gap-4">
+                                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                                             <button 
                                                 onClick={handleReportUser}
                                                 disabled={reportState === 'submitting'}
-                                                className={`flex-[2] py-4 rounded-2xl font-black text-white transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 active:translate-y-0
+                                                className={`flex-[2] py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-black text-white text-sm sm:text-base transition-all shadow-lg sm:hover:shadow-xl sm:hover:-translate-y-0.5 active:translate-y-0
                                                     ${isDark ? 'bg-gradient-to-r from-red-600 to-red-500 shadow-red-600/20' : 'bg-gradient-to-r from-red-600 to-red-500 shadow-red-500/30'}
                                                     ${reportState === 'submitting' ? 'opacity-70 cursor-not-allowed scale-95' : ''}`}>
                                                 {reportState === 'submitting' ? 'Submitting...' : 'Block & Report'}
                                             </button>
                                             <button 
                                                 onClick={() => { setReportMode(false); setReportState('idle'); }}
-                                                className={`flex-1 py-4 rounded-2xl font-bold transition-all border-2
-                                                    ${isDark ? 'border-white/10 text-white/50 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
+                                                className={`flex-1 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base transition-all border-2
+                                                    ${isDark ? 'border-white/10 text-white/50 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50 bg-white'}`}>
                                                 Cancel
                                             </button>
                                         </div>
@@ -328,22 +338,23 @@ export function PostSessionModal() {
                                 <button
                                     onClick={handleSubmitRating}
                                     disabled={submitting || submitted}
-                                    className={`w-full py-5 rounded-2xl font-black text-xl text-white shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
+                                    className={`w-full py-4 sm:py-5 rounded-xl sm:rounded-2xl font-black text-lg sm:text-xl text-white shadow-lg sm:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]
                                     ${(submitting || submitted)
-                                        ? 'bg-slate-500 cursor-not-allowed'
+                                        ? 'bg-slate-500 cursor-not-allowed hover:scale-100 active:scale-100'
                                         : isDark 
-                                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
-                                            : 'bg-slate-900 hover:bg-slate-800'}`}>
+                                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 shadow-blue-900/40' 
+                                            : 'bg-slate-900 hover:bg-slate-800 shadow-slate-900/20'}`}
+                                >
                                     {submitted ? 'Feedback Submitted ✓' : submitting ? 'Submitting...' : 'Submit Feedback'}
                                 </button>
 
-                                {error && <p className={`text-sm text-center font-semibold ${isDark ? 'text-red-400' : 'text-red-600'}`}>{error}</p>}
+                                {error && <p className={`text-xs sm:text-sm text-center font-semibold ${isDark ? 'text-red-400' : 'text-red-600'}`}>{error}</p>}
 
                                 <button 
                                     onClick={() => setReportMode(true)}
-                                    className={`w-full py-4 font-bold text-sm transition-colors flex items-center justify-center gap-2 uppercase tracking-widest rounded-2xl hover:bg-red-500/5
-                                        ${isDark ? 'text-red-400/60 hover:text-red-400' : 'text-red-400 hover:text-red-600'}`}>
-                                    <AlertTriangle className="w-5 h-5" />
+                                    className={`w-full py-3.5 sm:py-4 font-bold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 uppercase tracking-widest rounded-xl sm:rounded-2xl hover:bg-red-500/5
+                                        ${isDark ? 'text-red-400/60 hover:text-red-400' : 'text-red-500/80 hover:text-red-600'}`}>
+                                    <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
                                     <span>Report User</span>
                                 </button>
                             </div>

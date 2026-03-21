@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-// 🚨 'io' hata kar sirf apna global socket import kiya hai
 import { socket } from '@/services/socket' 
 import {
   Video, Mic, MicOff, VideoOff, Send, Settings, Shield, PhoneOff, AlertTriangle, Loader2, MessageSquare, X
@@ -8,6 +7,7 @@ import {
 import { useThemeColors } from '@/app/hooks/useThemeColors'
 import { useTheme } from '@/app/contexts/ThemeContext'
 import { getAccessToken } from '@/services/auth'
+import { useGlobalCleanup } from '../hooks/useGlobalCleanup'
 
 const SOCKET_SERVER_URL = 'http://localhost:5050'
 
@@ -17,6 +17,7 @@ interface Participant {
 }
 
 export function LiveInteractionRoom() {
+  useGlobalCleanup();
   const colors = useThemeColors()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -190,7 +191,6 @@ export function LiveInteractionRoom() {
     setAutoplayError(false)
   }
 
-  // 🚨 DO NOT disconnect socket here, just clear WebRTC and local tracks
   const fullCleanup = () => {
     cleanupPeer()
     if (localStreamRef.current) {
@@ -223,7 +223,6 @@ export function LiveInteractionRoom() {
         
         await fetchDevices()
 
-        // 🚨 GLOBAL SOCKET CONNECTION LOGIC 🚨
         const token = getAccessToken()
         if (!token) {
           alert('Authentication error. Please log in again.')
@@ -236,10 +235,8 @@ export function LiveInteractionRoom() {
           socket.connect();
         }
 
-        // Join the specific video room
         socket.emit('join_room', ROOM_ID)
 
-        // Attach all room listeners
         socket.on('room_error', (errorMsg) => { setIsAuthorized(false); setErrorReason(errorMsg); fullCleanup() })
         socket.on('room_joined_success', () => setIsAuthorized(true))
         socket.on('session_ended', () => { fullCleanup(); navigate(`/session/${ROOM_ID}`); });
@@ -297,7 +294,6 @@ export function LiveInteractionRoom() {
 
     init()
     
-    // 🚨 CLEANUP: Remove listeners but KEEP socket connected for the rest of the app
     return () => { 
       fullCleanup(); 
       socket.off('room_error');
@@ -391,7 +387,6 @@ export function LiveInteractionRoom() {
   }
 
   /* ---------------- COMMON INTERESTS LOGIC ---------------- */
-  // 🚨 Filter the interests to find common ones between 'me' and 'them'
   const commonInterests = (me?.interests || []).filter(interest => (them?.interests || []).includes(interest));
   const displayInterests = commonInterests.slice(0, 5);
   const remainingInterestsCount = commonInterests.length - 5;
@@ -400,7 +395,7 @@ export function LiveInteractionRoom() {
   /* ---------------- LOADING & ERROR UI ---------------- */
   if (isAuthorized === false) {
     return (
-      <div className={`w-full h-screen flex flex-col items-center justify-center p-4 ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+      <div className={`w-full h-[100dvh] flex flex-col items-center justify-center p-4 ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
         <div className="bg-red-500/10 p-6 rounded-full animate-pulse mb-6">
           <AlertTriangle className="w-16 h-16 text-red-500" />
         </div>
@@ -415,7 +410,7 @@ export function LiveInteractionRoom() {
 
   if (isAuthorized === null) {
     return (
-      <div className={`w-full h-screen flex flex-col items-center justify-center ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+      <div className={`w-full h-[100dvh] flex flex-col items-center justify-center ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
         <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-6" />
         <p className="text-slate-400 font-medium text-lg animate-pulse">Establishing Secure Connection...</p>
       </div>
@@ -424,7 +419,7 @@ export function LiveInteractionRoom() {
 
   /* ---------------- MAIN UI ---------------- */
   return (
-    <div className={`w-full h-screen flex flex-col overflow-hidden transition-colors duration-500 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
+    <div className={`w-full h-[100dvh] flex flex-col overflow-hidden transition-colors duration-500 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
       
       {/* HEADER */}
       <div className={`h-16 shrink-0 flex items-center justify-between px-4 lg:px-8 border-b z-20 ${isDark ? 'bg-slate-900/90 border-white/10 backdrop-blur-md' : 'bg-white/90 border-slate-200 backdrop-blur-md'}`}>
@@ -570,14 +565,15 @@ export function LiveInteractionRoom() {
         {showChat && (
           <div className={`absolute right-0 top-0 h-full w-full sm:w-[400px] lg:relative lg:w-[350px] xl:w-[400px] z-50 flex flex-col shadow-2xl transition-all duration-300 animate-in slide-in-from-right-10 ${isDark ? 'bg-slate-900/95 border-l border-white/10 backdrop-blur-xl' : 'bg-white/95 border-l border-slate-200 backdrop-blur-xl'}`}>
             
-            <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+            <div className={`flex items-center justify-between p-4 border-b shrink-0 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
               <h3 className={`font-bold tracking-wide ${isDark ? 'text-white' : 'text-slate-900'}`}>Room Chat</h3>
               <button onClick={() => setShowChat(false)} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'}`}>
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
+            {/* Fix: Added min-h-0 to allow the chat list to scroll properly */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 scroll-smooth">
               {chatMessages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
                   <div className={`px-4 py-2.5 rounded-2xl text-sm max-w-[85%] break-words shadow-sm leading-relaxed
@@ -596,7 +592,7 @@ export function LiveInteractionRoom() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className={`p-4 ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
+            <div className={`p-4 shrink-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
               <div className="flex items-center gap-2">
                 <input
                   value={msgInput}
@@ -609,7 +605,13 @@ export function LiveInteractionRoom() {
                 <button 
                   onClick={sendMessage} 
                   disabled={!msgInput.trim()} 
-                  className={`p-3 rounded-xl transition-all duration-300 ${msgInput.trim() ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5' : isDark ? 'bg-slate-800 text-slate-600' : 'bg-slate-100 text-slate-400'}`}
+                  className={`p-3 rounded-xl transition-all duration-300 ${
+                    msgInput.trim() 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5' 
+                      : isDark 
+                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed' 
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  }`}
                 >
                   <Send className="w-5 h-5" />
                 </button>
