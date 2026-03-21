@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, AlertTriangle, X, Check, ThumbsUp, UserPlus } from 'lucide-react';
+import { Star, AlertTriangle, X, Check, ThumbsUp, UserPlus, Loader2 } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { fetchJsonWithAuth } from '@/services/auth';
 import { submitSessionRating } from '@/services/user';
+
+type ToastType = 'success' | 'error' | 'info';
+
+interface Toast {
+    id: number;
+    message: string;
+    type: ToastType;
+}
+
+let toastCounter = 0;
 
 export function PostSessionModal() {
     const colors = useThemeColors();
@@ -20,8 +30,12 @@ export function PostSessionModal() {
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Interaction states
+    // Connection request states
     const [requestSent, setRequestSent] = useState(false);
+    const [connectionExists, setConnectionExists] = useState(false);
+    const [sendingRequest, setSendingRequest] = useState(false);
+
+    // Report states
     const [reportMode, setReportMode] = useState(false);
     const [reportState, setReportState] = useState<'idle' | 'submitting' | 'success' | 'error' | 'duplicate'>('idle');
 
@@ -30,10 +44,18 @@ export function PostSessionModal() {
     const [targetName, setTargetName] = useState<string>("Loading...");
     const [reportReason, setReportReason] = useState<string>("");
 
+    // Toast notifications
+    const [toasts, setToasts] = useState<Toast[]>([]);
+
+    const showToast = (message: string, type: ToastType = 'info') => {
+        const id = ++toastCounter;
+        setToasts((prev) => [...prev, { id, message, type }]);
+        setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+    };
+
     // Fetch session details
     useEffect(() => {
         if (!roomid) return;
-        // Using the more specific endpoint from your second version
         fetchJsonWithAuth(`/api/match/session/${roomid}`)
             .then((data: any) => {
                 if (data.success) {
@@ -46,6 +68,32 @@ export function PostSessionModal() {
                 setTargetName("Unknown User");
             });
     }, [roomid]);
+
+    const handleSendConnectionRequest = async () => {
+        if (!targetId || sendingRequest || requestSent || connectionExists) return;
+
+        setSendingRequest(true);
+        try {
+            await fetchJsonWithAuth('/api/requests/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ receiverId: targetId }),
+            });
+            setRequestSent(true);
+            showToast(`Connection request sent to ${targetName}! 🎉`, 'success');
+        } catch (err: any) {
+            const status = err?.status || err?.statusCode;
+            if (status === 409) {
+                // Duplicate — request already pending or connection already exists
+                setConnectionExists(true);
+                showToast('A connection with this user already exists.', 'info');
+            } else {
+                showToast('Failed to send request. Please try again.', 'error');
+            }
+        } finally {
+            setSendingRequest(false);
+        }
+    };
 
     const handleSubmitRating = async () => {
         if (!roomid) {
@@ -96,10 +144,60 @@ export function PostSessionModal() {
         }
     };
 
+    // Determine connection button appearance
+    const connBtnLabel = () => {
+        if (connectionExists) return 'Connection Already Exists';
+        if (requestSent) return 'Connection Request Sent';
+        if (sendingRequest) return 'Sending...';
+        return 'Send Connection Request';
+    };
+
+    const connBtnIcon = () => {
+        if (sendingRequest) return <Loader2 className="w-5 h-5 animate-spin" />;
+        if (requestSent || connectionExists) return <Check className="w-5 h-5" />;
+        return <UserPlus className="w-6 h-6" />;
+    };
+
+    const connBtnColors = () => {
+        if (requestSent)
+            return isDark ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-700';
+        if (connectionExists)
+            return isDark ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-blue-50 border-blue-200 text-blue-700';
+        return isDark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400';
+    };
+
     return (
         <div className={`w-full h-full flex items-center justify-center relative overflow-hidden backdrop-blur-md z-50 font-sans transition-colors duration-500
             ${isDark ? 'bg-slate-950/90' : 'bg-slate-100/90'}`}>
             
+            {/* Toast Notifications */}
+            <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
+                {toasts.map((toast) => (
+                    <div
+                        key={toast.id}
+                        className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border backdrop-blur-xl text-sm font-semibold pointer-events-auto
+                            animate-in slide-in-from-right-5 fade-in duration-300
+                            ${toast.type === 'success'
+                                ? isDark
+                                    ? 'bg-emerald-900/80 border-emerald-500/30 text-emerald-300 shadow-emerald-900/40'
+                                    : 'bg-emerald-50 border-emerald-200 text-emerald-800 shadow-emerald-100'
+                                : toast.type === 'error'
+                                    ? isDark
+                                        ? 'bg-red-900/80 border-red-500/30 text-red-300 shadow-red-900/40'
+                                        : 'bg-red-50 border-red-200 text-red-800 shadow-red-100'
+                                    : isDark
+                                        ? 'bg-blue-900/80 border-blue-500/30 text-blue-300 shadow-blue-900/40'
+                                        : 'bg-blue-50 border-blue-200 text-blue-800 shadow-blue-100'
+                            }`}
+                    >
+                        <span className="text-lg">
+                            {toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}
+                        </span>
+                        <span>{toast.message}</span>
+                    </div>
+                ))}
+            </div>
+
             {/* Background FX Grid */}
             <div className={`absolute inset-0 pointer-events-none ${isDark ? 'opacity-[0.03]' : 'opacity-[0.05]'}`}
                 style={{
@@ -156,14 +254,15 @@ export function PostSessionModal() {
 
                     {/* Connection Request */}
                     <button
-                        onClick={() => setRequestSent(!requestSent)}
+                        onClick={handleSendConnectionRequest}
+                        disabled={sendingRequest || requestSent || connectionExists}
                         className={`w-full max-w-md py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 mb-8 transition-all duration-300 border-2
-                            ${requestSent
-                                ? (isDark ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-700')
-                                : (isDark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400')
-                            }`}
+                            ${connBtnColors()}
+                            ${(requestSent || connectionExists) ? 'cursor-default' : ''}
+                            ${sendingRequest ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
-                        {requestSent ? <><Check className="w-5 h-5" /><span>Connection Request Queued</span></> : <><UserPlus className="w-6 h-6" /><span>Send Connection Request</span></>}
+                        {connBtnIcon()}
+                        <span>{connBtnLabel()}</span>
                     </button>
 
                     <div className="w-full max-w-md">
@@ -235,7 +334,7 @@ export function PostSessionModal() {
                                         : isDark 
                                             ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
                                             : 'bg-slate-900 hover:bg-slate-800'}`}>
-                                    {submitted ? 'Feedback Submitted' : submitting ? 'Submitting...' : 'Submit Feedback'}
+                                    {submitted ? 'Feedback Submitted ✓' : submitting ? 'Submitting...' : 'Submit Feedback'}
                                 </button>
 
                                 {error && <p className={`text-sm text-center font-semibold ${isDark ? 'text-red-400' : 'text-red-600'}`}>{error}</p>}
