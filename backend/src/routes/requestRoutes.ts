@@ -370,4 +370,72 @@ router.post(
   }
 );
 
+/**
+ * POST /api/requests/remove-connection
+ * body: { targetUserId: number }
+ * Removes an accepted connection between the current user and targetUserId.
+ * Deletes the chat and its messages, and marks the connection_request as REMOVED.
+ */
+router.post(
+  "/remove-connection",
+  authMiddleware.authenticate.bind(authMiddleware),
+  async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+      const targetUserId = Number(req.body.targetUserId);
+
+      if (!targetUserId || isNaN(targetUserId)) {
+        return res.status(400).json({ success: false, message: "targetUserId is required" });
+      }
+
+      if (targetUserId === userId) {
+        return res.status(400).json({ success: false, message: "Cannot remove connection with yourself" });
+      }
+
+      await query("BEGIN");
+
+      // Delete the connection request row entirely
+      // (schema CHECK constraint only allows PENDING/ACCEPTED/REJECTED/CANCELLED so we can't set it to REMOVED)
+      const delRes = await query(
+        `DELETE FROM connection_requests
+         WHERE status = 'ACCEPTED'
+           AND (
+             (sender_id = $1 AND receiver_id = $2)
+             OR (sender_id = $2 AND receiver_id = $1)
+           )
+         RETURNING id`,
+        [userId, targetUserId]
+      );
+
+      if (delRes.rows.length === 0) {
+        await query("ROLLBACK");
+        return res.status(404).json({ success: false, message: "No accepted connection found with this user" });
+      }
+
+      // Find and delete the chat + messages
+      const a = Math.min(userId, targetUserId);
+      const b = Math.max(userId, targetUserId);
+
+      const chatRes = await query(
+        `SELECT id FROM chats WHERE user1_id = $1 AND user2_id = $2`,
+        [a, b]
+      );
+
+      if (chatRes.rows.length > 0) {
+        const chatId = chatRes.rows[0].id;
+        await query(`DELETE FROM messages WHERE chat_id = $1`, [chatId]);
+        await query(`DELETE FROM chats WHERE id = $1`, [chatId]);
+      }
+
+      await query("COMMIT");
+
+      return res.status(200).json({ success: true, message: "Connection removed" });
+    } catch (error) {
+      await query("ROLLBACK");
+      console.error("Remove connection error:", error);
+      return res.status(500).json({ success: false, message: "Failed to remove connection" });
+    }
+  }
+);
+
 export default router;
