@@ -4,6 +4,8 @@ import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { ApiError, clearAuthTokens, fetchJsonWithAuth } from '@/services/auth';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
+import { ThemeToggle } from "./ThemeToggle";
+
 // Shape of each user returned by the backend
 interface BackendUser {
   id: number;
@@ -223,8 +225,16 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        {/* Stats & Logout */}
+        {/* Stats & Logout & Theme */}
         <div className="flex items-center gap-4 sm:gap-6 self-end md:self-auto overflow-x-auto no-scrollbar w-full md:w-auto pb-1 md:pb-0">
+          
+          {/* ✅ THEME TOGGLE ADDED HERE */}
+          <div className="shrink-0 flex items-center">
+            <ThemeToggle />
+          </div>
+          
+          <div className={`w-px h-10 hidden sm:block ${isDark ? 'bg-white/10' : 'bg-slate-200'}`}></div>
+
           <div className="text-center shrink-0">
             <div className={`text-2xl sm:text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{allUsers.length}</div>
             <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Total Users</div>

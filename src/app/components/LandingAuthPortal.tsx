@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
-
+import { ThemeToggle } from './ThemeToggle';
 export function LandingAuthPortal() {
   const colors = useThemeColors();
   const { theme } = useTheme();
@@ -18,6 +18,9 @@ export function LandingAuthPortal() {
         isDark ? 'bg-slate-950' : 'bg-white'
       }`}
     >
+        <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
+                      <ThemeToggle />
+                  </div>
       {/* --- LEFT PANEL: Branding & Visuals --- */}
       <div
         className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full

@@ -8,6 +8,7 @@ import { useThemeColors } from '@/app/hooks/useThemeColors'
 import { useTheme } from '@/app/contexts/ThemeContext'
 import { getAccessToken } from '@/services/auth'
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup'
+import { ThemeToggle } from "./ThemeToggle"
 
 const SOCKET_SERVER_URL = 'http://localhost:5050'
 
@@ -395,12 +396,12 @@ export function LiveInteractionRoom() {
   /* ---------------- LOADING & ERROR UI ---------------- */
   if (isAuthorized === false) {
     return (
-      <div className={`w-full h-[100dvh] flex flex-col items-center justify-center p-4 ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+      <div className={`w-full h-[100dvh] flex flex-col items-center justify-center p-4 transition-colors duration-500 ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
         <div className="bg-red-500/10 p-6 rounded-full animate-pulse mb-6">
           <AlertTriangle className="w-16 h-16 text-red-500" />
         </div>
         <h2 className="text-3xl font-extrabold mb-3 tracking-tight">Access Denied</h2>
-        <p className="text-slate-500 mb-8 text-center max-w-md text-lg">{errorReason}</p>
+        <p className={`mb-8 text-center max-w-md text-lg ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{errorReason}</p>
         <button onClick={() => navigate('/homepage')} className="px-8 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all shadow-lg hover:shadow-blue-500/25 hover:-translate-y-0.5">
           Return to Homepage
         </button>
@@ -410,9 +411,9 @@ export function LiveInteractionRoom() {
 
   if (isAuthorized === null) {
     return (
-      <div className={`w-full h-[100dvh] flex flex-col items-center justify-center ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+      <div className={`w-full h-[100dvh] flex flex-col items-center justify-center transition-colors duration-500 ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
         <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-6" />
-        <p className="text-slate-400 font-medium text-lg animate-pulse">Establishing Secure Connection...</p>
+        <p className={`font-medium text-lg animate-pulse ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Establishing Secure Connection...</p>
       </div>
     )
   }
@@ -432,60 +433,65 @@ export function LiveInteractionRoom() {
           </h3>
         </div>
         
-        <button 
-          onClick={() => setShowSettings(true)}
-          className={`p-2.5 rounded-full transition-all duration-300 ${isDark ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'}`}
-        >
-          <Settings className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <ThemeToggle />
+          <button 
+            onClick={() => setShowSettings(true)}
+            className={`p-2.5 rounded-full transition-all duration-300 ${isDark ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'}`}
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* BODY */}
       <div className="flex-1 flex flex-row overflow-hidden relative">
         
         {/* ================= VIDEO SECTION ================= */}
-        <div className="flex-1 relative bg-black/95 flex items-center justify-center p-2 lg:p-6 overflow-hidden">
-          <div className="relative w-full h-full bg-slate-900 rounded-2xl lg:rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.3)] ring-1 ring-white/10">
+        <div className={`flex-1 relative flex items-center justify-center p-2 lg:p-6 overflow-hidden transition-colors duration-500 ${isDark ? 'bg-black/95' : 'bg-slate-200/50'}`}>
+          <div className={`relative w-full h-full rounded-2xl lg:rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.1)] ring-1 transition-colors duration-500 ${isDark ? 'bg-slate-900 ring-white/10 shadow-[0_0_40px_rgba(0,0,0,0.3)]' : 'bg-slate-100 ring-slate-300'}`}>
             <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
 
             {/* 🚨 COMMON INTERESTS OVERLAY 🚨 */}
             {them && remoteConnected && (
-              <div className="absolute top-4 left-4 lg:top-6 lg:left-6 z-20 bg-black/40 backdrop-blur-xl p-3 lg:p-4 rounded-2xl border border-white/10 shadow-2xl max-w-[70%] sm:max-w-xs animate-in fade-in slide-in-from-top-4 duration-500">
-                <h3 className="text-white font-bold text-base lg:text-lg leading-tight truncate tracking-wide drop-shadow-md">{them.username}</h3>
+              <div className={`absolute top-4 left-4 lg:top-6 lg:left-6 z-20 backdrop-blur-xl p-3 lg:p-4 rounded-2xl border shadow-2xl max-w-[70%] sm:max-w-xs animate-in fade-in slide-in-from-top-4 duration-500 transition-colors ${isDark ? 'bg-black/40 border-white/10' : 'bg-white/70 border-slate-200'}`}>
+                <h3 className={`font-bold text-base lg:text-lg leading-tight truncate tracking-wide drop-shadow-md ${isDark ? 'text-white' : 'text-slate-900'}`}>{them.username}</h3>
                 
                 {commonInterests.length > 0 ? (
                   <>
-                    <p className="text-[10px] lg:text-xs text-blue-300/80 mt-1.5 font-medium uppercase tracking-wider">Common Interests</p>
+                    <p className={`text-[10px] lg:text-xs mt-1.5 font-medium uppercase tracking-wider ${isDark ? 'text-blue-300/80' : 'text-blue-600/80'}`}>Common Interests</p>
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
                       {displayInterests.map((interest, idx) => (
-                        <span key={idx} className="px-2.5 py-1 bg-white/10 text-blue-200 text-[10px] lg:text-xs font-medium rounded-lg border border-white/5 backdrop-blur-sm">
+                        <span key={idx} className={`px-2.5 py-1 text-[10px] lg:text-xs font-medium rounded-lg border backdrop-blur-sm transition-colors ${isDark ? 'bg-white/10 text-blue-200 border-white/5' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                           {interest}
                         </span>
                       ))}
                       {remainingInterestsCount > 0 && (
-                        <span className="px-2.5 py-1 bg-blue-600/20 text-blue-300 text-[10px] lg:text-xs font-medium rounded-lg border border-blue-500/30 backdrop-blur-sm">
+                        <span className={`px-2.5 py-1 text-[10px] lg:text-xs font-medium rounded-lg border backdrop-blur-sm transition-colors ${isDark ? 'bg-blue-600/20 text-blue-300 border-blue-500/30' : 'bg-blue-100 text-blue-800 border-blue-300'}`}>
                           +{remainingInterestsCount}
                         </span>
                       )}
                     </div>
                   </>
                 ) : (
-                  <p className="text-[10px] lg:text-xs text-slate-400 mt-1.5 font-medium italic">No common interests</p>
+                  <p className={`text-[10px] lg:text-xs mt-1.5 font-medium italic ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>No common interests</p>
                 )}
               </div>
             )}
 
+            {/* WAITING OVERLAY */}
             {!remoteConnected && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+              <div className={`absolute inset-0 rounded-2xl lg:rounded-3xl flex items-center justify-center backdrop-blur-sm transition-colors ${isDark ? 'bg-slate-900/50' : 'bg-white/50'}`}>
                 <div className="flex flex-col items-center animate-pulse">
                   <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4" />
-                  <p className="text-slate-300 font-semibold tracking-widest text-sm lg:text-base">WAITING FOR PEER...</p>
+                  <p className={`font-semibold tracking-widest text-sm lg:text-base ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>WAITING FOR PEER...</p>
                 </div>
               </div>
             )}
 
+            {/* CAMERA OFF OVERLAY */}
             {remoteConnected && !remoteCameraOn && !autoplayError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-950 text-slate-400 z-10">
+              <div className={`absolute inset-0 rounded-2xl lg:rounded-3xl flex items-center justify-center z-10 transition-colors ${isDark ? 'bg-slate-950 text-slate-400' : 'bg-slate-200 text-slate-500'}`}>
                 <div className="flex flex-col items-center opacity-70">
                   <VideoOff className="w-12 h-12 mb-3" />
                   <p className="font-medium tracking-widest text-sm">CAMERA OFF</p>
@@ -493,8 +499,9 @@ export function LiveInteractionRoom() {
               </div>
             )}
 
+            {/* AUTOPLAY ERROR OVERLAY */}
             {autoplayError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md text-white z-30">
+              <div className={`absolute inset-0 rounded-2xl lg:rounded-3xl flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md text-white z-30`}>
                 <p className="mb-5 text-lg font-medium drop-shadow-lg">Browser blocked audio</p>
                 <button 
                   onClick={handlePlayRemote} 
@@ -506,18 +513,18 @@ export function LiveInteractionRoom() {
             )}
 
             {/* FLOATING CONTROLS */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 lg:gap-5 px-6 py-3 rounded-full bg-slate-950/60 backdrop-blur-xl border border-white/10 shadow-2xl z-40 transition-all duration-300 hover:bg-slate-900/80">
+            <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 lg:gap-5 px-6 py-3 rounded-full backdrop-blur-xl border shadow-2xl z-40 transition-all duration-300 ${isDark ? 'bg-slate-950/60 border-white/10 hover:bg-slate-900/80' : 'bg-white/80 border-slate-200 hover:bg-white'}`}>
               
               <button 
                 onClick={toggleMic} 
-                className={`p-3.5 lg:p-4 rounded-full transition-all duration-300 shadow-lg outline-none ${micOn ? 'bg-slate-700/50 text-white hover:bg-slate-600/80 hover:scale-105' : 'bg-red-500 text-white hover:bg-red-600 hover:scale-105 ring-4 ring-red-500/20'}`}
+                className={`p-3.5 lg:p-4 rounded-full transition-all duration-300 shadow-lg outline-none ${micOn ? (isDark ? 'bg-slate-700/50 text-white hover:bg-slate-600/80 hover:scale-105' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105') : 'bg-red-500 text-white hover:bg-red-600 hover:scale-105 ring-4 ring-red-500/20'}`}
               >
                 {micOn ? <Mic className="w-5 h-5 lg:w-6 lg:h-6" /> : <MicOff className="w-5 h-5 lg:w-6 lg:h-6" />}
               </button>
 
               <button 
                 onClick={toggleCamera} 
-                className={`p-3.5 lg:p-4 rounded-full transition-all duration-300 shadow-lg outline-none ${cameraOn ? 'bg-slate-700/50 text-white hover:bg-slate-600/80 hover:scale-105' : 'bg-red-500 text-white hover:bg-red-600 hover:scale-105 ring-4 ring-red-500/20'}`}
+                className={`p-3.5 lg:p-4 rounded-full transition-all duration-300 shadow-lg outline-none ${cameraOn ? (isDark ? 'bg-slate-700/50 text-white hover:bg-slate-600/80 hover:scale-105' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105') : 'bg-red-500 text-white hover:bg-red-600 hover:scale-105 ring-4 ring-red-500/20'}`}
               >
                 {cameraOn ? <Video className="w-5 h-5 lg:w-6 lg:h-6" /> : <VideoOff className="w-5 h-5 lg:w-6 lg:h-6" />}
               </button>
@@ -525,7 +532,7 @@ export function LiveInteractionRoom() {
               <div className="relative">
                 <button 
                   onClick={() => setShowChat(!showChat)} 
-                  className={`p-3.5 lg:p-4 rounded-full transition-all duration-300 shadow-lg outline-none ${showChat ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 shadow-[0_0_15px_rgba(37,99,235,0.5)]' : 'bg-slate-700/50 text-white hover:bg-slate-600/80 hover:scale-105'}`}
+                  className={`p-3.5 lg:p-4 rounded-full transition-all duration-300 shadow-lg outline-none ${showChat ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 shadow-[0_0_15px_rgba(37,99,235,0.5)]' : (isDark ? 'bg-slate-700/50 text-white hover:bg-slate-600/80 hover:scale-105' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105')}`}
                 >
                   <MessageSquare className="w-5 h-5 lg:w-6 lg:h-6" />
                 </button>
@@ -534,7 +541,7 @@ export function LiveInteractionRoom() {
                 )}
               </div>
 
-              <div className="w-px h-8 bg-white/20 mx-1 lg:mx-2" />
+              <div className={`w-px h-8 mx-1 lg:mx-2 ${isDark ? 'bg-white/20' : 'bg-slate-300'}`} />
 
               <button 
                 onClick={endCall} 
@@ -545,15 +552,17 @@ export function LiveInteractionRoom() {
             </div>
 
             {/* SELF PIP */}
-            <div className="absolute top-4 right-4 lg:top-auto lg:bottom-6 lg:right-6 w-28 h-40 sm:w-32 sm:h-48 lg:w-64 lg:h-40 bg-slate-800 rounded-xl lg:rounded-2xl overflow-hidden border border-white/20 shadow-2xl z-30 group transition-transform duration-300 hover:scale-105 hover:border-white/40">
-              <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            <div className={`absolute top-4 right-4 lg:top-auto lg:bottom-6 lg:right-6 w-28 h-40 sm:w-32 sm:h-48 lg:w-64 lg:h-40 rounded-xl lg:rounded-2xl overflow-hidden border shadow-2xl z-30 group transition-all duration-300 hover:scale-105 isolate ${isDark ? 'bg-slate-800 border-white/20 hover:border-white/40' : 'bg-slate-200 border-slate-300 hover:border-slate-400'}`}>
+              <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-xl lg:rounded-2xl" />
+              
               {me && (
-                <div className="absolute bottom-2 left-2 z-30 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-lg text-white text-[10px] lg:text-xs font-medium truncate max-w-[85%] border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className={`absolute bottom-2 left-2 z-30 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] lg:text-xs font-medium truncate max-w-[85%] border opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${isDark ? 'bg-black/60 text-white border-white/10' : 'bg-white/70 text-slate-900 border-slate-200'}`}>
                   {me.username} (You)
                 </div>
               )}
+              
               {!cameraOn && (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-900/95 text-slate-400 text-xs lg:text-sm font-medium backdrop-blur-md z-10">
+                <div className={`absolute inset-0 rounded-xl lg:rounded-2xl flex items-center justify-center text-xs lg:text-sm font-medium backdrop-blur-md z-10 transition-colors ${isDark ? 'bg-slate-900/95 text-slate-400' : 'bg-slate-100/95 text-slate-500'}`}>
                   <VideoOff className="w-5 h-5 lg:w-6 lg:h-6" />
                 </div>
               )}
@@ -572,7 +581,6 @@ export function LiveInteractionRoom() {
               </button>
             </div>
 
-            {/* Fix: Added min-h-0 to allow the chat list to scroll properly */}
             <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 scroll-smooth">
               {chatMessages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
@@ -592,7 +600,7 @@ export function LiveInteractionRoom() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className={`p-4 shrink-0 ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
+            <div className={`p-4 shrink-0 transition-colors ${isDark ? 'bg-slate-900' : 'bg-white'}`}>
               <div className="flex items-center gap-2">
                 <input
                   value={msgInput}
@@ -625,10 +633,10 @@ export function LiveInteractionRoom() {
       {/* SETTINGS MODAL */}
       {showSettings && (
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className={`p-6 rounded-2xl w-full max-w-md shadow-2xl border ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+          <div className={`p-6 rounded-2xl w-full max-w-md shadow-2xl border transition-colors ${isDark ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold tracking-tight">Device Settings</h2>
-              <button onClick={() => setShowSettings(false)} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}>
+              <button onClick={() => setShowSettings(false)} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'}`}>
                 <X className="w-5 h-5" />
               </button>
             </div>

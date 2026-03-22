@@ -14,12 +14,14 @@ import {
   LayoutGrid,
   PanelLeftClose,
   PanelLeftOpen,
+  Menu
 } from "lucide-react";
 import { useThemeColors } from "@/app/hooks/useThemeColors";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, clearAuthTokens } from "@/services/auth";
 import { buildApiUrl } from "@/services/config";
 import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function HomePageScreen() {
   const colors = useThemeColors();
@@ -35,13 +37,10 @@ export function HomePageScreen() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   
-  // Naya Logic: Mobile par by default sidebar band rahega
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window !== "undefined") {
-      return window.innerWidth >= 1024;
-    }
-    return true;
-  });
+  // Sidebar Hover & Pin Logic
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Default mobile par band
+  const [isHovered, setIsHovered] = useState(false); // Hover logic ke liye
+  const isExpanded = sidebarOpen || isHovered; // Combined logic
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +69,6 @@ export function HomePageScreen() {
         const json = await res.json().catch(() => ({}));
 
         if (!res.ok || !json.success) {
-          console.error("Profile fetch failed:", res.status, json);
           setUser(null);
           setProfileLoading(false);
           return;
@@ -78,7 +76,6 @@ export function HomePageScreen() {
 
         setUser(json.data?.user || null);
       } catch (err) {
-        console.error("Profile fetch error:", err);
         setUser(null);
       } finally {
         setProfileLoading(false);
@@ -138,7 +135,6 @@ export function HomePageScreen() {
 
       navigate("/matchmaking");
     } catch (err) {
-      console.error("Join queue error:", err);
       setQueueError("Failed to connect to server");
       setIsJoiningQueue(false);
     }
@@ -160,7 +156,7 @@ export function HomePageScreen() {
       ? "Start Matching"
       : activeTab === "profile"
       ? "Your Profile"
-      : "Welcome to IncognIITo";
+      : "Dashboard";
 
   const desc =
     activeTab === "requests"
@@ -187,11 +183,13 @@ export function HomePageScreen() {
         />
       )}
 
-      {/* --- LEFT SIDEBAR --- */}
+      {/* --- LEFT SIDEBAR (HOVER EXPAND LOGIC) --- */}
       <div
+        onMouseEnter={() => setIsHovered(true)} 
+        onMouseLeave={() => setIsHovered(false)}
         className={`fixed lg:relative inset-y-0 left-0 shrink-0 flex flex-col border-r z-50 transition-all duration-300 ease-in-out
           ${
-            sidebarOpen
+            isExpanded 
               ? "w-[280px] lg:w-80 translate-x-0"
               : "w-[280px] -translate-x-full lg:translate-x-0 lg:w-24"
           }
@@ -213,10 +211,10 @@ export function HomePageScreen() {
         {/* Logo */}
         <div
           className={`h-16 md:h-24 flex items-center relative z-10 transition-all duration-300 ${
-            sidebarOpen ? "px-6 lg:px-8" : "justify-center px-2"
+            isExpanded ? "px-6 lg:px-8" : "justify-center px-2" 
           }`}
         >
-          {sidebarOpen ? (
+          {isExpanded ? ( 
             <div>
               <h2 className="text-xl md:text-2xl font-black tracking-tight">
                 <span className={isDark ? "text-white" : "text-slate-900"}>Incogn</span>
@@ -235,8 +233,8 @@ export function HomePageScreen() {
           )}
         </div>
 
-        {/* Quick profile card - Naya Clickable Logic */}
-        <div className={`relative z-10 transition-all duration-300 ${sidebarOpen ? "px-4 pb-4" : "px-3 pb-4"}`}>
+        {/* Quick profile card */}
+        <div className={`relative z-10 transition-all duration-300 ${isExpanded ? "px-4 pb-4" : "px-3 pb-4"}`}>
           <button
             onClick={() => {
               if (window.innerWidth < 1024) setSidebarOpen(false);
@@ -246,9 +244,9 @@ export function HomePageScreen() {
               isDark
                 ? "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
                 : "bg-slate-50 border-slate-200 hover:bg-white hover:shadow-md hover:border-slate-300"
-            } ${sidebarOpen ? "p-3 md:p-4" : "p-3"}`}
+            } ${isExpanded ? "p-3 md:p-4" : "p-3"}`} 
           >
-            <div className={`flex items-center ${sidebarOpen ? "gap-3" : "justify-center"}`}>
+            <div className={`flex items-center ${isExpanded ? "gap-3" : "justify-center"}`}>
               {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
                 <img
                   src={user?.avatarUrl || user?.avatar_url || user?.avatar}
@@ -261,7 +259,7 @@ export function HomePageScreen() {
                 </div>
               )}
 
-              {sidebarOpen && (
+              {isExpanded && ( 
                 <div className="min-w-0">
                   <p className={`font-bold text-sm md:text-base truncate ${isDark ? "text-white" : "text-slate-900"}`}>
                     {profileLoading ? "Loading..." : displayName}
@@ -281,7 +279,7 @@ export function HomePageScreen() {
               if (window.innerWidth < 1024) setSidebarOpen(false);
             }}
             className={`w-full flex items-center ${
-              sidebarOpen ? "justify-between px-4" : "justify-center px-2"
+              isExpanded ? "justify-between px-4" : "justify-center px-2" 
             } py-3.5 rounded-xl transition-all duration-300 group
               ${
                 activeTab === "home"
@@ -299,7 +297,7 @@ export function HomePageScreen() {
                   activeTab === "home" ? "text-blue-500" : ""
                 }`}
               />
-              {sidebarOpen && <span className="font-medium text-sm md:text-base truncate">Overview</span>}
+              {isExpanded && <span className="font-medium text-sm md:text-base truncate">Overview</span>}
             </div>
           </button>
 
@@ -314,7 +312,7 @@ export function HomePageScreen() {
                 setActiveTab(item.id);
               }}
               className={`w-full flex items-center ${
-                sidebarOpen ? "justify-between px-4" : "justify-center px-2"
+                isExpanded ? "justify-between px-4" : "justify-center px-2" 
               } py-3.5 rounded-xl transition-all duration-300 group
                 ${
                   activeTab === item.id
@@ -332,12 +330,12 @@ export function HomePageScreen() {
                     activeTab === item.id ? "text-blue-500" : ""
                   }`}
                 />
-                {sidebarOpen && <span className="font-medium text-sm md:text-base truncate">{item.label}</span>}
+                {isExpanded && <span className="font-medium text-sm md:text-base truncate">{item.label}</span>}
               </div>
 
-              {sidebarOpen &&
+              {isExpanded && 
                 (item.count > 0 ? (
-                  <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold shadow-lg shadow-red-500/30">
+                  <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] lg:text-xs font-bold shadow-lg shadow-red-500/30">
                     {item.count}
                   </span>
                 ) : (
@@ -356,7 +354,7 @@ export function HomePageScreen() {
           <button
             onClick={logout}
             className={`w-full rounded-xl py-3 flex items-center ${
-              sidebarOpen ? "justify-center gap-2 px-4" : "justify-center px-2"
+              isExpanded ? "justify-center gap-2 px-4" : "justify-center px-2" 
             } font-semibold transition-all
               ${
                 isDark
@@ -365,7 +363,7 @@ export function HomePageScreen() {
               }`}
           >
             <LogOut className="w-4 h-4 shrink-0" />
-            {sidebarOpen && <span className="text-sm md:text-base">Log Out</span>}
+            {isExpanded && <span className="text-sm md:text-base">Log Out</span>}
           </button>
         </div>
       </div>
@@ -392,15 +390,17 @@ export function HomePageScreen() {
             ${isDark ? "bg-slate-900/70 border-white/10" : "bg-white/80 border-slate-200"}`}
         >
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            {/* ✅ Sidebar Toggle (Ab sirf Mobile par dikhega) */}
             <button
               onClick={() => setSidebarOpen((prev) => !prev)}
-              className={`w-10 h-10 md:w-11 md:h-11 rounded-xl border flex items-center justify-center transition-all shrink-0 ${
-                isDark
-                  ? "bg-white/5 border-white/10 text-white hover:bg-white/10"
-                  : "bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100"
-              }`}
+              className={`lg:hidden p-2.5 sm:p-3 rounded-xl border flex items-center justify-center transition-all shrink-0 shadow-sm
+                ${
+                  isDark
+                    ? "bg-white/5 border-white/10 text-white hover:bg-white/10"
+                    : "bg-white border-slate-200 text-slate-900 hover:bg-slate-50"
+                }`}
             >
-              {sidebarOpen ? <PanelLeftClose className="w-4 h-4 md:w-5 md:h-5" /> : <PanelLeftOpen className="w-4 h-4 md:w-5 md:h-5" />}
+              <Menu className="w-5 h-5" />
             </button>
 
             <div className="min-w-0">
@@ -409,104 +409,109 @@ export function HomePageScreen() {
               </h3>
               <p className={`hidden sm:block text-xs md:text-sm mt-0.5 lg:mt-1 truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                 {activeTab === "home"
-                  ? "Quick overview of your campus-only anonymous network."
+                  ? "IITK only anonymous social network"
                   : "Understand this section and proceed."}
               </p>
             </div>
           </div>
-
-          {/* User Profile Dropdown */}
-          <div className="relative z-[100]" ref={menuRef}>
-            <button
-              onClick={() => setHeaderMenuOpen(!headerMenuOpen)}
-              className={`w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full ring-2 ring-offset-2 transition-all focus:outline-none flex items-center justify-center shadow-md
-                ${
-                  isDark
-                    ? "ring-offset-slate-900 ring-transparent hover:ring-blue-500"
-                    : "ring-offset-white ring-transparent hover:ring-blue-400"
-                }`}
-            >
-              {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
-                <img
-                  src={user?.avatarUrl || user?.avatar_url || user?.avatar}
-                  alt="Profile"
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl">
-                  {profileLoading ? "…" : avatarLetter}
-                </div>
-              )}
-            </button>
-
-            {headerMenuOpen && (
-              <div
-                className={`absolute right-0 top-full mt-2 lg:mt-4 w-72 sm:w-80 rounded-3xl shadow-2xl border overflow-hidden z-[200] transition-all transform origin-top-right backdrop-blur-xl
-                  ${isDark ? "bg-slate-800/95 border-white/10 shadow-black/50" : "bg-white/95 border-slate-200 shadow-2xl"}`}
+          
+          <div className="flex items-center gap-4 sm:gap-5">
+            {/* ✅ THEME TOGGLE MOVED NEXT TO PROFILE */}
+            <ThemeToggle />
+          
+            {/* User Profile Dropdown */}
+            <div className="relative z-[100]" ref={menuRef}>
+              <button
+                onClick={() => setHeaderMenuOpen(!headerMenuOpen)}
+                className={`w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full ring-2 ring-offset-2 transition-all focus:outline-none flex items-center justify-center shadow-md
+                  ${
+                    isDark
+                      ? "ring-offset-slate-900 ring-transparent hover:ring-blue-500"
+                      : "ring-offset-white ring-transparent hover:ring-blue-400"
+                  }`}
               >
+                {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
+                  <img
+                    src={user?.avatarUrl || user?.avatar_url || user?.avatar}
+                    alt="Profile"
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl">
+                    {profileLoading ? "…" : avatarLetter}
+                  </div>
+                )}
+              </button>
+
+              {headerMenuOpen && (
                 <div
-                  className={`p-6 sm:p-8 border-b flex flex-col items-center ${isDark ? "border-white/10" : "border-slate-100"}`}
+                  className={`absolute right-0 top-full mt-2 lg:mt-4 w-72 sm:w-80 rounded-3xl shadow-2xl border overflow-hidden z-[200] transition-all transform origin-top-right backdrop-blur-xl
+                    ${isDark ? "bg-slate-800/95 border-white/10 shadow-black/50" : "bg-white/95 border-slate-200 shadow-2xl"}`}
                 >
                   <div
-                    className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full mb-4 sm:mb-6 shadow-lg ring-4 ${
-                      isDark ? "ring-slate-700" : "ring-slate-50"
-                    }`}
+                    className={`p-6 sm:p-8 border-b flex flex-col items-center ${isDark ? "border-white/10" : "border-slate-100"}`}
                   >
-                    {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
-                      <img
-                        src={user?.avatarUrl || user?.avatar_url || user?.avatar}
-                        alt="Profile"
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-4xl sm:text-5xl">
-                        {avatarLetter}
-                      </div>
-                    )}
+                    <div
+                      className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full mb-4 sm:mb-6 shadow-lg ring-4 ${
+                        isDark ? "ring-slate-700" : "ring-slate-50"
+                      }`}
+                    >
+                      {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
+                        <img
+                          src={user?.avatarUrl || user?.avatar_url || user?.avatar}
+                          alt="Profile"
+                          className="w-full h-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-4xl sm:text-5xl">
+                          {avatarLetter}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <p
+                      className={`font-extrabold text-lg sm:text-xl text-center truncate w-full ${
+                        isDark ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {displayName}
+                    </p>
+                    <p
+                      className={`text-sm sm:text-base text-center truncate w-full mt-1 sm:mt-2 mb-1 sm:mb-2 ${
+                        isDark ? "text-slate-400" : "text-slate-500"
+                      }`}
+                    >
+                      {user?.email || "Verified IITK User"}
+                    </p>
                   </div>
 
-                  <p
-                    className={`font-extrabold text-lg sm:text-xl text-center truncate w-full ${
-                      isDark ? "text-white" : "text-slate-900"
-                    }`}
-                  >
-                    {displayName}
-                  </p>
-                  <p
-                    className={`text-sm sm:text-base text-center truncate w-full mt-1 sm:mt-2 mb-1 sm:mb-2 ${
-                      isDark ? "text-slate-400" : "text-slate-500"
-                    }`}
-                  >
-                    {user?.email || "Verified IITK User"}
-                  </p>
+                  <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
+                    <button
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        navigate("/profile");
+                      }}
+                      className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
+                        ${isDark ? "hover:bg-white/10 text-white" : "hover:bg-slate-50 text-slate-800"}`}
+                    >
+                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500"  />
+                      Edit Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setHeaderMenuOpen(false);
+                        logout();
+                      }}
+                      className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
+                        ${isDark ? "hover:bg-white/10 text-red-400" : "hover:bg-red-50 text-red-600"}`}
+                    >
+                      <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+                      Log Out
+                    </button>
+                  </div>
                 </div>
-
-                <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
-                  <button
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      navigate("/profile");
-                    }}
-                    className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
-                      ${isDark ? "hover:bg-white/10 text-white" : "hover:bg-slate-50 text-slate-800"}`}
-                  >
-                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
-                    Edit Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      setHeaderMenuOpen(false);
-                      logout();
-                    }}
-                    className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
-                      ${isDark ? "hover:bg-white/10 text-red-400" : "hover:bg-red-50 text-red-600"}`}
-                  >
-                    <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-                    Log Out
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 

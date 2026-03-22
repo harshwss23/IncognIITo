@@ -10,16 +10,22 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme] = useState<Theme>('light');
+  // LocalStorage se theme read karega, warna default 'dark' rakhega (IncognIITo ke liye dark vibe best hai)
+  const [theme, setTheme] = useState<Theme>(() => {
+    const savedTheme = localStorage.getItem('app-theme');
+    return (savedTheme as Theme) || 'dark';
+  });
 
   useEffect(() => {
-    // Update document class for global styling
+    // Update document class for global styling and save to localStorage
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(theme);
+    localStorage.setItem('app-theme', theme);
   }, [theme]);
 
+  // Ab ye function actually kaam karega
   const toggleTheme = () => {
-    // No-op: theme is forced to light
+    setTheme((prevTheme) => (prevTheme === 'dark' ? 'light' : 'dark'));
   };
 
   return (

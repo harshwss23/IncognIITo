@@ -6,7 +6,7 @@ import { ApiError, clearAuthTokens } from '@/services/auth';
 import { getUserProfile, updateUserProfile, uploadAvatar, removeAvatar, UserProfile as UserProfileModel } from '@/services/user';
 import { INTERESTS } from '@/app/constants/interests';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
-
+import { ThemeToggle } from "./ThemeToggle"; // Path apne hisaab se adjust kar lena
 export function UserProfile() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -229,10 +229,9 @@ export function UserProfile() {
             <div className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full p-1.5 shadow-2xl relative ${isDark ? 'bg-[#0F172A]' : 'bg-white'}`}>
               <button
                 type="button"
-                onClick={() => {
-                  if (!profile?.avatarUrl) {
-                    avatarInputRef.current?.click();
-                  }
+               onClick={() => {
+                  // Yahan se if condition hata di. Ab click karte hi hamesha file input khulega.
+                  avatarInputRef.current?.click();
                 }}
                 className={`w-full h-full rounded-full relative flex items-center justify-center group cursor-pointer overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}
               >
@@ -371,22 +370,28 @@ export function UserProfile() {
       {/* FIX 3: Added min-h-0 here to ensure flex-1 doesn't scale infinitely */}
       <div className="flex-1 flex flex-col p-4 sm:p-6 lg:p-10 lg:overflow-y-auto min-h-0 relative z-10 no-scrollbar">
         
-        {/* Header & Global Actions */}
+       {/* Header & Global Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 lg:mb-10 shrink-0">
           <h1 className={`text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
             Profile Overview
           </h1>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`w-full sm:w-auto px-8 py-3.5 sm:py-4 rounded-2xl font-bold text-white shadow-lg transition-all
-            hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2
-            ${isDark ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-blue-900/40' : 'bg-slate-900 hover:bg-slate-800 hover:shadow-slate-900/20'}
-            ${saving ? 'opacity-70 cursor-not-allowed scale-100' : ''}`}
-          >
-            {saving ? <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" /> : <Check className="w-5 h-5 sm:w-6 sm:h-6" />}
-            {saving ? 'Saving Changes...' : 'Save Changes'}
-          </button>
+          
+          {/* YAHAN ADD KIYA HAI WRAPPER AUR THEME TOGGLE 👇 */}
+          <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
+            <ThemeToggle />
+            
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className={`w-full sm:w-auto px-8 py-3.5 sm:py-4 rounded-2xl font-bold text-white shadow-lg transition-all
+              hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2
+              ${isDark ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-blue-900/40' : 'bg-slate-900 hover:bg-slate-800 hover:shadow-slate-900/20'}
+              ${saving ? 'opacity-70 cursor-not-allowed scale-100' : ''}`}
+            >
+              {saving ? <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" /> : <Check className="w-5 h-5 sm:w-6 sm:h-6" />}
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
         </div>
 
         {/* Toast Notifications */}
