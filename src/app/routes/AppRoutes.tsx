@@ -7,6 +7,7 @@ import { PublicRoute } from "../components/PublicRoute";
 
 // Icons & Services (FIXED IMPORTS HERE 👇)
 import { Loader2, MonitorSmartphone, AlertTriangle, ArrowRight, Sparkles } from "lucide-react";
+import { buildApiUrl } from "@/services/config";
 import { getAccessToken } from "@/services/auth";
 import { socket } from "@/services/socket";
 
@@ -51,18 +52,18 @@ export const SessionBlockedScreen = () => {
 
     try {
       // 2. 🚨 BACKEND STRIKE: Frozen/Background tabs ki taar server se kaato 🚨
-      await fetch('http://localhost:5050/api/match/force-disconnect', {
+      await fetch(buildApiUrl('/api/match/force-disconnect'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       }).catch(err => console.log("Force disconnect failed:", err));
 
       // 3. Purani Matchmaking/Live call clear karo
-      await fetch('http://localhost:5050/api/match/leave', {
+      await fetch(buildApiUrl('/api/match/leave'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       }).catch(err => console.log("Leave queue info:", err));
       
-      await fetch('http://localhost:5050/api/match/end', {
+      await fetch(buildApiUrl('/api/match/end'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       }).catch(err => console.log("End session info:", err));

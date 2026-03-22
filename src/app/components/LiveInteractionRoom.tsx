@@ -7,10 +7,11 @@ import {
 import { useThemeColors } from '@/app/hooks/useThemeColors'
 import { useTheme } from '@/app/contexts/ThemeContext'
 import { getAccessToken } from '@/services/auth'
+import { buildApiUrl, apiBaseUrl } from '@/services/config'
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup'
 import { ThemeToggle } from "./ThemeToggle"
 
-const SOCKET_SERVER_URL = 'http://localhost:5050'
+const SOCKET_SERVER_URL = apiBaseUrl;
 
 interface Participant {
   username: string;
@@ -352,7 +353,7 @@ export function LiveInteractionRoom() {
 
   const endCall = async () => {
     try {
-      await fetch('http://localhost:5050/api/match/end', {
+      await fetch(buildApiUrl('/api/match/end'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${getAccessToken()}`, 'Content-Type': 'application/json' }
       });
@@ -368,7 +369,7 @@ export function LiveInteractionRoom() {
       if (isAuthorizedRef.current === true) {
         const token = getAccessToken();
         if (token) {
-          fetch('http://localhost:5050/api/match/end', {
+          fetch(buildApiUrl('/api/match/end'), {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             keepalive: true 
