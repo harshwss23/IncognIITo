@@ -6,7 +6,8 @@ import { ApiError, clearAuthTokens } from '@/services/auth';
 import { getUserProfile, updateUserProfile, uploadAvatar, removeAvatar, UserProfile as UserProfileModel } from '@/services/user';
 import { INTERESTS } from '@/app/constants/interests';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
-import { ThemeToggle } from "./ThemeToggle"; // Path apne hisaab se adjust kar lena
+import { ThemeToggle } from "./ThemeToggle"; 
+
 export function UserProfile() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -27,8 +28,10 @@ export function UserProfile() {
   const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const avatarMenuRef = useRef<HTMLDivElement>(null);
+  
   const MAX_INTERESTS = 10;
 
   const handleAuthFailure = (status: number) => {
@@ -243,7 +246,6 @@ export function UserProfile() {
               <button
                 type="button"
                onClick={() => {
-                  // Yahan se if condition hata di. Ab click karte hi hamesha file input khulega.
                   avatarInputRef.current?.click();
                 }}
                 className={`w-full h-full rounded-full relative flex items-center justify-center group cursor-pointer overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}
@@ -389,7 +391,6 @@ export function UserProfile() {
             Profile Overview
           </h1>
           
-          {/* YAHAN ADD KIYA HAI WRAPPER AUR THEME TOGGLE 👇 */}
           <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
             <ThemeToggle />
             
