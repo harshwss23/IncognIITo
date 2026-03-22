@@ -25,7 +25,25 @@ router.post(
         return res.status(400).json({ success: false, message: "You cannot send request to yourself" });
       }
 
-      // ensure receiver exists
+      // 1. Check if they are already mutual friends
+      const mutualCheck = await query(
+        `SELECT 1 FROM connection_requests 
+         WHERE status = 'ACCEPTED' 
+           AND (
+             (sender_id = $1 AND receiver_id = $2) 
+             OR (sender_id = $2 AND receiver_id = $1)
+           )`,
+        [senderId, receiverId]
+      );
+
+      if (mutualCheck.rows.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "You Both are Already Mutual Friends" 
+        });
+      }
+
+      // 2. ensure receiver exists
       const u = await query(`SELECT id FROM users WHERE id = $1`, [receiverId]);
       if (u.rows.length === 0) {
         return res.status(404).json({ success: false, message: "Receiver not found" });
@@ -153,19 +171,39 @@ router.get(
       // ✅ FIXED: Using DISTINCT ON to strictly prevent duplicates
       // ✅ FIXED: Returning u.id as 'id' so React keys work correctly
       const result = await query(
-        `SELECT DISTINCT ON (u.id)
-                u.id, 
-          u.id as other_user_id,
-                c.id as chat_id,
-                u.email as sender_email, 
-                u.display_name as sender_display_name,
-                up.avatar_url as sender_avatar_url
-         FROM connection_requests r
-         JOIN users u ON (u.id = r.sender_id OR u.id = r.receiver_id) AND u.id != $1
-         LEFT JOIN user_profiles up ON up.user_id = u.id
-         JOIN chats c ON (c.user1_id = $1 AND c.user2_id = u.id) OR (c.user1_id = u.id AND c.user2_id = $1)
-         WHERE (r.sender_id = $1 OR r.receiver_id = $1) AND r.status = $2
-         ORDER BY u.id, r.created_at DESC`,
+        `SELECT * FROM (
+           SELECT DISTINCT ON (u.id)
+                  u.id, 
+                  u.id as other_user_id,
+                  c.id as chat_id,
+                  u.email as sender_email, 
+                  u.display_name as sender_display_name,
+                  up.avatar_url as sender_avatar_url,
+                  m.body as last_message,
+                  m.created_at as last_message_time,
+                  r.created_at as connection_created_at
+           FROM connection_requests r
+           JOIN users u ON (u.id = r.sender_id OR u.id = r.receiver_id) AND u.id != $1
+           LEFT JOIN user_profiles up ON up.user_id = u.id
+           JOIN chats c ON (c.user1_id = $1 AND c.user2_id = u.id) OR (c.user1_id = u.id AND c.user2_id = $1)
+           LEFT JOIN LATERAL (
+             SELECT body, created_at
+             FROM messages
+             WHERE chat_id = c.id
+               AND created_at > COALESCE(
+                 CASE 
+                   WHEN c.user1_id = $1 THEN c.user1_cleared_at
+                   ELSE c.user2_cleared_at
+                 END, 
+                 '1970-01-01'
+               )
+             ORDER BY created_at DESC
+             LIMIT 1
+           ) m ON true
+           WHERE (r.sender_id = $1 OR r.receiver_id = $1) AND r.status = $2
+           ORDER BY u.id, m.created_at DESC NULLS LAST, r.created_at DESC
+         ) sub
+         ORDER BY COALESCE(last_message_time, connection_created_at) DESC`,
         [userId, status]
       );
 

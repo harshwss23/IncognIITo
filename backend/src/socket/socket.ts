@@ -93,6 +93,14 @@ socket.on("send_message", async ({ chatId, text, tempId }: { chatId: number; tex
   }
 });
 
+    socket.on("typing", ({ chatId }: { chatId: number | string }) => {
+      socket.to(`chat:${chatId}`).emit("typing_status", { chatId, userId, isTyping: true });
+    });
+
+    socket.on("stop_typing", ({ chatId }: { chatId: number | string }) => {
+      socket.to(`chat:${chatId}`).emit("typing_status", { chatId, userId, isTyping: false });
+    });
+
     socket.on("disconnect", () => {
       console.log("❌ Socket disconnected:", socket.id, "user:", userId);
     });

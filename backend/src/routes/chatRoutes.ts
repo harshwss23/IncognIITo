@@ -4,7 +4,7 @@ import { query } from '../config/database';
 
 const router = Router();
 
-// ✅ FIXED: Changed "/chats" to "/" so it resolves to "/api/chats"
+// ✅ Update: Include last_message and filter by cleared_at
 router.get("/", authMiddleware.authenticate.bind(authMiddleware), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
@@ -15,7 +15,9 @@ router.get("/", authMiddleware.authenticate.bind(authMiddleware), async (req: Re
           u.id as other_user_id,
           u.display_name,
           u.email,
-          p.avatar_url
+          p.avatar_url,
+          m.body as last_message,
+          m.created_at as last_message_time
        FROM chats c
        JOIN users u 
          ON u.id = CASE 
@@ -23,8 +25,22 @@ router.get("/", authMiddleware.authenticate.bind(authMiddleware), async (req: Re
              ELSE c.user1_id
          END
        LEFT JOIN user_profiles p ON u.id = p.user_id
-       WHERE c.user1_id = $1 OR c.user2_id = $1
-       ORDER BY c.created_at DESC`,
+       LEFT JOIN LATERAL (
+         SELECT body, created_at
+         FROM messages
+         WHERE chat_id = c.id
+           AND created_at > COALESCE(
+             CASE 
+               WHEN c.user1_id = $1 THEN c.user1_cleared_at
+               ELSE c.user2_cleared_at
+             END, 
+             '1970-01-01'
+           )
+         ORDER BY created_at DESC
+         LIMIT 1
+       ) m ON true
+       WHERE (c.user1_id = $1 OR c.user2_id = $1)
+       ORDER BY COALESCE(m.created_at, c.created_at) DESC`,
       [userId]
     );
 
@@ -41,19 +57,26 @@ router.get("/", authMiddleware.authenticate.bind(authMiddleware), async (req: Re
   }
 });
 
-// ✅ FIXED: Changed "/chats/:chatId/messages" to "/:chatId/messages"
-// ✅ FIXED: Added try/catch block
+// ✅ Update: Filter messages by cleared_at
 router.get("/:chatId/messages", authMiddleware.authenticate.bind(authMiddleware), async (req: Request, res: Response) => {
   try {
     const chatId = Number(req.params.chatId);
+    const userId = req.user!.userId;
 
-    // ✅ FIXED: Changed 'body' to 'text' to match your database schema
     const result = await query(
-      `SELECT id, sender_id, body as text, created_at
-       FROM messages
-       WHERE chat_id=$1
-       ORDER BY created_at ASC`,
-      [chatId]
+      `SELECT m.id, m.sender_id, m.body as text, m.created_at
+       FROM messages m
+       JOIN chats c ON c.id = m.chat_id
+       WHERE m.chat_id = $1 
+         AND m.created_at > COALESCE(
+           CASE 
+             WHEN c.user1_id = $2 THEN c.user1_cleared_at
+             ELSE c.user2_cleared_at
+           END, 
+           '1970-01-01'
+         )
+       ORDER BY m.created_at ASC`,
+      [chatId, userId]
     );
 
     res.json({
@@ -63,6 +86,34 @@ router.get("/:chatId/messages", authMiddleware.authenticate.bind(authMiddleware)
   } catch (err) {
     console.error("Fetch messages error:", err);
     res.status(500).json({ success: false, message: "Failed to load chat history" });
+  }
+});
+
+// ✅ Update: Set cleared_at timestamp instead of deleting
+router.delete("/:chatId/messages", authMiddleware.authenticate.bind(authMiddleware), async (req: Request, res: Response) => {
+  try {
+    const chatId = Number(req.params.chatId);
+    const userId = req.user!.userId;
+
+    // 1. Verify user is part of this chat and update the correct cleared_at column
+    const updateResult = await query(
+      `UPDATE chats 
+       SET 
+         user1_cleared_at = CASE WHEN user1_id = $2 THEN CURRENT_TIMESTAMP ELSE user1_cleared_at END,
+         user2_cleared_at = CASE WHEN user2_id = $2 THEN CURRENT_TIMESTAMP ELSE user2_cleared_at END
+       WHERE id = $1 AND (user1_id = $2 OR user2_id = $2)
+       RETURNING id`,
+      [chatId, userId]
+    );
+
+    if (updateResult.rows.length === 0) {
+      return res.status(403).json({ success: false, message: "Unauthorized or chat not found" });
+    }
+
+    res.json({ success: true, message: "Chat history cleared successfully" });
+  } catch (err) {
+    console.error("Clear chat error:", err);
+    res.status(500).json({ success: false, message: "Failed to clear chat history" });
   }
 });
 

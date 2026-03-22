@@ -15,7 +15,10 @@ import {
   Info,
   ArrowLeft,
   ChevronLeft,
+  Smile,
+  Trash2
 } from "lucide-react";
+import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, ensureValidAccessToken } from "@/services/auth";
 import { useNavigate } from "react-router-dom";
@@ -134,6 +137,10 @@ export function FuturisticChatInterface() {
   const [removeLoading, setRemoveLoading] = useState(false);
   const [modalTarget, setModalTarget] = useState<any>(null);
 
+  // Clear Chat
+  const [clearChatModal, setClearChatModal] = useState(false);
+  const [clearLoading, setClearLoading] = useState(false);
+
   // Toasts
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const showToast = (msg: string, type: ToastType = "info") => {
@@ -141,6 +148,14 @@ export function FuturisticChatInterface() {
     setToasts(prev => [...prev, { id, message: msg, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
   };
+
+  // Typing status
+  const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({});
+  const typingTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+
+  // Emoji Picker
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeFriendRef = useRef<any>(null);
@@ -153,6 +168,7 @@ export function FuturisticChatInterface() {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpenFor(null);
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) setShowEmojiPicker(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -188,8 +204,15 @@ export function FuturisticChatInterface() {
     };
     init();
 
+    const handleTypingStatus = ({ chatId, userId, isTyping }: any) => {
+      setTypingStatus(prev => ({ ...prev, [safeStr(chatId)]: isTyping }));
+    };
+
+    socket.on("typing_status", handleTypingStatus);
+
     return () => {
       socket.off("new_message");
+      socket.off("typing_status", handleTypingStatus);
     };
   }, []);
 
@@ -219,9 +242,11 @@ export function FuturisticChatInterface() {
 
       setMutualFriends(prev => {
         const idx = prev.findIndex(f => safeStr(f.chat_id) === msgChatId);
-        if (idx <= 0) return prev;
+        if (idx === -1) return prev;
         const updated = [...prev];
         const [bumped] = updated.splice(idx, 1);
+        bumped.last_message = msg.text;
+        bumped.last_message_time = new Date().toISOString();
         return [bumped, ...updated];
       });
 
@@ -294,11 +319,41 @@ export function FuturisticChatInterface() {
     
     setMutualFriends(prev => {
       const idx = prev.findIndex(f => safeStr(f.chat_id) === safeStr(activeFriend.chat_id));
-      if (idx <= 0) return prev;
+      if (idx === -1) return prev;
       const updated = [...prev];
       const [bumped] = updated.splice(idx, 1);
+      bumped.last_message = message;
+      bumped.last_message_time = now.toISOString();
       return [bumped, ...updated];
     });
+
+    // Stop typing immediately when sending
+    socket.emit("stop_typing", { chatId: activeFriend.chat_id });
+    setShowEmojiPicker(false);
+  };
+
+  const handleEmojiClick = (emojiData: any) => {
+    setMessage(prev => prev + emojiData.emoji);
+    // Focus back to input after choosing emoji if you want, but for now just append
+  };
+
+  const handleInputChange = (val: string) => {
+    setMessage(val);
+    if (!activeFriend?.chat_id) return;
+
+    // Send typing event
+    socket.emit("typing", { chatId: activeFriend.chat_id });
+
+    // Clear existing timeout
+    const cid = safeStr(activeFriend.chat_id);
+    if (typingTimeoutRef.current[cid]) {
+      clearTimeout(typingTimeoutRef.current[cid]);
+    }
+
+    // Set new timeout to stop typing after 2 seconds of inactivity
+    typingTimeoutRef.current[cid] = setTimeout(() => {
+      socket.emit("stop_typing", { chatId: activeFriend.chat_id });
+    }, 2000);
   };
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
@@ -371,6 +426,36 @@ export function FuturisticChatInterface() {
       showToast("Connection removed.", "info");
     } catch { showToast("Network error.", "error"); }
     finally { setRemoveLoading(false); }
+  };
+  
+  const handleClearChat = async () => {
+    if (!activeFriend?.chat_id) return;
+    setClearLoading(true);
+    try {
+      const res = await authFetch(`/api/chats/${activeFriend.chat_id}/messages`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        setMessages([]);
+        setMutualFriends(prev => {
+          const updated = [...prev];
+          const idx = updated.findIndex(f => safeStr(f.chat_id) === safeStr(activeFriend.chat_id));
+          if (idx !== -1) {
+            updated[idx] = { ...updated[idx], last_message: null, last_message_time: null };
+          }
+          return updated;
+        });
+        showToast("Chat history cleared.", "success");
+        setClearChatModal(false);
+      } else {
+        const json = await res.json().catch(() => ({}));
+        showToast(json.message || "Failed to clear chat.", "error");
+      }
+    } catch {
+      showToast("Network error.", "error");
+    } finally {
+      setClearLoading(false);
+    }
   };
 
   const messagesWithDateSeparators = useMemo(() => {
@@ -457,13 +542,17 @@ export function FuturisticChatInterface() {
                       )}
                     </div>
 
-                    {/* Name + email */}
+                    {/* Name + last message */}
                     <div className="flex-1 min-w-0 pr-6">
                       <p className={`font-bold text-sm sm:text-base truncate mb-0.5 ${unread > 0 && !active ? (isDark ? "text-white" : "text-slate-900") : ""}`}>
                         {info.name}
                       </p>
                       <p className={`text-[10px] sm:text-xs truncate font-medium ${active ? (isDark ? "text-blue-300" : "text-blue-600") : (isDark ? "text-slate-500" : "text-slate-500")}`}>
-                        {info.email || 'Encrypted Channel'}
+                        {typingStatus[friendKey] ? (
+                          <span className="text-emerald-500 animate-pulse font-bold">typing...</span>
+                        ) : (
+                          f.last_message || 'No messages yet'
+                        )}
                       </p>
                     </div>
                   </button>
@@ -569,6 +658,19 @@ export function FuturisticChatInterface() {
                   </div>
                 </div>
               </div>
+              
+              {/* ✅ NEW: Clear Chat Button */}
+              <button 
+                onClick={() => setClearChatModal(true)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all font-bold text-xs sm:text-sm border-2
+                  ${isDark 
+                    ? "border-red-500/20 text-red-400 hover:bg-red-500/10" 
+                    : "border-red-100 text-red-600 hover:bg-red-50 hover:border-red-200"}`}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Clear Chat</span>
+              </button>
+
             </div>
 
             {/* Messages Area */}
@@ -622,19 +724,50 @@ export function FuturisticChatInterface() {
                   </div>
                 </div>
               )}
+              {typingStatus[safeStr(activeFriend?.chat_id)] && (
+                <div className="flex justify-start animate-in fade-in duration-300">
+                  <div className={`px-4 py-2 rounded-2xl text-xs font-bold italic shadow-sm flex items-center gap-2
+                    ${isDark ? "bg-slate-800 text-emerald-400 border border-white/5" : "bg-white text-emerald-600 border border-slate-100"}`}>
+                    <div className="flex gap-1">
+                      <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                      <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                      <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce"></div>
+                    </div>
+                    <span>{activeInfo.name} is typing...</span>
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
 
             {/* Input Area */}
-            <div className={`p-4 sm:p-6 z-20 shrink-0 ${isDark ? "bg-gradient-to-t from-[#0B1121] via-[#0B1121] to-transparent" : "bg-gradient-to-t from-slate-50 via-slate-50 to-transparent"}`}>
+            <div className={`p-4 sm:p-6 z-20 shrink-0 relative ${isDark ? "bg-gradient-to-t from-[#0B1121] via-[#0B1121] to-transparent" : "bg-gradient-to-t from-slate-50 via-slate-50 to-transparent"}`}>
+              {showEmojiPicker && (
+                <div ref={emojiPickerRef} className="absolute bottom-full mb-4 right-4 sm:right-6 animate-in slide-in-from-bottom-2 fade-in duration-200 z-[100]">
+                  <EmojiPicker
+                    theme={isDark ? EmojiTheme.DARK : EmojiTheme.LIGHT}
+                    onEmojiClick={handleEmojiClick}
+                    autoFocusSearch={false}
+                    lazyLoadEmojis={true}
+                  />
+                </div>
+              )}
               <div className={`flex items-center gap-2 p-1.5 sm:p-2 rounded-[2rem] border shadow-lg backdrop-blur-xl transition-all focus-within:ring-4
                 ${isDark ? "bg-slate-900/80 border-white/10 focus-within:border-blue-500/50 focus-within:ring-blue-500/20" : "bg-white/90 border-slate-200 focus-within:border-blue-400 focus-within:ring-blue-500/20"}`}>
+                
+                <button
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className={`p-3 rounded-2xl transition-all shrink-0 hover:bg-white/10 ${showEmojiPicker ? 'text-blue-500' : 'text-slate-400'}`}
+                >
+                  <Smile className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+
                 <input
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={(e) => handleInputChange(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                   placeholder="Type a secure message..."
-                  className={`flex-1 bg-transparent px-4 sm:px-5 py-3 outline-none text-sm sm:text-base font-medium
+                  className={`flex-1 bg-transparent px-2 sm:px-3 py-3 outline-none text-sm sm:text-base font-medium
                     ${isDark ? "text-white placeholder-slate-500" : "text-slate-900 placeholder-slate-400"}`}
                 />
                 <button 
@@ -693,6 +826,16 @@ export function FuturisticChatInterface() {
         confirmLabel="Remove" confirmColor="bg-amber-600 hover:bg-amber-500 shadow-amber-600/20 text-white"
         loading={removeLoading} onConfirm={handleRemoveConnection}
         onCancel={() => setRemoveModal(false)}
+      />
+
+      {/* ── Clear Chat Modal ───────────────────────── */}
+      <ConfirmModal
+        isDark={isDark} open={clearChatModal}
+        title="Clear Chat History"
+        desc={`Are you sure you want to clear the entire chat history with ${activeInfo.name}? This action cannot be undone.`}
+        confirmLabel="Clear Now" confirmColor="bg-red-600 hover:bg-red-500 shadow-red-600/20 text-white"
+        loading={clearLoading} onConfirm={handleClearChat}
+        onCancel={() => setClearChatModal(false)}
       />
     </div>
   );

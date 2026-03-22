@@ -155,7 +155,7 @@ class Server {
 
         const decoded = (await tokenService.verifyToken(token)) as any;
         socket.data.userId = decoded.userId || decoded.id;
-        
+
         if (!socket.data.userId) {
           return next(new Error("Invalid token payload"));
         }
@@ -178,9 +178,9 @@ class Server {
 
       if (existingSockets.length > 0) {
         console.warn(`🚨 User ${userId} tried connecting from a new tab/device. Keeping oldest session, killing new one.`);
-        
+
         socket.emit("multiple_tabs_error", "You already have an active session in another window or device.");
-        
+
         socket.disconnect(true);
         return; // Halt completely! Do not register any other events for this socket.
       }
@@ -190,28 +190,28 @@ class Server {
       console.log(`✅ User ${userId} claimed the primary session.`);
       socket.on("force_takeover", async () => {
         console.log(`🔥 User ${userId} requested a FORCE TAKEOVER.`);
-        
+
         // 1. Us user ke saare current active sockets (purane tabs) ko dhundho
         const existingSockets = await this.io.in(globalUserRoom).fetchSockets();
-        
+
         // 2. Un sabko ek silent death signal do aur server se disconnect kar do
         existingSockets.forEach((oldSocket) => {
           // Khud ko disconnect mat karna (though naya socket abhi tak is room mein nahi hai)
           if (oldSocket.id !== socket.id) {
             console.log(`Killing old socket ${oldSocket.id} for user ${userId}`);
-            oldSocket.emit("duplicate_session_detected"); 
+            oldSocket.emit("duplicate_session_detected");
             oldSocket.disconnect(true);
           }
         });
 
         // 3. Queue aur Active sessions database se clear karo
         try {
-          await queueService.leaveQueue(userId).catch(() => {});
-          
+          await queueService.leaveQueue(userId).catch(() => { });
+
           const roomId = await queueService.getActiveSession(userId);
           if (roomId) {
             this.io.to(roomId).emit("session_ended", "Your partner disconnected (Session Taken Over).");
-            
+
             const sessionResult = await pool.query(
               `SELECT id, user1_id, user2_id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`,
               [roomId]
@@ -323,7 +323,7 @@ class Server {
             console.log(
               `⚠️ Ignored session cleanup for ${socket.id} (Was denied access / Second tab)`
             );
-            await queueService.leaveQueue(userId).catch(() => {});
+            await queueService.leaveQueue(userId).catch(() => { });
             return;
           }
 
@@ -355,7 +355,7 @@ class Server {
               console.log(`🧹 Cleaned up session ${roomId} due to disconnect.`);
             }
           } else {
-            await queueService.leaveQueue(userId).catch(() => {});
+            await queueService.leaveQueue(userId).catch(() => { });
           }
         } catch (error) {
           console.error("Error handling forceful disconnect cleanup:", error);
@@ -370,7 +370,7 @@ class Server {
 
   public start(): void {
     this.httpServer.listen(this.port, async () => {
-      console.log("🚀 IncognIITo Backend Server");
+      console.log("🚀 IncognIITo Backend Server ");
       console.log("================================");
       console.log(`📡 Server running on port ${this.port}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
