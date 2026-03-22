@@ -6,7 +6,7 @@ import { Loader2, ArrowLeft, ShieldCheck, MessageCircle, Award, Flag, User } fro
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch } from "@/services/auth";
 import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
-
+import { ThemeToggle } from "./ThemeToggle"; // Import ko baaki components ke paas laga dena
 type PublicUser = {
   id: number;
   email: string;
@@ -166,11 +166,16 @@ export function PublicUserProfile() {
 
       {/* Main Content Area */}
       {/* FIX 3: Added min-h-0 here to protect flex-1 stretching limits */}
+      {/* Main Content Area */}
+      {/* FIX 3: Added min-h-0 here to protect flex-1 stretching limits */}
       <div className="flex-1 min-h-0 flex flex-col p-4 sm:p-6 lg:p-10 overflow-visible lg:overflow-y-auto relative no-scrollbar">
+        
+        {/* ✅ YAHAN THEME TOGGLE ADD KIYA HAI */}
         <div className="flex items-center justify-between mb-6 lg:mb-8 shrink-0">
           <h1 className={`text-2xl sm:text-3xl font-black ${isDark ? "text-white" : "text-slate-900"}`}>
             Profile Overview
           </h1>
+          <ThemeToggle />
         </div>
 
         {error ? (

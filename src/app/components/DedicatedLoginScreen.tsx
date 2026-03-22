@@ -6,7 +6,7 @@ import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
 import { setAuthTokens } from '@/services/auth';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
-
+import { ThemeToggle } from './ThemeToggle';
 export function DedicatedLoginScreen() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -74,7 +74,11 @@ export function DedicatedLoginScreen() {
             className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${
                 isDark ? 'bg-slate-950' : 'bg-white'
             }`}
+        
         >
+              <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
+                            <ThemeToggle />
+                        </div>
             {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
             <div
                 className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full

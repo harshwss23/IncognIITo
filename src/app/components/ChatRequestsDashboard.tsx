@@ -22,10 +22,12 @@ import {
   Info,
   Menu
 } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle"; // Path check kar lena apne setup ke hisaab se
 import { useThemeColors } from "@/app/hooks/useThemeColors";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, clearAuthTokens } from "@/services/auth";
 import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
+
 // ─── Toast System ──────────────────────────────────────
 type ToastType = "success" | "error" | "info";
 interface ToastItem {
@@ -76,17 +78,18 @@ export function ChatRequestsDashboard() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const navigate = useNavigate();
+  
   const [activeTab, setActiveTab] = useState("requests");
   const [user, setUser] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Default false for mobile safety
+  
+  // Sidebar Hover & Pin Logic
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile ke liye default false
+  const [isHovered, setIsHovered] = useState(false); // Desktop hover logic
+  const isExpanded = sidebarOpen || isHovered;
+  
   const menuRef = useRef<HTMLDivElement>(null);
-
-  // Auto-open sidebar on large screens
-  useEffect(() => {
-    if (window.innerWidth >= 1024) setSidebarOpen(true);
-  }, []);
 
   // ── Incoming requests
   const [requests, setRequests] = useState<any[]>([]);
@@ -259,7 +262,6 @@ export function ChatRequestsDashboard() {
   ];
 
   return (
-    // FIXED: h-[100dvh] for scroll-safety
     <div className={`w-full h-[100dvh] flex overflow-hidden transition-colors duration-500 relative ${isDark ? "bg-slate-950" : "bg-slate-50"}`}>
       <ToastContainer toasts={toasts} isDark={isDark} />
 
@@ -271,9 +273,12 @@ export function ChatRequestsDashboard() {
         />
       )}
 
-      {/* --- LEFT SIDEBAR --- */}
-      <div className={`fixed lg:relative inset-y-0 left-0 shrink-0 flex flex-col border-r z-50 transition-all duration-300 ease-in-out
-          ${sidebarOpen 
+      {/* --- LEFT SIDEBAR (HOVER TO EXPAND) --- */}
+      <div 
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`fixed lg:relative inset-y-0 left-0 shrink-0 flex flex-col border-r z-50 transition-all duration-300 ease-in-out
+          ${isExpanded 
             ? 'w-[280px] lg:w-[320px] translate-x-0' 
             : 'w-[280px] lg:w-[100px] -translate-x-full lg:translate-x-0'}
           ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 shadow-2xl lg:shadow-none'}`}
@@ -284,8 +289,8 @@ export function ChatRequestsDashboard() {
         </div>
 
         {/* Logo */}
-        <div className={`h-16 md:h-20 lg:h-24 flex items-center justify-between relative z-10 shrink-0 border-b border-transparent ${sidebarOpen ? "px-6 lg:px-8" : "justify-center px-2"}`}>
-          {sidebarOpen ? (
+        <div className={`h-16 md:h-20 lg:h-24 flex items-center justify-between relative z-10 shrink-0 border-b border-transparent transition-all duration-300 ${isExpanded ? "px-6 lg:px-8" : "justify-center px-2"}`}>
+          {isExpanded ? (
             <div>
               <h2 className="text-xl lg:text-2xl font-black tracking-tight">
                 <span className={isDark ? "text-white" : "text-slate-900"}>Incogn</span>
@@ -310,9 +315,9 @@ export function ChatRequestsDashboard() {
         </div>
 
         {/* Profile card */}
-        <div className={`relative z-10 shrink-0 transition-all duration-300 ${sidebarOpen ? "px-4 pb-4" : "px-3 pb-4"}`}>
-          <div className={`rounded-2xl border transition-colors ${isDark ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"} ${sidebarOpen ? "p-3 lg:p-4" : "p-3"}`}>
-            <div className={`flex items-center ${sidebarOpen ? "gap-3" : "justify-center"}`}>
+        <div className={`relative z-10 shrink-0 transition-all duration-300 ${isExpanded ? "px-4 pb-4" : "px-3 pb-4"}`}>
+          <div className={`rounded-2xl border transition-colors ${isDark ? "bg-white/5 border-white/10" : "bg-slate-50 border-slate-200"} ${isExpanded ? "p-3 lg:p-4" : "p-3"}`}>
+            <div className={`flex items-center ${isExpanded ? "gap-3" : "justify-center"}`}>
               {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
                 <img src={user?.avatarUrl || user?.avatar_url || user?.avatar} alt="Profile" className="w-10 h-10 lg:w-12 lg:h-12 rounded-full object-cover shrink-0 shadow-sm" />
               ) : (
@@ -320,7 +325,7 @@ export function ChatRequestsDashboard() {
                   {profileLoading ? "…" : avatarLetter}
                 </div>
               )}
-              {sidebarOpen && (
+              {isExpanded && (
                 <div className="min-w-0">
                   <p className={`font-bold text-sm lg:text-base truncate ${isDark ? "text-white" : "text-slate-900"}`}>{profileLoading ? "Loading..." : displayName}</p>
                   <p className="text-[10px] lg:text-xs text-blue-500 font-semibold truncate">Verified IITK</p>
@@ -334,14 +339,14 @@ export function ChatRequestsDashboard() {
         <nav className="flex-1 px-3 lg:px-4 space-y-1.5 lg:space-y-2 relative z-10 overflow-y-auto no-scrollbar">
           <button
             onClick={() => navigate("/homepage")}
-            className={`w-full flex items-center ${sidebarOpen ? "justify-between px-4" : "justify-center px-2"} py-3 lg:py-4 rounded-xl transition-all duration-300 group
+            className={`w-full flex items-center ${isExpanded ? "justify-between px-4" : "justify-center px-2"} py-3 lg:py-4 rounded-xl transition-all duration-300 group
               ${activeTab === "home"
                 ? isDark ? "bg-gradient-to-r from-blue-600/20 to-blue-500/10 border border-blue-500/30 text-white" : "bg-blue-50 border border-blue-200 text-blue-700"
                 : isDark ? "border border-transparent text-slate-400 hover:bg-white/5 hover:text-white" : "border border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
           >
             <div className="flex items-center gap-3 min-w-0">
               <LayoutGrid className={`w-5 h-5 shrink-0 transition-transform group-hover:scale-110 ${activeTab === "home" ? "text-blue-500" : ""}`} />
-              {sidebarOpen && <span className="font-semibold text-sm lg:text-base truncate">Overview</span>}
+              {isExpanded && <span className="font-semibold text-sm lg:text-base truncate">Overview</span>}
             </div>
           </button>
 
@@ -356,16 +361,16 @@ export function ChatRequestsDashboard() {
                 if (item.id === "match") { navigate("/homepage"); return; }
                 setActiveTab(item.id);
               }}
-              className={`w-full flex items-center ${sidebarOpen ? "justify-between px-4" : "justify-center px-2"} py-3 lg:py-4 rounded-xl transition-all duration-300 group
+              className={`w-full flex items-center ${isExpanded ? "justify-between px-4" : "justify-center px-2"} py-3 lg:py-4 rounded-xl transition-all duration-300 group
                 ${activeTab === item.id
                   ? isDark ? "bg-gradient-to-r from-blue-600/20 to-blue-500/10 border border-blue-500/30 text-white" : "bg-blue-50 border border-blue-200 text-blue-700"
                   : isDark ? "border border-transparent text-slate-400 hover:bg-white/5 hover:text-white" : "border border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <item.icon className={`w-5 h-5 shrink-0 transition-transform group-hover:scale-110 ${activeTab === item.id ? "text-blue-500" : ""}`} />
-                {sidebarOpen && <span className="font-semibold text-sm lg:text-base truncate">{item.label}</span>}
+                {isExpanded && <span className="font-semibold text-sm lg:text-base truncate">{item.label}</span>}
               </div>
-              {sidebarOpen && (item.count > 0 ? (
+              {isExpanded && (item.count > 0 ? (
                 <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] lg:text-xs font-bold shadow-lg shadow-red-500/30">{item.count}</span>
               ) : (
                 <ChevronRight className={`w-4 h-4 transition-transform group-hover:translate-x-0.5 ${isDark ? "text-slate-600" : "text-slate-400"}`} />
@@ -378,18 +383,18 @@ export function ChatRequestsDashboard() {
         <div className={`p-4 border-t relative z-10 space-y-2 shrink-0 ${isDark ? "border-white/10" : "border-slate-200"}`}>
           <button
             onClick={() => navigate("/homepage")}
-            className={`w-full py-3.5 rounded-xl font-bold flex items-center ${sidebarOpen ? "justify-center gap-2 px-4" : "justify-center px-2"} border-2 transition-colors text-sm lg:text-base
+            className={`w-full py-3.5 rounded-xl font-bold flex items-center ${isExpanded ? "justify-center gap-2 px-4" : "justify-center px-2"} border-2 transition-colors text-sm lg:text-base
               ${isDark ? "border-blue-500/20 text-blue-300 hover:bg-blue-500/10" : "border-blue-100 text-blue-700 hover:bg-blue-50 hover:border-blue-200"}`}
           >
-            {sidebarOpen ? <><ArrowLeft className="w-4 h-4" /><span className="truncate">Back to Home</span></> : <ArrowLeft className="w-4 h-4" />}
+            {isExpanded ? <><ArrowLeft className="w-4 h-4" /><span className="truncate">Back to Home</span></> : <ArrowLeft className="w-4 h-4" />}
           </button>
           <button
             onClick={logout}
-            className={`w-full rounded-xl py-3 flex items-center ${sidebarOpen ? "justify-center gap-2 px-4" : "justify-center px-2"} font-bold transition-all text-sm lg:text-base
+            className={`w-full rounded-xl py-3 flex items-center ${isExpanded ? "justify-center gap-2 px-4" : "justify-center px-2"} font-bold transition-all text-sm lg:text-base
               ${isDark ? "bg-white/5 hover:bg-white/10 text-red-400 hover:text-red-300" : "bg-slate-100 hover:bg-slate-200 text-red-600 hover:text-red-700"}`}
           >
             <LogOut className="w-4 h-4 shrink-0" />
-            {sidebarOpen && <span className="truncate">Log Out</span>}
+            {isExpanded && <span className="truncate">Log Out</span>}
           </button>
         </div>
       </div>
@@ -405,15 +410,15 @@ export function ChatRequestsDashboard() {
         {/* Header */}
         <div className={`h-16 md:h-20 lg:h-24 px-4 sm:px-6 lg:px-10 flex items-center justify-between shrink-0 z-30 border-b backdrop-blur-md
             ${isDark ? "bg-slate-900/70 border-white/10" : "bg-white/80 border-slate-200"}`}>
+          
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            {/* Sidebar Toggle */}
+            {/* ✅ Sidebar Toggle (Ab sirf Mobile par dikhega) */}
             <button
               onClick={() => setSidebarOpen((prev) => !prev)}
-              className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-center transition-all shrink-0 shadow-sm
+              className={`lg:hidden p-2.5 sm:p-3 rounded-xl border flex items-center justify-center transition-all shrink-0 shadow-sm
                 ${isDark ? "bg-white/5 border-white/10 text-white hover:bg-white/10" : "bg-white border-slate-200 text-slate-900 hover:bg-slate-50"}`}
             >
-              <Menu className="w-5 h-5 lg:hidden" />
-              {sidebarOpen ? <PanelLeftClose className="hidden lg:block w-5 h-5" /> : <PanelLeftOpen className="hidden lg:block w-5 h-5" />}
+              <Menu className="w-5 h-5" />
             </button>
             <div className="min-w-0">
               <h3 className={`text-lg sm:text-2xl lg:text-3xl font-black tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>Connection Requests</h3>
@@ -421,52 +426,56 @@ export function ChatRequestsDashboard() {
             </div>
           </div>
 
-          {/* Profile dropdown */}
-          <div className="relative z-[100] shrink-0" ref={menuRef}>
-            <button
-              onClick={() => setHeaderMenuOpen(!headerMenuOpen)}
-              className={`w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full ring-2 ring-offset-2 transition-all focus:outline-none flex items-center justify-center shadow-md
-                ${isDark ? "ring-offset-slate-900 ring-transparent hover:ring-blue-500" : "ring-offset-white ring-transparent hover:ring-blue-400"}`}
-            >
-              {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
-                <img src={user?.avatarUrl || user?.avatar_url || user?.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
-              ) : (
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl">
-                  {profileLoading ? "…" : avatarLetter}
+          {/* Profile dropdown & Theme Toggle */}
+          <div className="flex items-center gap-3 sm:gap-5">
+            <ThemeToggle />
+            
+            <div className="relative z-[100] shrink-0" ref={menuRef}>
+              <button
+                onClick={() => setHeaderMenuOpen(!headerMenuOpen)}
+                className={`w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full ring-2 ring-offset-2 transition-all focus:outline-none flex items-center justify-center shadow-md
+                  ${isDark ? "ring-offset-slate-900 ring-transparent hover:ring-blue-500" : "ring-offset-white ring-transparent hover:ring-blue-400"}`}
+              >
+                {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
+                  <img src={user?.avatarUrl || user?.avatar_url || user?.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl">
+                    {profileLoading ? "…" : avatarLetter}
+                  </div>
+                )}
+              </button>
+
+              {headerMenuOpen && (
+                <div className={`absolute right-0 top-full mt-2 lg:mt-4 w-72 sm:w-80 rounded-3xl shadow-2xl border overflow-hidden z-[200] transition-all transform origin-top-right backdrop-blur-xl
+                    ${isDark ? "bg-slate-800/95 border-white/10 shadow-black/50" : "bg-white/95 border-slate-200 shadow-2xl"}`}>
+                  <div className={`p-6 sm:p-8 border-b flex flex-col items-center ${isDark ? "border-white/10" : "border-slate-100"}`}>
+                    <div className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full mb-4 sm:mb-6 shadow-lg ring-4 ${isDark ? "ring-slate-700" : "ring-slate-50"}`}>
+                      {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
+                        <img src={user?.avatarUrl || user?.avatar_url || user?.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-4xl sm:text-5xl">
+                          {avatarLetter}
+                        </div>
+                      )}
+                    </div>
+                    <p className={`font-extrabold text-lg sm:text-xl text-center truncate w-full ${isDark ? "text-white" : "text-slate-900"}`}>{displayName}</p>
+                    <p className={`text-sm sm:text-base text-center truncate w-full mt-1 sm:mt-2 mb-1 sm:mb-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>{user?.email || "Verified IITK User"}</p>
+                  </div>
+                  <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
+                    <button onClick={() => { setHeaderMenuOpen(false); navigate("/profile"); }}
+                      className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
+                        ${isDark ? "hover:bg-white/10 text-white" : "hover:bg-slate-50 text-slate-800"}`}>
+                      <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" /> Edit Profile
+                    </button>
+                    <button onClick={() => { setHeaderMenuOpen(false); logout(); }}
+                      className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
+                        ${isDark ? "hover:bg-white/10 text-red-400" : "hover:bg-red-50 text-red-600"}`}>
+                      <LogOut className="w-4 h-4 sm:w-5 sm:h-5" /> Log Out
+                    </button>
+                  </div>
                 </div>
               )}
-            </button>
-
-            {headerMenuOpen && (
-              <div className={`absolute right-0 top-full mt-2 lg:mt-4 w-72 sm:w-80 rounded-3xl shadow-2xl border overflow-hidden z-[200] transition-all transform origin-top-right backdrop-blur-xl
-                  ${isDark ? "bg-slate-800/95 border-white/10 shadow-black/50" : "bg-white/95 border-slate-200 shadow-2xl"}`}>
-                <div className={`p-6 sm:p-8 border-b flex flex-col items-center ${isDark ? "border-white/10" : "border-slate-100"}`}>
-                  <div className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full mb-4 sm:mb-6 shadow-lg ring-4 ${isDark ? "ring-slate-700" : "ring-slate-50"}`}>
-                    {user?.avatarUrl || user?.avatar_url || user?.avatar ? (
-                      <img src={user?.avatarUrl || user?.avatar_url || user?.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-4xl sm:text-5xl">
-                        {avatarLetter}
-                      </div>
-                    )}
-                  </div>
-                  <p className={`font-extrabold text-lg sm:text-xl text-center truncate w-full ${isDark ? "text-white" : "text-slate-900"}`}>{displayName}</p>
-                  <p className={`text-sm sm:text-base text-center truncate w-full mt-1 sm:mt-2 mb-1 sm:mb-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>{user?.email || "Verified IITK User"}</p>
-                </div>
-                <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
-                  <button onClick={() => { setHeaderMenuOpen(false); navigate("/profile"); }}
-                    className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
-                      ${isDark ? "hover:bg-white/10 text-white" : "hover:bg-slate-50 text-slate-800"}`}>
-                    <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" /> Edit Profile
-                  </button>
-                  <button onClick={() => { setHeaderMenuOpen(false); logout(); }}
-                    className={`w-full flex items-center justify-center gap-3 px-4 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-semibold transition-colors
-                      ${isDark ? "hover:bg-white/10 text-red-400" : "hover:bg-red-50 text-red-600"}`}>
-                    <LogOut className="w-4 h-4 sm:w-5 sm:h-5" /> Log Out
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
 

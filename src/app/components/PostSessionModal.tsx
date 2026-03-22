@@ -6,6 +6,7 @@ import { useTheme } from '@/app/contexts/ThemeContext';
 import { fetchJsonWithAuth } from '@/services/auth';
 import { submitSessionRating } from '@/services/user';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
+import { ThemeToggle } from "./ThemeToggle";
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -22,11 +23,9 @@ export function PostSessionModal() {
     const { theme } = useTheme();
     const isDark = theme === 'dark';
     const navigate = useNavigate();
-    // FIX: Match parameter casing typically used in routing (roomId vs roomid)
-    const { roomId } = useParams<{ roomId: string }>();
     
     // Fallback if URL param is weirdly cased in your setup
-    const { roomid } = useParams<{ roomid: string }>();
+    const { roomId, roomid } = useParams<{ roomId?: string, roomid?: string }>();
     const activeRoomId = roomId || roomid; 
 
     // Rating states
@@ -176,9 +175,14 @@ export function PostSessionModal() {
     };
 
     return (
-        <div className={`fixed inset-0 w-full min-h-[100dvh] flex flex-col p-4 sm:p-6 md:p-10 z-[100] overflow-y-auto no-scrollbar backdrop-blur-md transition-colors duration-500
-            ${isDark ? 'bg-slate-950/90' : 'bg-slate-900/60'}`}>
+        <div className={`fixed inset-0 w-full min-h-[100dvh] flex flex-col p-4 sm:p-6 md:p-10 z-[100] overflow-y-auto no-scrollbar backdrop-blur-xl transition-colors duration-500
+            ${isDark ? 'bg-slate-950/90' : 'bg-slate-200/60'}`}>
             
+            {/* ✅ THEME TOGGLE ADDED HERE (Top Left) */}
+            <div className="absolute top-6 right-6 sm:top-8 sm:right-8 z-[200]">
+                <ThemeToggle />
+            </div>
+
             {/* Toast Notifications */}
             <div className="fixed top-4 left-4 right-4 sm:left-auto sm:top-6 sm:right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
                 {toasts.map((toast) => (
@@ -208,37 +212,41 @@ export function PostSessionModal() {
             </div>
 
             {/* Background FX Grid (absolute to the viewport) */}
-            <div className={`fixed inset-0 pointer-events-none ${isDark ? 'opacity-[0.03]' : 'opacity-[0.08]'}`}
+            <div className={`fixed inset-0 pointer-events-none transition-opacity duration-500 ${isDark ? 'opacity-[0.03]' : 'opacity-[0.05]'}`}
                 style={{
-                    backgroundImage: `linear-gradient(0deg, transparent 24%, ${isDark ? '#FFF' : '#000'} 25%, ${isDark ? '#FFF' : '#000'} 26%, transparent 27%, transparent 74%, ${isDark ? '#FFF' : '#000'} 75%, ${isDark ? '#FFF' : '#000'} 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, ${isDark ? '#FFF' : '#000'} 25%, ${isDark ? '#FFF' : '#000'} 26%, transparent 27%, transparent 74%, ${isDark ? '#FFF' : '#000'} 75%, ${isDark ? '#FFF' : '#000'} 76%, transparent 77%, transparent)`,
+                    backgroundImage: `linear-gradient(0deg, transparent 24%, ${isDark ? '#FFF' : '#334155'} 25%, ${isDark ? '#FFF' : '#334155'} 26%, transparent 27%, transparent 74%, ${isDark ? '#FFF' : '#334155'} 75%, ${isDark ? '#FFF' : '#334155'} 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, ${isDark ? '#FFF' : '#334155'} 25%, ${isDark ? '#FFF' : '#334155'} 26%, transparent 27%, transparent 74%, ${isDark ? '#FFF' : '#334155'} 75%, ${isDark ? '#FFF' : '#334155'} 76%, transparent 77%, transparent)`,
                     backgroundSize: '80px 80px'
                 }}
             />
 
             {/* Main Modal Card */}
-            <div className={`relative z-10 w-full max-w-2xl my-auto mx-auto rounded-[2rem] sm:rounded-[3rem] overflow-hidden border shadow-2xl transition-all duration-300
-                ${isDark ? 'bg-[#0B1120] border-white/10 shadow-black/60' : 'bg-white border-white shadow-slate-400/30'}`}>
+            <div className={`relative z-10 w-full max-w-2xl my-auto mx-auto rounded-[2rem] sm:rounded-[3rem] overflow-hidden border transition-all duration-500
+                ${isDark 
+                    ? 'bg-[#0B1120] border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.6)]' 
+                    : 'bg-white/95 backdrop-blur-3xl border-white shadow-[0_20px_60px_rgba(0,0,0,0.08)]'}`}>
                 
                 <div className="h-1.5 sm:h-2 w-full bg-gradient-to-r from-blue-600 via-violet-600 to-cyan-500"></div>
 
                 <button 
                     onClick={() => navigate('/homepage')}
                     className={`absolute top-4 right-4 sm:top-6 sm:right-6 md:top-8 md:right-8 p-2.5 sm:p-3 rounded-full transition-all duration-200 z-20
-                    ${isDark ? 'bg-white/5 hover:bg-white/10 text-white/50 hover:text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600'}`}>
+                    ${isDark ? 'bg-white/5 hover:bg-white/10 text-white/50 hover:text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700'}`}>
                     <X className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
 
                 <div className="px-6 py-10 sm:px-12 sm:py-14 md:px-16 md:py-16 text-center flex flex-col items-center">
                     
                     <div className={`w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl sm:rounded-[2rem] flex items-center justify-center mb-6 sm:mb-8 md:mb-10 shadow-xl border transform transition-transform hover:scale-105 duration-300 shrink-0
-                        ${isDark ? 'bg-gradient-to-br from-white/10 text-blue-400 border-white/10' : 'bg-gradient-to-br from-slate-50 text-blue-600 border-slate-100'}`}>
+                        ${isDark 
+                            ? 'bg-gradient-to-br from-white/10 to-transparent text-blue-400 border-white/10' 
+                            : 'bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 border-blue-100 shadow-blue-900/5'}`}>
                         <ThumbsUp className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14" />
                     </div>
 
                     <h2 className={`text-3xl sm:text-4xl md:text-5xl font-black tracking-tight mb-3 sm:mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         Session Ended
                     </h2>
-                    <p className={`text-sm sm:text-lg md:text-xl max-w-lg leading-relaxed mb-8 sm:mb-10 md:mb-12 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <p className={`text-sm sm:text-lg md:text-xl max-w-lg leading-relaxed mb-8 sm:mb-10 md:mb-12 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                         How was your conversation with <span className={`font-bold px-2 py-1 rounded-lg break-words ${isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-900'}`}>{targetName}</span>?
                     </p>
 
@@ -255,7 +263,7 @@ export function PostSessionModal() {
                                 <Star className={`w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 transition-all duration-300 filter drop-shadow-md sm:drop-shadow-lg
                                     ${star <= (hoveredRating || rating) 
                                         ? 'fill-yellow-400 text-yellow-400' 
-                                        : (isDark ? 'text-slate-800 fill-slate-800/50' : 'text-slate-200 fill-slate-50')
+                                        : (isDark ? 'text-slate-800 fill-slate-800/50' : 'text-slate-200 fill-slate-100')
                                     }`} 
                                 />
                             </button>
@@ -278,7 +286,7 @@ export function PostSessionModal() {
                     <div className="w-full max-w-md mx-auto">
                         {reportMode ? (
                             <div className={`p-6 sm:p-8 rounded-3xl sm:rounded-[2rem] border relative overflow-hidden text-left mt-2 shadow-2xl transition-all duration-500 animate-in fade-in zoom-in-95 fill-mode-forwards
-                                ${isDark ? 'bg-[#0F172A] border-red-500/20 shadow-red-900/10' : 'bg-red-50/95 border-red-200 shadow-red-200/50 backdrop-blur-sm'}`}>
+                                ${isDark ? 'bg-[#0F172A] border-red-500/20 shadow-red-900/10' : 'bg-red-50 border-red-200 shadow-red-200/50'}`}>
                                 
                                 {reportState === 'success' ? (
                                     <div className="flex flex-col items-center justify-center py-4 sm:py-6 text-center animate-in fade-in zoom-in duration-500">
@@ -326,7 +334,7 @@ export function PostSessionModal() {
                                             <button 
                                                 onClick={() => { setReportMode(false); setReportState('idle'); }}
                                                 className={`flex-1 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base transition-all border-2
-                                                    ${isDark ? 'border-white/10 text-white/50 hover:bg-white/5' : 'border-slate-200 text-slate-500 hover:bg-slate-50 bg-white'}`}>
+                                                    ${isDark ? 'border-white/10 text-white/50 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-white bg-slate-50'}`}>
                                                 Cancel
                                             </button>
                                         </div>
@@ -352,8 +360,8 @@ export function PostSessionModal() {
 
                                 <button 
                                     onClick={() => setReportMode(true)}
-                                    className={`w-full py-3.5 sm:py-4 font-bold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 uppercase tracking-widest rounded-xl sm:rounded-2xl hover:bg-red-500/5
-                                        ${isDark ? 'text-red-400/60 hover:text-red-400' : 'text-red-500/80 hover:text-red-600'}`}>
+                                    className={`w-full py-3.5 sm:py-4 font-bold text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 uppercase tracking-widest rounded-xl sm:rounded-2xl
+                                        ${isDark ? 'text-red-400/60 hover:text-red-400 hover:bg-red-500/5' : 'text-red-500/80 hover:text-red-600 hover:bg-red-50'}`}>
                                     <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
                                     <span>Report User</span>
                                 </button>

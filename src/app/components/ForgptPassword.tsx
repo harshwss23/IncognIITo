@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { buildApiUrl } from '@/services/config';
 import { setAuthTokens } from '@/services/auth';
 import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
-
+import { ThemeToggle } from "./ThemeToggle";
 export function ForgotPasswordScreen() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -121,6 +121,9 @@ export function ForgotPasswordScreen() {
         isDark ? "bg-slate-950" : "bg-white"
       }`}
     >
+        <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
+                      <ThemeToggle />
+                  </div>
       {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
       <div
         className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full

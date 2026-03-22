@@ -3,34 +3,33 @@ import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/app/contexts/ThemeContext';
 
 export function ThemeToggle() {
-  const { theme, toggleTheme } = useTheme();
+    // Tumhare context se theme aur usko change karne ka function extract karo
+    const { theme, toggleTheme } = useTheme(); 
+    const isDark = theme === 'dark';
 
-  return (
-    <button
-      onClick={toggleTheme}
-      className={`
-        relative group overflow-hidden rounded-2xl px-6 py-3 font-bold text-sm
-        transition-all duration-300 hover:scale-[1.05] active:scale-[0.98]
-        ${theme === 'dark' 
-          ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:shadow-[0_0_30px_rgba(59,130,246,0.6)]' 
-          : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-[0_0_20px_rgba(251,146,60,0.4)] hover:shadow-[0_0_30px_rgba(251,146,60,0.6)]'
-        }
-      `}
-    >
-      <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-      <div className="relative flex items-center gap-2">
-        {theme === 'dark' ? (
-          <>
-            <Sun className="w-5 h-5" />
-            <span>LIGHT MODE</span>
-          </>
-        ) : (
-          <>
-            <Moon className="w-5 h-5" />
-            <span>DARK MODE</span>
-          </>
-        )}
-      </div>
-    </button>
-  );
+    return (
+        <button
+            onClick={toggleTheme}
+            aria-label="Toggle Dark Mode"
+            className={`p-2.5 rounded-xl transition-all duration-300 active:scale-90 ${
+                isDark 
+                    ? 'bg-slate-800 text-yellow-400 hover:bg-slate-700 shadow-[0_0_15px_rgba(250,204,21,0.1)]' 
+                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm'
+            }`}
+        >
+            {/* Smooth transition ke sath icon change hoga */}
+            <div className="relative w-5 h-5 flex items-center justify-center">
+                <Sun 
+                    className={`absolute transition-all duration-300 ${
+                        isDark ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
+                    }`} 
+                />
+                <Moon 
+                    className={`absolute transition-all duration-300 ${
+                        isDark ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
+                    }`} 
+                />
+            </div>
+        </button>
+    );
 }

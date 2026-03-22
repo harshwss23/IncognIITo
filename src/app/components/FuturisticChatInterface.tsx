@@ -20,7 +20,7 @@ import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, ensureValidAccessToken } from "@/services/auth";
 import { useNavigate } from "react-router-dom";
 import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
-
+import { ThemeToggle } from "./ThemeToggle";
 type ChatMsg = {
   id: string | number;
   tempId?: string;
@@ -410,6 +410,10 @@ export function FuturisticChatInterface() {
             </div>
             <h2 className={`text-lg md:text-xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>Connections</h2>
           </div>
+          
+          {/* ✅ YAHAN THEME TOGGLE ADD KIYA HAI */}
+          <ThemeToggle />
+          
         </div>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-4 space-y-1.5 no-scrollbar">

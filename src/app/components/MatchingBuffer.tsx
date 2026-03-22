@@ -6,7 +6,7 @@ import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
 import { socket } from '@/services/socket';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
-
+import { ThemeToggle } from "./ThemeToggle"; // Path verify kar lena
 export function MatchingBuffer() {
   const { skipCleanup } = useGlobalCleanup();
   const colors = useThemeColors();
@@ -206,6 +206,12 @@ export function MatchingBuffer() {
 
   return (
     <div className={`w-full h-[100dvh] overflow-y-auto no-scrollbar flex flex-col p-4 sm:p-8 relative transition-colors duration-500 ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}>
+      
+      {/* ✅ YAHAN THEME TOGGLE ADD KIYA HAI */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-50">
+        <ThemeToggle />
+      </div>
+
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div className={`absolute top-0 right-0 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] rounded-full blur-[80px] sm:blur-[120px] mix-blend-screen opacity-50 sm:opacity-30 transition-colors ${isDark ? 'bg-blue-600' : 'bg-blue-300'}`} />
         <div className={`absolute bottom-0 left-0 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] rounded-full blur-[80px] sm:blur-[120px] mix-blend-screen opacity-50 sm:opacity-20 transition-colors ${isDark ? 'bg-purple-600' : 'bg-purple-300'}`} />
