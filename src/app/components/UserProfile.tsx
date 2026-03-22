@@ -6,7 +6,8 @@ import { ApiError, clearAuthTokens } from '@/services/auth';
 import { getUserProfile, updateUserProfile, uploadAvatar, removeAvatar, UserProfile as UserProfileModel } from '@/services/user';
 import { INTERESTS } from '@/app/constants/interests';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
-import { ThemeToggle } from "./ThemeToggle"; // Path apne hisaab se adjust kar lena
+import { ThemeToggle } from "./ThemeToggle"; 
+
 export function UserProfile() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -27,8 +28,10 @@ export function UserProfile() {
   const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const avatarMenuRef = useRef<HTMLDivElement>(null);
+  const MAX_INTERESTS = 10;
 
   const handleAuthFailure = (status: number) => {
     if (status === 401) {
@@ -107,11 +110,22 @@ export function UserProfile() {
   };
 
   const toggleInterest = (interest: string) => {
-    setInterests((prev) =>
-      prev.includes(interest)
-        ? prev.filter((item) => item !== interest)
-        : [...prev, interest]
-    );
+    // Clear any old toast messages before updating
+    setError('');
+    setSuccess('');
+
+    setInterests((prev) => {
+      if (prev.includes(interest)) {
+        return prev.filter((item) => item !== interest);
+      }
+
+      if (prev.length >= MAX_INTERESTS) {
+        setError(`You can select up to ${MAX_INTERESTS} interests.`);
+        return prev;
+      }
+
+      return [...prev, interest];
+    });
   };
 
   const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -179,6 +193,7 @@ export function UserProfile() {
   const availableInterests = INTERESTS.filter(
     (interest) => !interests.includes(interest) && interest.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const reachedInterestLimit = interests.length >= MAX_INTERESTS;
 
   const hasRatings = rating > 0;
   const ratingFeedback = !hasRatings
@@ -230,7 +245,6 @@ export function UserProfile() {
               <button
                 type="button"
                onClick={() => {
-                  // Yahan se if condition hata di. Ab click karte hi hamesha file input khulega.
                   avatarInputRef.current?.click();
                 }}
                 className={`w-full h-full rounded-full relative flex items-center justify-center group cursor-pointer overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}
@@ -376,7 +390,6 @@ export function UserProfile() {
             Profile Overview
           </h1>
           
-          {/* YAHAN ADD KIYA HAI WRAPPER AUR THEME TOGGLE 👇 */}
           <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
             <ThemeToggle />
             
@@ -459,7 +472,7 @@ export function UserProfile() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
               <h3 className={`text-xl sm:text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Your Interests</h3>
               <span className={`text-xs sm:text-sm font-bold uppercase tracking-wider px-3 sm:px-4 py-1.5 sm:py-2 rounded-full w-fit ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                {interests.length} Selected
+                {interests.length} / {MAX_INTERESTS} Selected
               </span>
             </div>
             
@@ -492,7 +505,9 @@ export function UserProfile() {
           {/* Discover Interests (Unselected + Search) */}
           <div className={`rounded-[2rem] border p-6 sm:p-8 ${isDark ? 'bg-slate-900/50 border-white/5 backdrop-blur-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <h3 className={`text-xl sm:text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Discover Interests</h3>
+              <h3 className={`text-xl sm:text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                Discover Interests
+              </h3>
               
               {/* Search Bar */}
               <div className={`relative flex items-center w-full sm:w-64 lg:w-72 ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
@@ -510,6 +525,11 @@ export function UserProfile() {
             </div>
 
             <div className="flex flex-wrap gap-2 sm:gap-2.5 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
+              {reachedInterestLimit && (
+                <p className={`w-full text-left text-xs sm:text-sm font-semibold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                  Limit reached: remove one interest to add another.
+                </p>
+              )}
               {availableInterests.length === 0 ? (
                 <p className={`w-full text-center py-10 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   {searchQuery ? 'No matching interests found.' : 'You have selected all available interests! 🎉'}
@@ -519,7 +539,8 @@ export function UserProfile() {
                   <button
                     key={interest}
                     onClick={() => toggleInterest(interest)}
-                    className={`group flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border transition-all hover:scale-[1.03] active:scale-[0.97]
+                    disabled={reachedInterestLimit}
+                    className={`group flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border transition-all hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100
                       ${isDark ? 'bg-[#0F172A] border-slate-800 text-slate-300 hover:border-blue-500/50 hover:text-blue-300 hover:bg-blue-500/5' 
                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50'}`}
                   >
