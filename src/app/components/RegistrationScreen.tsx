@@ -6,6 +6,7 @@ import { buildApiUrl } from '@/services/config';
 import { useNavigate } from 'react-router-dom';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from './ThemeToggle';
+
 export function RegistrationScreen() {
   const colors = useThemeColors();
   const { theme } = useTheme();
@@ -97,18 +98,20 @@ export function RegistrationScreen() {
 
   return (
     <div
-      // Fix 1: Exact h-[100dvh] and global scroll fallback
-      className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${
-        isDark ? 'bg-slate-950' : 'bg-white'
+      // FIX 1: Changed to min-h-[100dvh] for mobile so keyboard doesn't squish layout, exact h-[100dvh] on desktop
+      className={`w-full flex flex-col lg:flex-row min-h-[100dvh] lg:h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${
+        isDark ? 'bg-[#020617]' : 'bg-slate-50' // Unified mobile background to match left panel
       }`}
     >
-      <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
-                <ThemeToggle />
-            </div>
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 lg:top-8 lg:right-10 z-50">
+        <ThemeToggle />
+      </div>
+
       {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
       <div
-        className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
-        px-6 py-10 sm:px-10 sm:py-12 md:px-12 lg:p-16 xl:p-20
+        // FIX 2: Removed min-h-[50dvh]. Let it size naturally on mobile, with extra bottom padding for the overlap.
+        className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 
+        px-6 pt-12 pb-16 sm:px-10 sm:py-16 md:px-12 lg:p-16 xl:p-20 lg:h-full
         ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}
       >
         {/* Grid Pattern */}
@@ -135,14 +138,14 @@ export function RegistrationScreen() {
         {/* Branding Content */}
         <div className="relative z-10 flex flex-col justify-center flex-1 lg:flex-none">
           <div
-            className={`w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-5 sm:mb-6 lg:mb-8 shadow-2xl
+            className={`w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-5 sm:mb-6 lg:mb-8 shadow-2xl
             ${isDark ? 'bg-gradient-to-br from-blue-600 to-purple-600 shadow-blue-500/30' : 'bg-white shadow-blue-200'}`}
           >
-            <Sparkles className={`w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 ${isDark ? 'text-white' : 'text-blue-600'}`} />
+            <Sparkles className={`w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 ${isDark ? 'text-white' : 'text-blue-600'}`} />
           </div>
 
           <h1
-            className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${
+            className={`text-4xl sm:text-6xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-4 sm:mb-6 ${
               isDark ? 'text-white' : 'text-slate-900'
             }`}
           >
@@ -158,9 +161,9 @@ export function RegistrationScreen() {
           </p>
         </div>
 
-        {/* Feature Highlights */}
+        {/* Feature Highlights - Hidden on very small screens to save space */}
         <div
-          className={`relative z-10 mt-10 lg:mt-0 flex flex-wrap gap-6 sm:gap-8 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all inline-flex w-fit
+          className={`relative z-10 mt-8 lg:mt-0 hidden sm:flex flex-wrap gap-6 sm:gap-8 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all w-fit
             ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-slate-200'}`}
         >
           <div className="flex items-center gap-4 min-w-0">
@@ -177,18 +180,22 @@ export function RegistrationScreen() {
 
       {/* --- RIGHT PANEL: REGISTRATION FORM --- */}
       <div
-        // FIX 2: Added min-h-0 here to ensure the panel can scroll its contents if OTP expands it
-        className={`w-full lg:w-[480px] xl:w-[560px] flex flex-col shrink-0 lg:h-full min-h-0 lg:overflow-y-auto relative z-20 border-t lg:border-t-0 lg:border-l
-        ${isDark ? 'bg-slate-900/95 border-white/5 backdrop-blur-xl' : 'bg-white border-slate-100 shadow-2xl'}`}
+        // FIX 3: Added flex-1 on mobile. Added -mt-8 and rounded-t-[2.5rem] to create a cool overlapping bottom-sheet effect.
+        className={`w-full flex-1 lg:w-[480px] xl:w-[560px] flex flex-col shrink-0 lg:h-full min-h-0 lg:overflow-y-auto relative z-20 
+        -mt-8 lg:mt-0 rounded-t-[2.5rem] lg:rounded-none border-t lg:border-t-0 lg:border-l shadow-[0_-10px_40px_rgba(0,0,0,0.1)] lg:shadow-none
+        ${isDark ? 'bg-slate-900/95 border-white/10 backdrop-blur-xl' : 'bg-white border-slate-100'}`}
       >
-        {/* Fix 3: Safe top flex spacer for vertical centering */}
-        <div className="flex-grow shrink-0"></div>
+        {/* Mobile drag-handle indicator (purely visual) */}
+        <div className="w-full flex justify-center pt-4 pb-2 lg:hidden">
+          <div className={`w-12 h-1.5 rounded-full ${isDark ? 'bg-white/20' : 'bg-slate-300'}`}></div>
+        </div>
 
-        {/* Fix 4: mx-auto ensures the flex-grow spacers work correctly */}
-        <div className="w-full max-w-sm lg:max-w-md mx-auto px-6 py-12 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
+        <div className="flex-grow shrink-0 hidden lg:block"></div>
+
+        <div className="w-full max-w-sm sm:max-w-md lg:max-w-md mx-auto px-6 pb-12 pt-4 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
           
           {/* Form Header */}
-          <div className="space-y-2">
+          <div className="space-y-2 text-center lg:text-left">
             <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Get Started
             </h2>
@@ -364,7 +371,7 @@ export function RegistrationScreen() {
 
             <button
               onClick={() => navigate('/login')}
-              className={`w-full px-5 py-4 sm:py-5 rounded-2xl font-bold text-base sm:text-lg flex items-center justify-center gap-3 border-2 transition-all duration-300
+              className={`w-full px-5 py-3.5 sm:py-5 rounded-2xl font-bold text-base sm:text-lg flex items-center justify-center gap-3 border-2 transition-all duration-300
                 ${
                   isDark
                     ? 'border-white/10 text-white hover:bg-white/10 hover:border-white/20'
@@ -377,14 +384,13 @@ export function RegistrationScreen() {
           </div>
 
           {/* Footer */}
-          <p className={`text-center text-xs sm:text-sm leading-relaxed px-2 pt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className={`text-center text-xs sm:text-sm leading-relaxed px-2 pt-2 pb-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             By registering, you accept our <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>Terms</span> &{' '}
             <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>Privacy Policy</span>.
           </p>
         </div>
 
-        {/* Fix 5: Safe bottom flex spacer for vertical centering */}
-        <div className="flex-grow shrink-0"></div>
+        <div className="flex-grow shrink-0 hidden lg:block"></div>
       </div>
     </div>
   );
