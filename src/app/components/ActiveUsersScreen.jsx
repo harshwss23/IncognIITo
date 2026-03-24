@@ -54,7 +54,7 @@ export function ActiveUsersScreen() {
   const filteredUsers = useMemo(() => {
     if (!me) return [];
 
-    const list = users.filter((u) => u.id !== me.id);
+    const list = users.filter((u) => u.id !== me.id && u.verified === true);
 
     if (!search.trim()) return list;
 

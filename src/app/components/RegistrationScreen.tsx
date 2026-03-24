@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, Sparkles, ArrowRight, Check, ShieldCheck, Globe, UserPlus } from 'lucide-react';
+import { Mail, Lock, Sparkles, ArrowRight, Check, ShieldCheck, Globe, UserPlus,Eye,EyeOff } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
@@ -7,12 +7,13 @@ import { useNavigate } from 'react-router-dom';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from './ThemeToggle';
 
+
 export function RegistrationScreen() {
   const colors = useThemeColors();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const navigate = useNavigate();
-
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [strength, setStrength] = useState(0);
@@ -98,9 +99,9 @@ export function RegistrationScreen() {
 
   return (
     <div
-      // FIX 1: Changed to min-h-[100dvh] for mobile so keyboard doesn't squish layout, exact h-[100dvh] on desktop
-      className={`w-full flex flex-col lg:flex-row min-h-[100dvh] lg:h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${
-        isDark ? 'bg-[#020617]' : 'bg-slate-50' // Unified mobile background to match left panel
+      // 🚀 FIXED MAIN CONTAINER: Takes full viewport height. Auto-scrolls on mobile, locks on desktop.
+      className={`w-full h-[100dvh] overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row transition-colors duration-500 no-scrollbar ${
+        isDark ? 'bg-[#020617]' : 'bg-slate-50'
       }`}
     >
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6 lg:top-8 lg:right-10 z-50">
@@ -109,8 +110,7 @@ export function RegistrationScreen() {
 
       {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
       <div
-        // FIX 2: Removed min-h-[50dvh]. Let it size naturally on mobile, with extra bottom padding for the overlap.
-        className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 
+        className={`relative w-full lg:flex-1 flex flex-col justify-center overflow-hidden shrink-0 
         px-6 pt-12 pb-16 sm:px-10 sm:py-16 md:px-12 lg:p-16 xl:p-20 lg:h-full
         ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}
       >
@@ -161,7 +161,7 @@ export function RegistrationScreen() {
           </p>
         </div>
 
-        {/* Feature Highlights - Hidden on very small screens to save space */}
+        {/* Feature Highlights - Hidden on very small screens */}
         <div
           className={`relative z-10 mt-8 lg:mt-0 hidden sm:flex flex-wrap gap-6 sm:gap-8 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all w-fit
             ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-slate-200'}`}
@@ -180,12 +180,11 @@ export function RegistrationScreen() {
 
       {/* --- RIGHT PANEL: REGISTRATION FORM --- */}
       <div
-        // FIX 3: Added flex-1 on mobile. Added -mt-8 and rounded-t-[2.5rem] to create a cool overlapping bottom-sheet effect.
-        className={`w-full flex-1 lg:w-[480px] xl:w-[560px] flex flex-col shrink-0 lg:h-full min-h-0 lg:overflow-y-auto relative z-20 
+        className={`w-full lg:w-[480px] xl:w-[560px] flex flex-col shrink-0 lg:h-full lg:overflow-y-auto relative z-20 
         -mt-8 lg:mt-0 rounded-t-[2.5rem] lg:rounded-none border-t lg:border-t-0 lg:border-l shadow-[0_-10px_40px_rgba(0,0,0,0.1)] lg:shadow-none
         ${isDark ? 'bg-slate-900/95 border-white/10 backdrop-blur-xl' : 'bg-white border-slate-100'}`}
       >
-        {/* Mobile drag-handle indicator (purely visual) */}
+        {/* Mobile drag-handle indicator (visual only) */}
         <div className="w-full flex justify-center pt-4 pb-2 lg:hidden">
           <div className={`w-12 h-1.5 rounded-full ${isDark ? 'bg-white/20' : 'bg-slate-300'}`}></div>
         </div>
@@ -235,6 +234,7 @@ export function RegistrationScreen() {
             </div>
 
             {/* Password Field */}
+            {/* Password Field */}
             <div className="space-y-2">
               <label className={`text-xs sm:text-sm font-bold uppercase tracking-wide ml-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 Create Password
@@ -242,17 +242,33 @@ export function RegistrationScreen() {
               <div className="relative group">
                 <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${isDark ? 'text-slate-500 group-focus-within:text-blue-400' : 'text-slate-400 group-focus-within:text-blue-500'}`} />
                 <input
-                  type="password"
+                  // ✨ FIX: Dynamic type based on state
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min. 8 characters"
-                  className={`w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-2xl border-2 font-medium transition-all outline-none text-sm sm:text-base focus:ring-4
+                  // ✨ FIX: Changed pr-4 to pr-12 taaki text icon ke peeche na chhup jaye
+                  className={`w-full pl-12 pr-12 py-3.5 sm:py-4 rounded-2xl border-2 font-medium transition-all outline-none text-sm sm:text-base focus:ring-4
                     ${
                       isDark
                         ? 'bg-[#0B1120] border-slate-800 text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-600'
                         : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400'
                     }`}
                 />
+                
+                {/* ✨ NEW: Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className={`w-5 h-5 transition-colors ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'}`} />
+                  ) : (
+                    <Eye className={`w-5 h-5 transition-colors ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'}`} />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -384,7 +400,7 @@ export function RegistrationScreen() {
           </div>
 
           {/* Footer */}
-          <p className={`text-center text-xs sm:text-sm leading-relaxed px-2 pt-2 pb-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className={`text-center text-xs sm:text-sm leading-relaxed px-2 pt-2 pb-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             By registering, you accept our <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>Terms</span> &{' '}
             <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>Privacy Policy</span>.
           </p>

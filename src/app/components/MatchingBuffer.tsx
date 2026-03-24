@@ -5,10 +5,10 @@ import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
 import { socket } from '@/services/socket';
-import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
+import { useGlobalCleanUp } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from "./ThemeToggle"; // Path verify kar lena
 export function MatchingBuffer() {
-  const { skipCleanup } = useGlobalCleanup();
+  const { skipCleanup } = useGlobalCleanUp();
   const colors = useThemeColors();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -56,9 +56,9 @@ export function MatchingBuffer() {
           // Status is 'idle' or unknown -> Join the queue
           const joinRes = await fetch(buildApiUrl('/api/match/join'), {
             method: 'POST',
-            headers: { 
+            headers: {
               'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json' 
+              'Content-Type': 'application/json'
             }
           });
           const joinData = await joinRes.json();
@@ -66,7 +66,7 @@ export function MatchingBuffer() {
           if (joinData.success) {
             // Re-fetch status once to get correct queue numbers after joining
             const finalCheck = await fetch(buildApiUrl('/api/match/status'), {
-                headers: { 'Authorization': `Bearer ${token}` }
+              headers: { 'Authorization': `Bearer ${token}` }
             });
             const finalData = await finalCheck.json();
             setQueueSize(finalData.queueSize || 0);
@@ -206,7 +206,7 @@ export function MatchingBuffer() {
 
   return (
     <div className={`w-full h-[100dvh] overflow-y-auto no-scrollbar flex flex-col p-4 sm:p-8 relative transition-colors duration-500 ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}>
-      
+
       {/* ✅ YAHAN THEME TOGGLE ADD KIYA HAI */}
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-50">
         <ThemeToggle />
@@ -220,7 +220,7 @@ export function MatchingBuffer() {
       <div className="flex-grow shrink-0 flex items-center justify-center relative z-10 w-full">
         <div className={`w-full max-w-md my-auto rounded-[2rem] sm:rounded-[2.5rem] border p-8 sm:p-10 text-center shadow-2xl backdrop-blur-xl transition-all
           ${isDark ? 'bg-slate-900/60 border-white/10 shadow-black/50' : 'bg-white/80 border-slate-200 shadow-blue-900/5'}`}>
-          
+
           <div className="flex flex-col items-center justify-center mb-8 sm:mb-10">
             <div className="relative flex items-center justify-center w-24 h-24 sm:w-28 sm:h-28 mb-6">
               <div className={`absolute inset-0 rounded-full blur-xl opacity-50 animate-pulse ${isDark ? 'bg-blue-500' : 'bg-blue-400'}`} />
@@ -279,10 +279,9 @@ export function MatchingBuffer() {
             onClick={handleCancel}
             disabled={isCancelling}
             className={`w-full group flex items-center justify-center gap-2 px-6 py-3.5 sm:py-4 rounded-xl text-sm sm:text-base font-bold transition-all border
-              ${
-                isDark
-                  ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20 hover:border-red-500/30'
-                  : 'bg-red-50 border-red-100 text-red-600 hover:bg-red-100 hover:border-red-200'
+              ${isDark
+                ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20 hover:border-red-500/30'
+                : 'bg-red-50 border-red-100 text-red-600 hover:bg-red-100 hover:border-red-200'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5 transition-transform group-hover:scale-110" />

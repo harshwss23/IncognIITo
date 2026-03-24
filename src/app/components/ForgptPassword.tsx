@@ -4,20 +4,20 @@ import { useTheme } from "@/app/contexts/ThemeContext";
 import { useNavigate } from "react-router-dom";
 import { buildApiUrl } from '@/services/config';
 import { setAuthTokens } from '@/services/auth';
-import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
+import { useGlobalCleanUp } from "../hooks/useGlobalCleanup";
 import { ThemeToggle } from "./ThemeToggle";
 export function ForgotPasswordScreen() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const navigate = useNavigate();
-  
+
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [strength, setStrength] = useState(0);
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -40,7 +40,7 @@ export function ForgotPasswordScreen() {
   const handleRequestOTP = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!email) return setError("Please enter your IITK email.");
-    
+
     setError("");
     setSuccessMsg("");
     setLoading(true);
@@ -86,7 +86,7 @@ export function ForgotPasswordScreen() {
         if (token) setAuthTokens({ accessToken: token, refreshToken });
 
         setSuccessMsg("Password reset successfully! Redirecting...");
-        setTimeout(() => navigate('/homepage'), 1500); 
+        setTimeout(() => navigate('/homepage'), 1500);
       } else {
         setError(data?.message || 'Failed to reset password.');
       }
@@ -104,7 +104,7 @@ export function ForgotPasswordScreen() {
       const res = await fetch(buildApiUrl('/api/auth/resend-otp'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, isPasswordReset: true }) 
+        body: JSON.stringify({ email, isPasswordReset: true })
       });
       const data = await res.json().catch(() => null);
       if (res.ok) setSuccessMsg("OTP resent successfully!");
@@ -117,13 +117,12 @@ export function ForgotPasswordScreen() {
   return (
     <div
       // Fix 1: Explicit h-[100dvh] and overflow-y-auto to guarantee full-page scroll on mobile
-      className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${
-        isDark ? "bg-slate-950" : "bg-white"
-      }`}
+      className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${isDark ? "bg-slate-950" : "bg-white"
+        }`}
     >
-        <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
-                      <ThemeToggle />
-                  </div>
+      <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
+        <ThemeToggle />
+      </div>
       {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
       <div
         className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
@@ -161,9 +160,8 @@ export function ForgotPasswordScreen() {
           </div>
 
           <h1
-            className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${
-              isDark ? "text-white" : "text-slate-900"
-            }`}
+            className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${isDark ? "text-white" : "text-slate-900"
+              }`}
           >
             Reset Your
             <br />
@@ -190,7 +188,7 @@ export function ForgotPasswordScreen() {
 
         {/* Fix 3: Replaced m-auto with mx-auto to prevent clipping */}
         <div className="w-full max-w-sm lg:max-w-md mx-auto px-6 py-12 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
-          
+
           {/* Header */}
           <div className="space-y-2">
             <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
@@ -328,14 +326,13 @@ export function ForgotPasswordScreen() {
                       <div
                         key={step}
                         className={`flex-1 rounded-full transition-all duration-500
-                          ${
-                            strength >= step
-                              ? strength < 2
-                                ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"
-                                : strength < 4
+                          ${strength >= step
+                            ? strength < 2
+                              ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                              : strength < 4
                                 ? "bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"
                                 : "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]"
-                              : isDark
+                            : isDark
                               ? "bg-slate-800"
                               : "bg-slate-200"
                           }`}
@@ -345,9 +342,8 @@ export function ForgotPasswordScreen() {
                   <div className="flex justify-between text-[10px] sm:text-xs px-1 font-bold uppercase tracking-wide gap-4">
                     <span className={isDark ? "text-slate-500" : "text-slate-400"}>Strength</span>
                     <span
-                      className={`whitespace-nowrap transition-colors duration-300 ${
-                        strength < 2 ? "text-red-500" : strength < 4 ? "text-yellow-500" : "text-green-500"
-                      }`}
+                      className={`whitespace-nowrap transition-colors duration-300 ${strength < 2 ? "text-red-500" : strength < 4 ? "text-yellow-500" : "text-green-500"
+                        }`}
                     >
                       {strength === 0 ? "Too Weak" : strength < 2 ? "Weak" : strength < 4 ? "Medium" : "Strong"}
                     </span>
@@ -359,11 +355,10 @@ export function ForgotPasswordScreen() {
                   onClick={handleResetPassword}
                   disabled={!otpValid || newPassword.length < 8 || loading}
                   className={`w-full mt-2 group relative overflow-hidden rounded-2xl px-5 py-4 sm:py-5 border-2 font-bold text-base sm:text-lg flex items-center justify-center gap-3 transition-all duration-300 shadow-lg active:scale-[0.98] disabled:active:scale-100 disabled:hover:scale-100
-                  ${
-                    isDark
+                  ${isDark
                       ? "bg-green-600/20 border-green-500/50 text-green-400 hover:bg-green-600 hover:text-white shadow-green-900/20"
                       : "bg-green-50 border-green-500 text-green-700 hover:bg-green-600 hover:text-white hover:border-green-600 shadow-green-100"
-                  } ${(!otpValid || newPassword.length < 8 || loading) ? "opacity-60 cursor-not-allowed border-transparent bg-slate-800 text-slate-500 shadow-none hover:bg-slate-800 hover:text-slate-500" : ""}`}
+                    } ${(!otpValid || newPassword.length < 8 || loading) ? "opacity-60 cursor-not-allowed border-transparent bg-slate-800 text-slate-500 shadow-none hover:bg-slate-800 hover:text-slate-500" : ""}`}
                 >
                   {loading ? <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin shrink-0" /> : <span>Verify & Reset Password</span>}
                   {!loading && <Check className="w-5 h-5 sm:w-6 sm:h-6 shrink-0 transition-transform group-hover:scale-110" />}
@@ -394,7 +389,7 @@ export function ForgotPasswordScreen() {
             </div>
           </div>
         </div>
-        
+
         {/* Fix 4: Safe bottom flex spacer for vertical centering */}
         <div className="flex-grow shrink-0"></div>
       </div>

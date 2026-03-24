@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { socket } from '@/services/socket' 
+import { socket } from '@/services/socket'
 import {
   Video, Mic, MicOff, VideoOff, Send, Settings, Shield, PhoneOff, AlertTriangle, Loader2, MessageSquare, X
 } from 'lucide-react'
@@ -8,7 +8,7 @@ import { useThemeColors } from '@/app/hooks/useThemeColors'
 import { useTheme } from '@/app/contexts/ThemeContext'
 import { getAccessToken } from '@/services/auth'
 import { buildApiUrl, apiBaseUrl } from '@/services/config'
-import { useGlobalCleanup } from '../hooks/useGlobalCleanup'
+import { useGlobalCleanUp } from '../hooks/useGlobalCleanup'
 import { ThemeToggle } from "./ThemeToggle"
 
 const SOCKET_SERVER_URL = apiBaseUrl;
@@ -19,7 +19,7 @@ interface Participant {
 }
 
 export function LiveInteractionRoom() {
-  useGlobalCleanup();
+  useGlobalCleanUp();
   const colors = useThemeColors()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -40,8 +40,8 @@ export function LiveInteractionRoom() {
   const isAuthorizedRef = useRef<boolean | null>(null)
 
   /* ---------------- STATE ---------------- */
-  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null) 
-  const [errorReason, setErrorReason] = useState<string>('') 
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null)
+  const [errorReason, setErrorReason] = useState<string>('')
   const [micOn, setMicOn] = useState(false)
   const [cameraOn, setCameraOn] = useState(false)
   const [remoteCameraOn, setRemoteCameraOn] = useState(false)
@@ -65,7 +65,7 @@ export function LiveInteractionRoom() {
   // USER & SETTINGS STATE
   const [me, setMe] = useState<Participant | null>(null)
   const [them, setThem] = useState<Participant | null>(null)
-  
+
   const [showSettings, setShowSettings] = useState(false)
   const [devices, setDevices] = useState<{ audio: MediaDeviceInfo[], video: MediaDeviceInfo[] }>({ audio: [], video: [] })
   const [selectedAudioId, setSelectedAudioId] = useState<string>('')
@@ -105,14 +105,14 @@ export function LiveInteractionRoom() {
       fetch(`${SOCKET_SERVER_URL}/api/match/${ROOM_ID}`, {
         headers: { 'Authorization': `Bearer ${getAccessToken()}` }
       })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setMe(data.me);
-          setThem(data.them);
-        }
-      })
-      .catch(err => console.error("Failed to fetch match info overlays:", err));
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setMe(data.me);
+            setThem(data.them);
+          }
+        })
+        .catch(err => console.error("Failed to fetch match info overlays:", err));
     }
   }, [ROOM_ID]);
 
@@ -143,7 +143,7 @@ export function LiveInteractionRoom() {
       const newStream = await navigator.mediaDevices.getUserMedia(constraints)
       const newTrack = kind === 'audio' ? newStream.getAudioTracks()[0] : newStream.getVideoTracks()[0]
       const oldTrack = kind === 'audio' ? localStreamRef.current.getAudioTracks()[0] : localStreamRef.current.getVideoTracks()[0]
-      
+
       if (oldTrack) {
         oldTrack.stop()
         localStreamRef.current.removeTrack(oldTrack)
@@ -233,15 +233,15 @@ export function LiveInteractionRoom() {
 
     const init = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: true, 
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
         });
         stream.getTracks().forEach((track) => (track.enabled = false))
         localStreamRef.current = stream
 
         if (localVideoRef.current) localVideoRef.current.srcObject = stream
-        
+
         await fetchDevices()
 
         const token = getAccessToken()
@@ -279,7 +279,7 @@ export function LiveInteractionRoom() {
           socket.emit('camera_status', { roomID: ROOM_ID, isOn: cameraOnRef.current })
           const peer = createPeer()
           await peer.setRemoteDescription(offer)
-          iceQueueRef.current.forEach(async (c) => { try { await peer.addIceCandidate(c) } catch (e) {} })
+          iceQueueRef.current.forEach(async (c) => { try { await peer.addIceCandidate(c) } catch (e) { } })
           iceQueueRef.current = []
           const answer = await peer.createAnswer()
           await peer.setLocalDescription(answer)
@@ -289,21 +289,21 @@ export function LiveInteractionRoom() {
         socket.on('receive_answer', async ({ answer }) => {
           if (!peerRef.current) return
           await peerRef.current.setRemoteDescription(answer)
-          iceQueueRef.current.forEach(async (c) => { try { await peerRef.current?.addIceCandidate(c) } catch (e) {} })
+          iceQueueRef.current.forEach(async (c) => { try { await peerRef.current?.addIceCandidate(c) } catch (e) { } })
           iceQueueRef.current = []
         })
 
         socket.on('receive_ice_candidate', async ({ candidate }) => {
           if (!peerRef.current) return
           if (peerRef.current.remoteDescription) {
-            try { await peerRef.current.addIceCandidate(candidate) } catch (e) {}
+            try { await peerRef.current.addIceCandidate(candidate) } catch (e) { }
           } else {
             iceQueueRef.current.push(candidate)
           }
         })
 
         socket.on('receive_camera_status', ({ isOn }) => setRemoteCameraOn(isOn))
-        
+
         socket.on('receive_message', (msg) => {
           setChatMessages((prev) => [...prev, { ...msg, sender: 'them' }])
           setShowChat((prevShow) => {
@@ -321,9 +321,9 @@ export function LiveInteractionRoom() {
     }
 
     init()
-    
-    return () => { 
-      fullCleanup(); 
+
+    return () => {
+      fullCleanup();
       socket.off('room_error');
       socket.off('room_joined_success');
       socket.off('session_ended');
@@ -393,7 +393,7 @@ export function LiveInteractionRoom() {
           fetch(buildApiUrl('/api/match/end'), {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            keepalive: true 
+            keepalive: true
           });
         }
       }
@@ -404,7 +404,7 @@ export function LiveInteractionRoom() {
 
   const handlePlayRemote = () => {
     if (remoteVideoRef.current) {
-      remoteVideoRef.current.muted = false; 
+      remoteVideoRef.current.muted = false;
       remoteVideoRef.current.play().then(() => setAutoplayError(false)).catch(err => console.error(err))
     }
   }
@@ -443,7 +443,7 @@ export function LiveInteractionRoom() {
   /* ---------------- MAIN UI ---------------- */
   return (
     <div className={`w-full h-[100dvh] flex flex-col overflow-hidden transition-colors duration-500 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
-      
+
       {/* HEADER */}
       <div className={`h-16 shrink-0 flex items-center justify-between px-4 lg:px-8 border-b z-20 ${isDark ? 'bg-slate-900/90 border-white/10 backdrop-blur-md' : 'bg-white/90 border-slate-200 backdrop-blur-md'}`}>
         <div className="flex items-center gap-3">
@@ -454,10 +454,10 @@ export function LiveInteractionRoom() {
             IncognIITo <span className="text-blue-500 font-normal hidden sm:inline">Live</span>
           </h3>
         </div>
-        
+
         <div className="flex items-center gap-2 sm:gap-4">
           <ThemeToggle />
-          <button 
+          <button
             onClick={() => setShowSettings(true)}
             className={`p-2.5 rounded-full transition-all duration-300 ${isDark ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'}`}
           >
@@ -468,7 +468,7 @@ export function LiveInteractionRoom() {
 
       {/* BODY */}
       <div className="flex-1 flex flex-row overflow-hidden relative">
-        
+
         {/* ================= VIDEO SECTION ================= */}
         <div className={`flex-1 relative flex items-center justify-center p-2 lg:p-6 overflow-hidden transition-colors duration-500 ${isDark ? 'bg-black/95' : 'bg-slate-200/50'}`}>
           <div className={`relative w-full h-full rounded-2xl lg:rounded-3xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.1)] ring-1 transition-colors duration-500 ${isDark ? 'bg-slate-900 ring-white/10 shadow-[0_0_40px_rgba(0,0,0,0.3)]' : 'bg-slate-100 ring-slate-300'}`}>
@@ -478,7 +478,7 @@ export function LiveInteractionRoom() {
             {them && remoteConnected && (
               <div className={`absolute top-4 left-4 lg:top-6 lg:left-6 z-20 backdrop-blur-xl p-3 lg:p-4 rounded-2xl border shadow-2xl max-w-[70%] sm:max-w-xs animate-in fade-in slide-in-from-top-4 duration-500 transition-colors ${isDark ? 'bg-black/40 border-white/10' : 'bg-white/70 border-slate-200'}`}>
                 <h3 className={`font-bold text-base lg:text-lg leading-tight truncate tracking-wide drop-shadow-md ${isDark ? 'text-white' : 'text-slate-900'}`}>{them.username}</h3>
-                
+
                 {commonInterests.length > 0 ? (
                   <>
                     <p className={`text-[10px] lg:text-xs mt-1.5 font-medium uppercase tracking-wider ${isDark ? 'text-blue-300/80' : 'text-blue-600/80'}`}>Common Interests</p>
@@ -525,8 +525,8 @@ export function LiveInteractionRoom() {
             {autoplayError && (
               <div className={`absolute inset-0 rounded-2xl lg:rounded-3xl flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md text-white z-30`}>
                 <p className="mb-5 text-lg font-medium drop-shadow-lg">Browser blocked audio</p>
-                <button 
-                  onClick={handlePlayRemote} 
+                <button
+                  onClick={handlePlayRemote}
                   className="px-8 py-3 bg-blue-500 hover:bg-blue-600 font-semibold transition-all text-white rounded-xl shadow-[0_0_20px_rgba(59,130,246,0.4)] hover:scale-105"
                 >
                   Tap to Unmute
@@ -536,24 +536,24 @@ export function LiveInteractionRoom() {
 
             {/* FLOATING CONTROLS */}
             <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 lg:gap-5 px-6 py-3 rounded-full backdrop-blur-xl border shadow-2xl z-40 transition-all duration-300 ${isDark ? 'bg-slate-950/60 border-white/10 hover:bg-slate-900/80' : 'bg-white/80 border-slate-200 hover:bg-white'}`}>
-              
-              <button 
-                onClick={toggleMic} 
+
+              <button
+                onClick={toggleMic}
                 className={`p-3.5 lg:p-4 rounded-full transition-all duration-300 shadow-lg outline-none ${micOn ? (isDark ? 'bg-slate-700/50 text-white hover:bg-slate-600/80 hover:scale-105' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105') : 'bg-red-500 text-white hover:bg-red-600 hover:scale-105 ring-4 ring-red-500/20'}`}
               >
                 {micOn ? <Mic className="w-5 h-5 lg:w-6 lg:h-6" /> : <MicOff className="w-5 h-5 lg:w-6 lg:h-6" />}
               </button>
 
-              <button 
-                onClick={toggleCamera} 
+              <button
+                onClick={toggleCamera}
                 className={`p-3.5 lg:p-4 rounded-full transition-all duration-300 shadow-lg outline-none ${cameraOn ? (isDark ? 'bg-slate-700/50 text-white hover:bg-slate-600/80 hover:scale-105' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105') : 'bg-red-500 text-white hover:bg-red-600 hover:scale-105 ring-4 ring-red-500/20'}`}
               >
                 {cameraOn ? <Video className="w-5 h-5 lg:w-6 lg:h-6" /> : <VideoOff className="w-5 h-5 lg:w-6 lg:h-6" />}
               </button>
 
               <div className="relative">
-                <button 
-                  onClick={() => setShowChat(!showChat)} 
+                <button
+                  onClick={() => setShowChat(!showChat)}
                   className={`p-3.5 lg:p-4 rounded-full transition-all duration-300 shadow-lg outline-none ${showChat ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 shadow-[0_0_15px_rgba(37,99,235,0.5)]' : (isDark ? 'bg-slate-700/50 text-white hover:bg-slate-600/80 hover:scale-105' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 hover:scale-105')}`}
                 >
                   <MessageSquare className="w-5 h-5 lg:w-6 lg:h-6" />
@@ -565,8 +565,8 @@ export function LiveInteractionRoom() {
 
               <div className={`w-px h-8 mx-1 lg:mx-2 ${isDark ? 'bg-white/20' : 'bg-slate-300'}`} />
 
-              <button 
-                onClick={endCall} 
+              <button
+                onClick={endCall}
                 className="p-3.5 lg:p-4 rounded-full bg-red-600 text-white hover:bg-red-700 hover:scale-110 transition-all shadow-[0_0_15px_rgba(220,38,38,0.5)] outline-none"
               >
                 <PhoneOff className="w-5 h-5 lg:w-6 lg:h-6" />
@@ -576,13 +576,13 @@ export function LiveInteractionRoom() {
             {/* SELF PIP */}
             <div className={`absolute top-4 right-4 lg:top-auto lg:bottom-6 lg:right-6 w-28 h-40 sm:w-32 sm:h-48 lg:w-64 lg:h-40 rounded-xl lg:rounded-2xl overflow-hidden border shadow-2xl z-30 group transition-all duration-300 hover:scale-105 isolate ${isDark ? 'bg-slate-800 border-white/20 hover:border-white/40' : 'bg-slate-200 border-slate-300 hover:border-slate-400'}`}>
               <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover rounded-xl lg:rounded-2xl" />
-              
+
               {me && (
                 <div className={`absolute bottom-2 left-2 z-30 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] lg:text-xs font-medium truncate max-w-[85%] border opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${isDark ? 'bg-black/60 text-white border-white/10' : 'bg-white/70 text-slate-900 border-slate-200'}`}>
                   {me.username} (You)
                 </div>
               )}
-              
+
               {!cameraOn && (
                 <div className={`absolute inset-0 rounded-xl lg:rounded-2xl flex items-center justify-center text-xs lg:text-sm font-medium backdrop-blur-md z-10 transition-colors ${isDark ? 'bg-slate-900/95 text-slate-400' : 'bg-slate-100/95 text-slate-500'}`}>
                   <VideoOff className="w-5 h-5 lg:w-6 lg:h-6" />
@@ -595,7 +595,7 @@ export function LiveInteractionRoom() {
         {/* ================= CHAT SECTION ================= */}
         {showChat && (
           <div className={`absolute right-0 top-0 h-full w-full sm:w-[400px] lg:relative lg:w-[350px] xl:w-[400px] z-50 flex flex-col shadow-2xl transition-all duration-300 animate-in slide-in-from-right-10 ${isDark ? 'bg-slate-900/95 border-l border-white/10 backdrop-blur-xl' : 'bg-white/95 border-l border-slate-200 backdrop-blur-xl'}`}>
-            
+
             <div className={`flex items-center justify-between p-4 border-b shrink-0 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
               <h3 className={`font-bold tracking-wide ${isDark ? 'text-white' : 'text-slate-900'}`}>Room Chat</h3>
               <button onClick={() => setShowChat(false)} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'}`}>
@@ -607,10 +607,10 @@ export function LiveInteractionRoom() {
               {chatMessages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
                   <div className={`px-4 py-2.5 rounded-2xl text-sm max-w-[85%] break-words shadow-sm leading-relaxed
-                    ${msg.sender === 'me' 
-                      ? 'bg-blue-600 text-white rounded-br-sm' 
-                      : isDark 
-                        ? 'bg-slate-800 text-slate-200 rounded-bl-sm border border-white/5' 
+                    ${msg.sender === 'me'
+                      ? 'bg-blue-600 text-white rounded-br-sm'
+                      : isDark
+                        ? 'bg-slate-800 text-slate-200 rounded-bl-sm border border-white/5'
                         : 'bg-slate-100 text-slate-900 rounded-bl-sm border border-slate-200'}`}>
                     {msg.text}
                     <div className={`text-[10px] mt-1 text-right opacity-60 ${msg.sender === 'me' ? 'text-blue-100' : 'text-slate-400'}`}>
@@ -632,16 +632,15 @@ export function LiveInteractionRoom() {
                   className={`flex-1 px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all shadow-inner
                     ${isDark ? 'bg-slate-950 border-slate-700 text-white placeholder-slate-500' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'}`}
                 />
-                <button 
-                  onClick={sendMessage} 
-                  disabled={!msgInput.trim()} 
-                  className={`p-3 rounded-xl transition-all duration-300 ${
-                    msgInput.trim() 
-                      ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5' 
-                      : isDark 
-                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed' 
-                        : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  }`}
+                <button
+                  onClick={sendMessage}
+                  disabled={!msgInput.trim()}
+                  className={`p-3 rounded-xl transition-all duration-300 ${msgInput.trim()
+                    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5'
+                    : isDark
+                      ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    }`}
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -662,12 +661,12 @@ export function LiveInteractionRoom() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-semibold mb-2 opacity-80">Camera</label>
-                <select 
-                  value={selectedVideoId} 
+                <select
+                  value={selectedVideoId}
                   onChange={(e) => switchDevice('video', e.target.value)}
                   className={`w-full p-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
                 >
@@ -681,8 +680,8 @@ export function LiveInteractionRoom() {
 
               <div>
                 <label className="block text-sm font-semibold mb-2 opacity-80">Microphone</label>
-                <select 
-                  value={selectedAudioId} 
+                <select
+                  value={selectedAudioId}
                   onChange={(e) => switchDevice('audio', e.target.value)}
                   className={`w-full p-3 rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm ${isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'}`}
                 >
@@ -695,7 +694,7 @@ export function LiveInteractionRoom() {
               </div>
             </div>
 
-            <button 
+            <button
               onClick={() => setShowSettings(false)}
               className="mt-8 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-blue-500/30 transition-all hover:-translate-y-0.5"
             >

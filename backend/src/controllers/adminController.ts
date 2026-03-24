@@ -16,6 +16,7 @@ export class AdminController {
         SELECT u.id,
                COALESCE(u.display_name, 'No Name') AS "userId",
                u.email,
+               u.verified,
                COALESCE(p.total_reports, 0)       AS "totalReports",
                COALESCE(p.rating, 0)              AS rating,
                CASE

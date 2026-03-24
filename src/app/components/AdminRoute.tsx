@@ -7,7 +7,7 @@ import {
   getAccessToken,
   isTokenExpired,
 } from "@/services/auth";
-import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
+import { useGlobalCleanUp } from "../hooks/useGlobalCleanup";
 type MeResponse = {
   data?: {
     user?: {

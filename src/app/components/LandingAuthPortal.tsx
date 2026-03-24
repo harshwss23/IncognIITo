@@ -3,7 +3,7 @@ import { LogIn, Mail, Fingerprint, Shield, Users, ArrowRight } from 'lucide-reac
 import { useNavigate } from 'react-router-dom';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
-import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
+import { useGlobalCleanUp } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from './ThemeToggle';
 export function LandingAuthPortal() {
   const colors = useThemeColors();
@@ -14,13 +14,12 @@ export function LandingAuthPortal() {
   return (
     <div
       // Main container handles the global scroll for mobile, locks on desktop
-      className={`w-full h-[100dvh] overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row transition-colors duration-500 no-scrollbar ${
-        isDark ? 'bg-slate-950' : 'bg-white'
-      }`}
+      className={`w-full h-[100dvh] overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row transition-colors duration-500 no-scrollbar ${isDark ? 'bg-slate-950' : 'bg-white'
+        }`}
     >
-        <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
-                      <ThemeToggle />
-                  </div>
+      <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
+        <ThemeToggle />
+      </div>
       {/* --- LEFT PANEL: Branding & Visuals --- */}
       <div
         className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
@@ -53,18 +52,16 @@ export function LandingAuthPortal() {
           <div className="flex items-center gap-3 mb-5 sm:mb-6">
             <div className={`h-[2px] w-8 sm:w-12 rounded-full ${isDark ? 'bg-blue-500' : 'bg-blue-600'}`}></div>
             <span
-              className={`text-[10px] sm:text-xs lg:text-sm font-bold tracking-[0.2em] uppercase ${
-                isDark ? 'text-blue-400' : 'text-blue-600'
-              }`}
+              className={`text-[10px] sm:text-xs lg:text-sm font-bold tracking-[0.2em] uppercase ${isDark ? 'text-blue-400' : 'text-blue-600'
+                }`}
             >
               IITK&apos;s Exclusive Network
             </span>
           </div>
 
           <h1
-            className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${
-              isDark ? 'text-white' : 'text-slate-900'
-            }`}
+            className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${isDark ? 'text-white' : 'text-slate-900'
+              }`}
           >
             Incogn
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">
@@ -74,9 +71,8 @@ export function LandingAuthPortal() {
           </h1>
 
           <p
-            className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed ${
-              isDark ? 'text-slate-400' : 'text-slate-600'
-            }`}
+            className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'
+              }`}
           >
             Connect anonymously. Share authentically. <br className="hidden sm:block" />
             The only video networking platform designed exclusively for the IIT Kanpur community.
@@ -90,9 +86,8 @@ export function LandingAuthPortal() {
         >
           <div className="flex items-center gap-4 min-w-0 flex-1">
             <div
-              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${
-                isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
-              }`}
+              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
+                }`}
             >
               <Users className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
@@ -101,9 +96,8 @@ export function LandingAuthPortal() {
                 1,240+
               </div>
               <div
-                className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mt-0.5 ${
-                  isDark ? 'text-slate-400' : 'text-slate-500'
-                }`}
+                className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}
               >
                 Active Students
               </div>
@@ -114,9 +108,8 @@ export function LandingAuthPortal() {
 
           <div className="flex items-center gap-4 min-w-0 flex-1">
             <div
-              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${
-                isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600'
-              }`}
+              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600'
+                }`}
             >
               <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
@@ -125,9 +118,8 @@ export function LandingAuthPortal() {
                 100%
               </div>
               <div
-                className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mt-0.5 ${
-                  isDark ? 'text-slate-400' : 'text-slate-500'
-                }`}
+                className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}
               >
                 Anonymity
               </div>
@@ -146,15 +138,14 @@ export function LandingAuthPortal() {
 
         {/* Fix: Replaced m-auto with mx-auto to prevent clipping */}
         <div className="w-full max-w-sm lg:max-w-md mx-auto px-6 py-12 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
-          
+
           {/* Header */}
           <div className="text-center space-y-3">
             <div
               className={`w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-3xl flex items-center justify-center mb-6 sm:mb-8
-                ${
-                  isDark
-                    ? 'bg-gradient-to-br from-blue-600 to-purple-600 shadow-[0_0_40px_rgba(59,130,246,0.3)]'
-                    : 'bg-slate-900 shadow-xl'
+                ${isDark
+                  ? 'bg-gradient-to-br from-blue-600 to-purple-600 shadow-[0_0_40px_rgba(59,130,246,0.3)]'
+                  : 'bg-slate-900 shadow-xl'
                 }`}
             >
               <Fingerprint className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
@@ -189,10 +180,9 @@ export function LandingAuthPortal() {
             <button
               onClick={() => navigate('/register')}
               className={`w-full rounded-2xl px-5 py-4 sm:py-5 border-2 font-bold text-base sm:text-lg flex items-center justify-center gap-3 transition-all duration-300
-                ${
-                  isDark
-                    ? 'border-white/10 text-white hover:bg-white/10 hover:border-white/20'
-                    : 'border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'
+                ${isDark
+                  ? 'border-white/10 text-white hover:bg-white/10 hover:border-white/20'
+                  : 'border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'
                 }`}
             >
               <Mail className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
@@ -202,9 +192,8 @@ export function LandingAuthPortal() {
 
           {/* Terms */}
           <p
-            className={`text-center text-xs sm:text-sm leading-relaxed pt-4 ${
-              isDark ? 'text-slate-500' : 'text-slate-400'
-            }`}
+            className={`text-center text-xs sm:text-sm leading-relaxed pt-4 ${isDark ? 'text-slate-500' : 'text-slate-400'
+              }`}
           >
             By entering, you agree to our{' '}
             <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>Zero-Log Policy</span> and{' '}
