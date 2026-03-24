@@ -10,7 +10,7 @@ import { Loader2, MonitorSmartphone, AlertTriangle, ArrowRight, Sparkles } from 
 import { buildApiUrl } from "@/services/config";
 import { getAccessToken } from "@/services/auth";
 import { socket } from "@/services/socket";
-
+import { useEffect } from "react";
 // Components (your existing screens)
 import { FuturisticChatInterface } from "../components/FuturisticChatInterface";
 import { ChatRequestsDashboard } from "../components/ChatRequestsDashboard";
@@ -41,7 +41,36 @@ export const SessionBlockedScreen = () => {
   if (!token) {
     return <Navigate to="/" replace />;
   }
+// ─── 🟢 FIXED AUTO-RECOVERY LOGIC ────────────────────────────
+// ─── 🟢 PERFECTED AUTO-RECOVERY LOGIC ────────────────────────
+  useEffect(() => {
+    // 1. Agar galti se yahan aaye aur already connected hai
 
+    let verificationTimer;
+
+    // 2. Listener: Jab socket actually connect ho jaye
+    const handleConnect = () => {
+      console.log("🟡 Socket connected. Waiting 1s for server validation...");
+      socket.on("false_multiple_tabs_error", (message) => {
+           navigate('/homepage', { replace: true });
+      });
+    };
+
+    // Listeners attach karo
+    socket.on("connect", handleConnect);
+    // 4. Connection initiate karo
+    if (!socket.connected && token) {
+      socket.auth = { token };
+      socket.connect(); 
+    }
+    // Cleanup function
+   return () => {
+      socket.off("connect", handleConnect);
+      socket.off("false_multiple_tabs_error", handleConnect);
+    };
+  }, [token, navigate]);
+  // ────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────
   const handleUseHere = async () => {
     setIsLoading(true);
 

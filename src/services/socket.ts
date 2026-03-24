@@ -29,7 +29,9 @@ socket.on("multiple_tabs_error", (message) => {
 socket.on("matched", (payload: { roomId: string; matchScore: number; event: string }) => {
   console.log("✅ Matched event received:", payload);
 });
-
+socket.on("connect", () => {
+  console.log("🟢 Socket connected successfully");
+});
 // Listener for connection errors
 socket.on("disconnect", () => {
   console.warn("⚠️ Socket disconnected");

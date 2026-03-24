@@ -160,6 +160,9 @@ router.put('/profile', async (req: Request, res: Response) => {
     // Normalize and validate interests against the allowed list
     const allowedInterests = new Set(INTERESTS);
     const interestsProvided = Array.isArray(interests);
+    if(interestsProvided && interests.length > 10) {
+      return res.status(400).json({ success: false, message: 'You can select up to 10 interests' });
+    }
     const sanitizedInterests = interestsProvided
       ? Array.from(
         new Set(
