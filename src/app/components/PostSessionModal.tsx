@@ -96,7 +96,7 @@ export function PostSessionModal() {
                 setConnectionExists(true);
                 showToast('A connection with this user already exists.', 'info');
             } else {
-                showToast('Failed to send request. Please try again.', 'error');
+                showToast(err.message || 'Failed to send connection request.', 'error');
             }
         } finally {
             setSendingRequest(false);

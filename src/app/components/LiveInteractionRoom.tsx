@@ -79,10 +79,25 @@ export function LiveInteractionRoom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatMessages])
 
-  // Clear unread dot when chat is opened
   useEffect(() => {
     if (showChat) setHasUnread(false)
   }, [showChat])
+
+  /* ---------------- HELPERS ---------------- */
+  
+  // ✅ NEW HELP: Background api hit to end session for EVERYONE
+  const forceEndMatchOnServer = async () => {
+    try {
+      const token = getAccessToken();
+      if (!token) return;
+      await fetch(buildApiUrl('/api/match/end'), {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+    } catch (error) {
+      console.error("Failed to hit end API", error);
+    }
+  }
 
   /* ---------------- FETCH MATCH INFO ---------------- */
   useEffect(() => {
@@ -179,7 +194,11 @@ export function LiveInteractionRoom() {
     }
 
     peer.onconnectionstatechange = () => {
-      if (peer.connectionState === 'disconnected' || peer.connectionState === 'failed') cleanupPeer()
+      // ✅ FIXED: If peer gets disconnected for ANY reason, end call for BOTH users automatically
+      if (peer.connectionState === 'disconnected' || peer.connectionState === 'failed') {
+        console.log("Peer disconnected unexpectedly, terminating session...");
+        endCall(); 
+      }
     }
     return peer
   }, [ROOM_ID])
@@ -241,7 +260,12 @@ export function LiveInteractionRoom() {
 
         socket.on('room_error', (errorMsg) => { setIsAuthorized(false); setErrorReason(errorMsg); fullCleanup() })
         socket.on('room_joined_success', () => setIsAuthorized(true))
-        socket.on('session_ended', () => { fullCleanup(); navigate(`/session/${ROOM_ID}`); });
+        
+        // 🚨 Any session end event from server kicks user out
+        socket.on('session_ended', () => { 
+          fullCleanup(); 
+          navigate(`/session/${ROOM_ID}`); 
+        });
 
         socket.on('user_joined', async () => {
           socket.emit('camera_status', { roomID: ROOM_ID, isOn: cameraOnRef.current })
@@ -289,8 +313,10 @@ export function LiveInteractionRoom() {
         })
 
       } catch (err) {
+        // ✅ FIXED: User denied permissions -> Terminate server match so other person isn't stuck.
         setIsAuthorized(false);
         setErrorReason("Camera/Microphone permission was denied. Please allow access in your browser settings.");
+        await forceEndMatchOnServer(); 
       }
     }
 
@@ -351,14 +377,9 @@ export function LiveInteractionRoom() {
     setMsgInput('')
   }
 
+  // ✅ FIXED: Extracted API call logic
   const endCall = async () => {
-    try {
-      await fetch(buildApiUrl('/api/match/end'), {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${getAccessToken()}`, 'Content-Type': 'application/json' }
-      });
-    } catch (error) { console.error("Failed to hit end API", error); }
-
+    await forceEndMatchOnServer();
     socket.emit('leave_room', ROOM_ID);
     fullCleanup();
     navigate(`/session/${ROOM_ID}`);

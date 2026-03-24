@@ -1,10 +1,10 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { buildApiUrl } from '@/services/config';
 
-export function useGlobalCleanUp() {
+export function useGlobalCleanup() {
   const hasCleanedUp = useRef(false);
   // Naya flag: By default cleanup on rahega
-  const shouldCleanup = useRef(true);
+  const shouldCleanup = useRef(true); 
 
   // Yeh function hum component ko denge taaki wo navigation se pehle cleanup rok sake
   const skipCleanup = useCallback(() => {
@@ -14,7 +14,7 @@ export function useGlobalCleanUp() {
   useEffect(() => {
     const executeCleanup = () => {
       // Agar cleanup already ho chuka hai, YA humne isko skip karne ko bola hai -> toh ruk jao
-      if (hasCleanedUp.current || !shouldCleanup.current) return;
+      if (hasCleanedUp.current || !shouldCleanup.current) return; 
 
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -27,8 +27,8 @@ export function useGlobalCleanUp() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({}),
-        keepalive: true
-      }).catch(() => { });
+        keepalive: true 
+      }).catch(() => {});
 
       // 2. End Session API
       fetch(buildApiUrl('/api/match/end'), {
@@ -39,8 +39,8 @@ export function useGlobalCleanUp() {
         },
         body: JSON.stringify({}),
         keepalive: true
-      }).catch(() => { });
-
+      }).catch(() => {});
+      
       hasCleanedUp.current = true;
     };
 
