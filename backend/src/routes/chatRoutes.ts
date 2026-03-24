@@ -40,6 +40,11 @@ router.get("/", authMiddleware.authenticate.bind(authMiddleware), async (req: Re
          LIMIT 1
        ) m ON true
        WHERE (c.user1_id = $1 OR c.user2_id = $1)
+         AND NOT EXISTS (
+           SELECT 1 FROM user_blocks 
+           WHERE (blocker_id = u.id AND blocked_id = $1)
+              OR (blocker_id = $1 AND blocked_id = u.id)
+         )
        ORDER BY COALESCE(m.created_at, c.created_at) DESC`,
       [userId]
     );

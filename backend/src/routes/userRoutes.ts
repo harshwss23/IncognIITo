@@ -308,7 +308,23 @@ router.post('/report', async (req: Request, res: Response) => {
       [targetId]
     );
 
-    res.status(200).json({ success: true, message: 'User reported successfully' });
+    // Automatically remove connection request and chat if they exist
+    await query(
+      `DELETE FROM connection_requests 
+       WHERE (sender_id = $1 AND receiver_id = $2) 
+          OR (sender_id = $2 AND receiver_id = $1)`,
+      [reporterId, targetId]
+    );
+
+    // Deleting chat will cascade to messages automatically
+    const a = Math.min(reporterId, targetId);
+    const b = Math.max(reporterId, targetId);
+    await query(
+      `DELETE FROM chats WHERE user1_id = $1 AND user2_id = $2`,
+      [a, b]
+    );
+
+    res.status(200).json({ success: true, message: 'User reported and blocked successfully' });
   } catch (error) {
     console.error('Report user error:', error);
     res.status(500).json({ success: false, message: 'Failed to report user' });
