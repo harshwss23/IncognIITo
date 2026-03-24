@@ -85,9 +85,43 @@ router.get('/profile', async (req: Request, res: Response) => {
 router.get('/profile/:id', async (req: Request, res: Response) => {
   try {
     const targetId = Number(req.params.id);
+    const requesterId = req.user!.userId;
 
     if (!targetId || Number.isNaN(targetId)) {
       return res.status(400).json({ success: false, message: 'Invalid user id' });
+    }
+
+    // Only allow self or accepted connections to view another user's profile
+    if (targetId !== requesterId) {
+      const connection = await query(
+        `SELECT 1
+         FROM connection_requests
+         WHERE status = 'ACCEPTED'
+           AND ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))
+         LIMIT 1`,
+        [requesterId, targetId]
+      );
+
+      if (connection.rows.length === 0) {
+        const selfProfile = await query(
+          `SELECT u.id, u.email, u.display_name, u.verified,
+                  p.interests, p.avatar_url, p.total_chats, p.total_reports, p.rating, p.is_banned
+           FROM users u
+           LEFT JOIN user_profiles p ON u.id = p.user_id
+           WHERE u.id = $1`,
+          [requesterId]
+        );
+
+        if (selfProfile.rows.length === 0) {
+          return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        return res.status(200).json({
+          success: true,
+          redirectToSelf: true,
+          data: { user: selfProfile.rows[0] },
+        });
+      }
     }
 
     const result = await query(
@@ -102,10 +136,11 @@ router.get('/profile/:id', async (req: Request, res: Response) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-
+    const dbdata=result.rows[0];
+    dbdata.email="hidden";
     return res.status(200).json({
       success: true,
-      data: { user: result.rows[0] },
+      data: { user: dbdata },
     });
   } catch (error) {
     console.error('Get public profile error:', error);

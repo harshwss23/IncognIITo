@@ -41,12 +41,28 @@ export function PublicUserProfile() {
         setLoading(true);
         setError("");
 
+        // Fast-path: if the requested id is the current user, send them to their own profile page
+        const meRes = await authFetch("/api/users/profile");
+        const meJson = await meRes.json().catch(() => ({}));
+        const myId = meJson?.data?.user?.id ? Number(meJson.data.user.id) : null;
+
+        if (myId && Number(id) === myId) {
+          setLoading(false);
+          navigate('/profile', { replace: true });
+          return;
+        }
+
         const res = await authFetch(`/api/users/profile/${id}`);
         const json = await res.json().catch(() => ({}));
 
         if (!res.ok || !json.success) {
           setError(json.message || "Failed to load profile");
           setProfile(null);
+          return;
+        }
+
+        if (json.redirectToSelf) {
+          navigate('/profile', { replace: true });
           return;
         }
 
@@ -133,7 +149,7 @@ export function PublicUserProfile() {
 
           <div className="flex justify-center gap-4 sm:gap-8 pb-6 border-b border-dashed border-slate-300 dark:border-slate-700">
             <div className="flex flex-col items-center">
-              <span className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Total Chats</span>
+              <span className={`text-sm font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Total Sessions</span>
               <div className="flex items-center gap-1.5 mt-1">
                 <MessageCircle className={`w-4 h-4 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
                 <span className={`text-xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>{totalChats}</span>
