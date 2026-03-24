@@ -183,6 +183,8 @@ class Server {
 
         socket.disconnect(true);
         return; // Halt completely! Do not register any other events for this socket.
+      }else{
+        socket.emit("false_multiple_tabs_error", "You dont have an active session in another window or device.");
       }
 
       // ─── 🟢 FIRST / OLDEST CONNECTION ──────────────
