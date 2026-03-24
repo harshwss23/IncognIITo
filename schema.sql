@@ -44,6 +44,10 @@ ALTER TABLE users
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_verified ON users(verified);
+DROP INDEX IF EXISTS idx_users_display_name_unique;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name_unique
+    ON users (regexp_replace(display_name, '\\s+', '', 'g'))
+    WHERE display_name IS NOT NULL AND display_name <> '';
 
 CREATE TABLE IF NOT EXISTS verification_tokens (
     id SERIAL PRIMARY KEY,
@@ -299,6 +303,10 @@ ALTER TABLE users
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_verified ON users(verified);
+DROP INDEX IF EXISTS idx_users_display_name_unique;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_display_name_unique
+    ON users (regexp_replace(display_name, '\\s+', '', 'g'))
+    WHERE display_name IS NOT NULL AND display_name <> '';
 
 CREATE TABLE IF NOT EXISTS verification_tokens (
     id BIGSERIAL PRIMARY KEY,
