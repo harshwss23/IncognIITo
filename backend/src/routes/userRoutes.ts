@@ -156,7 +156,13 @@ router.put('/profile', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
     const { displayName, interests, avatarUrl } = req.body;
-
+    const normalizedDisplayName = typeof displayName === 'string' ? displayName.trim() : '';
+    // Collapse internal whitespace to a single space for storage/consistency
+    const collapsedDisplayName = normalizedDisplayName.replace(/\s+/g, ' ');
+    if (!normalizedDisplayName) {
+      res.status(400).json({ success: false, message: "Display name is required" });
+      return;
+    }
     // Normalize and validate interests against the allowed list
     const allowedInterests = new Set(INTERESTS);
     const interestsProvided = Array.isArray(interests);
@@ -178,13 +184,26 @@ router.put('/profile', async (req: Request, res: Response) => {
       [userId]
     );
 
-    // Update user table
-    if (displayName !== undefined) {
-      await query(
-        'UPDATE users SET display_name = $1 WHERE id = $2',
-        [displayName, userId]
-      );
+    // Enforce unique display names (case-insensitive)
+    // For uniqueness, ignore whitespace differences ("JohnDoe" vs "John Doe" collide)
+    const existingName = await query(
+      `SELECT id FROM users
+       WHERE regexp_replace(display_name, '\\s+', '', 'g') = regexp_replace($1, '\\s+', '', 'g')
+         AND id <> $2
+       LIMIT 1`,
+      [collapsedDisplayName, userId]
+    );
+
+    if (existingName.rows.length > 0) {
+      res.status(409).json({ success: false, message: 'Display name is already taken' });
+      return;
     }
+
+    // Update user table
+    await query(
+      'UPDATE users SET display_name = $1 WHERE id = $2',
+      [collapsedDisplayName, userId]
+    );
 
     // Update user_profiles table
     await query(
@@ -201,6 +220,13 @@ router.put('/profile', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Update profile error:', error);
+    // 23505 → unique_violation (display_name uniqueness)
+    // @ts-ignore error.code comes from pg
+    if (error && error.code === '23505') {
+      res.status(409).json({ success: false, message: 'Display name is already taken' });
+      return;
+    }
+
     res.status(500).json({
       success: false,
       message: 'Failed to update profile',
