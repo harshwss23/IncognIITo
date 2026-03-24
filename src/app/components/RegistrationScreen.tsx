@@ -4,7 +4,7 @@ import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
 import { useNavigate } from 'react-router-dom';
-import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
+import { useGlobalCleanUp } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from './ThemeToggle';
 export function RegistrationScreen() {
   const colors = useThemeColors();
@@ -98,13 +98,12 @@ export function RegistrationScreen() {
   return (
     <div
       // Fix 1: Exact h-[100dvh] and global scroll fallback
-      className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${
-        isDark ? 'bg-slate-950' : 'bg-white'
-      }`}
+      className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${isDark ? 'bg-slate-950' : 'bg-white'
+        }`}
     >
       <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
-                <ThemeToggle />
-            </div>
+        <ThemeToggle />
+      </div>
       {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
       <div
         className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
@@ -142,9 +141,8 @@ export function RegistrationScreen() {
           </div>
 
           <h1
-            className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${
-              isDark ? 'text-white' : 'text-slate-900'
-            }`}
+            className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${isDark ? 'text-white' : 'text-slate-900'
+              }`}
           >
             Create Your
             <br />
@@ -186,7 +184,7 @@ export function RegistrationScreen() {
 
         {/* Fix 4: mx-auto ensures the flex-grow spacers work correctly */}
         <div className="w-full max-w-sm lg:max-w-md mx-auto px-6 py-12 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
-          
+
           {/* Form Header */}
           <div className="space-y-2">
             <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
@@ -212,10 +210,9 @@ export function RegistrationScreen() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="username@iitk.ac.in"
                   className={`w-full pl-12 pr-12 py-3.5 sm:py-4 rounded-2xl border-2 font-medium transition-all outline-none text-sm sm:text-base focus:ring-4
-                    ${
-                      isDark
-                        ? 'bg-[#0B1120] border-slate-800 text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400'
+                    ${isDark
+                      ? 'bg-[#0B1120] border-slate-800 text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-600'
+                      : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400'
                     }`}
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -240,10 +237,9 @@ export function RegistrationScreen() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min. 8 characters"
                   className={`w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-2xl border-2 font-medium transition-all outline-none text-sm sm:text-base focus:ring-4
-                    ${
-                      isDark
-                        ? 'bg-[#0B1120] border-slate-800 text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400'
+                    ${isDark
+                      ? 'bg-[#0B1120] border-slate-800 text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-600'
+                      : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400'
                     }`}
                 />
               </div>
@@ -256,14 +252,13 @@ export function RegistrationScreen() {
                   <div
                     key={step}
                     className={`flex-1 rounded-full transition-all duration-500
-                      ${
-                        strength >= step
-                          ? strength < 2
-                            ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
-                            : strength < 4
+                      ${strength >= step
+                        ? strength < 2
+                          ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
+                          : strength < 4
                             ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]'
                             : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]'
-                          : isDark
+                        : isDark
                           ? 'bg-slate-800'
                           : 'bg-slate-200'
                       }`}
@@ -273,9 +268,8 @@ export function RegistrationScreen() {
               <div className="flex justify-between text-[10px] sm:text-xs px-1 font-bold uppercase tracking-wide gap-4">
                 <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Strength</span>
                 <span
-                  className={`whitespace-nowrap transition-colors duration-300 ${
-                    strength < 2 ? 'text-red-500' : strength < 4 ? 'text-yellow-500' : 'text-green-500'
-                  }`}
+                  className={`whitespace-nowrap transition-colors duration-300 ${strength < 2 ? 'text-red-500' : strength < 4 ? 'text-yellow-500' : 'text-green-500'
+                    }`}
                 >
                   {strength === 0 ? 'Too Weak' : strength < 2 ? 'Weak' : strength < 4 ? 'Medium' : 'Strong'}
                 </span>
@@ -296,10 +290,9 @@ export function RegistrationScreen() {
                     onChange={(e) => setOtp(e.target.value)}
                     placeholder="6-digit code"
                     className={`w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-2xl border-2 font-bold tracking-widest transition-all outline-none text-sm sm:text-base focus:ring-4
-                      ${
-                        isDark
-                          ? 'bg-[#0B1120] border-slate-800 text-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-600 placeholder:tracking-normal'
-                          : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-400 placeholder:tracking-normal'
+                      ${isDark
+                        ? 'bg-[#0B1120] border-slate-800 text-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-600 placeholder:tracking-normal'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-400 placeholder:tracking-normal'
                       }`}
                   />
                 </div>
@@ -343,11 +336,10 @@ export function RegistrationScreen() {
                 onClick={handleVerifyOtp}
                 disabled={loading}
                 className={`w-full group relative overflow-hidden rounded-2xl px-5 py-4 sm:py-5 border-2 font-bold text-base sm:text-lg flex items-center justify-center gap-3 transition-all duration-300 shadow-lg
-                ${
-                  isDark
+                ${isDark
                     ? 'bg-green-600/20 border-green-500/50 text-green-400 hover:bg-green-600 hover:text-white shadow-green-900/20'
                     : 'bg-green-50 border-green-500 text-green-700 hover:bg-green-600 hover:text-white hover:border-green-600 shadow-green-100'
-                } ${loading ? 'opacity-70 pointer-events-none' : ''}`}
+                  } ${loading ? 'opacity-70 pointer-events-none' : ''}`}
               >
                 <span>{loading ? 'Verifying...' : 'Verify OTP & Register'}</span>
                 {!loading && <Check className="w-5 h-5 sm:w-6 sm:h-6 shrink-0 transition-transform group-hover:scale-110" />}
@@ -365,10 +357,9 @@ export function RegistrationScreen() {
             <button
               onClick={() => navigate('/login')}
               className={`w-full px-5 py-4 sm:py-5 rounded-2xl font-bold text-base sm:text-lg flex items-center justify-center gap-3 border-2 transition-all duration-300
-                ${
-                  isDark
-                    ? 'border-white/10 text-white hover:bg-white/10 hover:border-white/20'
-                    : 'border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'
+                ${isDark
+                  ? 'border-white/10 text-white hover:bg-white/10 hover:border-white/20'
+                  : 'border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'
                 }`}
             >
               <UserPlus className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />

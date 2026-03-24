@@ -26,7 +26,7 @@ import { ThemeToggle } from "./ThemeToggle"; // Path check kar lena apne setup k
 import { useThemeColors } from "@/app/hooks/useThemeColors";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, clearAuthTokens } from "@/services/auth";
-import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
+import { useGlobalCleanUp } from "../hooks/useGlobalCleanup";
 
 // ─── Toast System ──────────────────────────────────────
 type ToastType = "success" | "error" | "info";
@@ -49,12 +49,12 @@ function ToastContainer({ toasts, isDark }: { toasts: ToastItem[]; isDark: boole
               ? "bg-emerald-900/90 border-emerald-500/30 text-emerald-200 shadow-emerald-900/40"
               : "bg-emerald-50/95 border-emerald-200 text-emerald-800 shadow-emerald-100"
             : t.type === "error"
-            ? isDark
-              ? "bg-red-900/90 border-red-500/30 text-red-200 shadow-red-900/40"
-              : "bg-red-50/95 border-red-200 text-red-800 shadow-red-100"
-            : isDark
-            ? "bg-blue-900/90 border-blue-500/30 text-blue-200 shadow-blue-900/40"
-            : "bg-blue-50/95 border-blue-200 text-blue-800 shadow-blue-100";
+              ? isDark
+                ? "bg-red-900/90 border-red-500/30 text-red-200 shadow-red-900/40"
+                : "bg-red-50/95 border-red-200 text-red-800 shadow-red-100"
+              : isDark
+                ? "bg-blue-900/90 border-blue-500/30 text-blue-200 shadow-blue-900/40"
+                : "bg-blue-50/95 border-blue-200 text-blue-800 shadow-blue-100";
         const iconCls =
           t.type === "success" ? "text-emerald-500" : t.type === "error" ? "text-red-500" : "text-blue-500";
         return (
@@ -78,17 +78,17 @@ export function ChatRequestsDashboard() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const navigate = useNavigate();
-  
+
   const [activeTab, setActiveTab] = useState("requests");
   const [user, setUser] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-  
+
   // Sidebar Hover & Pin Logic
   const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile ke liye default false
   const [isHovered, setIsHovered] = useState(false); // Desktop hover logic
   const isExpanded = sidebarOpen || isHovered;
-  
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   // ── Incoming requests
@@ -274,12 +274,12 @@ export function ChatRequestsDashboard() {
       )}
 
       {/* --- LEFT SIDEBAR (HOVER TO EXPAND) --- */}
-      <div 
+      <div
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className={`fixed lg:relative inset-y-0 left-0 shrink-0 flex flex-col border-r z-50 transition-all duration-300 ease-in-out
-          ${isExpanded 
-            ? 'w-[280px] lg:w-[320px] translate-x-0' 
+          ${isExpanded
+            ? 'w-[280px] lg:w-[320px] translate-x-0'
             : 'w-[280px] lg:w-[100px] -translate-x-full lg:translate-x-0'}
           ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 shadow-2xl lg:shadow-none'}`}
       >
@@ -306,7 +306,7 @@ export function ChatRequestsDashboard() {
             </h2>
           )}
           {/* Mobile close button */}
-          <button 
+          <button
             onClick={() => setSidebarOpen(false)}
             className={`lg:hidden p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
           >
@@ -410,7 +410,7 @@ export function ChatRequestsDashboard() {
         {/* Header */}
         <div className={`h-16 md:h-20 lg:h-24 px-4 sm:px-6 lg:px-10 flex items-center justify-between shrink-0 z-30 border-b backdrop-blur-md
             ${isDark ? "bg-slate-900/70 border-white/10" : "bg-white/80 border-slate-200"}`}>
-          
+
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             {/* ✅ Sidebar Toggle (Ab sirf Mobile par dikhega) */}
             <button
@@ -429,7 +429,7 @@ export function ChatRequestsDashboard() {
           {/* Profile dropdown & Theme Toggle */}
           <div className="flex items-center gap-3 sm:gap-5">
             <ThemeToggle />
-            
+
             <div className="relative z-[100] shrink-0" ref={menuRef}>
               <button
                 onClick={() => setHeaderMenuOpen(!headerMenuOpen)}
@@ -660,7 +660,7 @@ export function ChatRequestsDashboard() {
                     <div key={rId}
                       className={`rounded-[1.25rem] border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 transition-all duration-300 shadow-sm
                         ${isDark ? "bg-white/5 border-white/10 hover:border-white/20" : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md"}`}>
-                      
+
                       <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                         {/* Avatar placeholder */}
                         <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl shrink-0 flex items-center justify-center font-bold text-lg sm:text-xl shadow-sm

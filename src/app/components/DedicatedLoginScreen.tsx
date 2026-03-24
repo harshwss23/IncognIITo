@@ -5,7 +5,7 @@ import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
 import { setAuthTokens } from '@/services/auth';
-import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
+import { useGlobalCleanUp } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from './ThemeToggle';
 export function DedicatedLoginScreen() {
     const navigate = useNavigate();
@@ -71,14 +71,13 @@ export function DedicatedLoginScreen() {
         <div
             // Fix 1: Changed `min-h` to `h-[100dvh]` and added `overflow-y-auto` 
             // This ensures the whole page scrolls on mobile regardless of parent containers
-            className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${
-                isDark ? 'bg-slate-950' : 'bg-white'
-            }`}
-        
+            className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${isDark ? 'bg-slate-950' : 'bg-white'
+                }`}
+
         >
-              <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
-                            <ThemeToggle />
-                        </div>
+            <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
+                <ThemeToggle />
+            </div>
             {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
             <div
                 className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
@@ -116,9 +115,8 @@ export function DedicatedLoginScreen() {
                     </div>
 
                     <h1
-                        className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${
-                            isDark ? 'text-white' : 'text-slate-900'
-                        }`}
+                        className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${isDark ? 'text-white' : 'text-slate-900'
+                            }`}
                     >
                         Secure Access
                         <br />
@@ -163,7 +161,7 @@ export function DedicatedLoginScreen() {
 
                 {/* Fix 3: Replaced `m-auto` with `mx-auto` so it doesn't push overflow off the top of the screen */}
                 <div className="w-full max-w-sm lg:max-w-md mx-auto px-6 py-12 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
-                    
+
                     {/* Form Header */}
                     <div className="space-y-2">
                         <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>

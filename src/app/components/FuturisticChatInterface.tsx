@@ -22,7 +22,7 @@ import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, ensureValidAccessToken } from "@/services/auth";
 import { useNavigate } from "react-router-dom";
-import { useGlobalCleanup } from "../hooks/useGlobalCleanup";
+import { useGlobalCleanUp } from "../hooks/useGlobalCleanup";
 import { ThemeToggle } from "./ThemeToggle";
 type ChatMsg = {
   id: string | number;
@@ -118,7 +118,7 @@ export function FuturisticChatInterface() {
   const [mutualFriends, setMutualFriends] = useState<any[]>([]);
   const [activeFriend, setActiveFriend] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
+
   // Mobile sidebar state logic
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(true);
 
@@ -255,7 +255,7 @@ export function FuturisticChatInterface() {
           ...prev,
           [msgChatId]: (prev[msgChatId] || 0) + 1,
         }));
-        return; 
+        return;
       }
 
       setMessages(prev => {
@@ -316,7 +316,7 @@ export function FuturisticChatInterface() {
     ]);
     socket.emit("send_message", { chatId: activeFriend.chat_id, text: message, tempId: tId });
     setMessage("");
-    
+
     setMutualFriends(prev => {
       const idx = prev.findIndex(f => safeStr(f.chat_id) === safeStr(activeFriend.chat_id));
       if (idx === -1) return prev;
@@ -427,7 +427,7 @@ export function FuturisticChatInterface() {
     } catch { showToast("Network error.", "error"); }
     finally { setRemoveLoading(false); }
   };
-  
+
   const handleClearChat = async () => {
     if (!activeFriend?.chat_id) return;
     setClearLoading(true);
@@ -495,21 +495,21 @@ export function FuturisticChatInterface() {
             </div>
             <h2 className={`text-lg md:text-xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>Connections</h2>
           </div>
-          
+
           {/* ✅ YAHAN THEME TOGGLE ADD KIYA HAI */}
           <ThemeToggle />
-          
+
         </div>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-4 space-y-1.5 no-scrollbar">
           {mutualFriends.length === 0 ? (
-             <div className="flex flex-col items-center justify-center h-full text-center px-4 animate-in fade-in zoom-in-95">
-                <UserMinus className={`w-12 h-12 mb-4 ${isDark ? "text-slate-700" : "text-slate-300"}`} />
-                <p className={`font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>No connections yet.</p>
-                <button onClick={() => navigate('/homepage')} className={`mt-4 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
-                  Find Matches
-                </button>
-             </div>
+            <div className="flex flex-col items-center justify-center h-full text-center px-4 animate-in fade-in zoom-in-95">
+              <UserMinus className={`w-12 h-12 mb-4 ${isDark ? "text-slate-700" : "text-slate-300"}`} />
+              <p className={`font-bold ${isDark ? "text-slate-400" : "text-slate-500"}`}>No connections yet.</p>
+              <button onClick={() => navigate('/homepage')} className={`mt-4 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}>
+                Find Matches
+              </button>
+            </div>
           ) : (
             mutualFriends.map((f) => {
               const info = getFriendDetails(f);
@@ -523,8 +523,8 @@ export function FuturisticChatInterface() {
                   <button
                     onClick={() => openChat(f)}
                     className={`w-full flex items-center gap-3 p-3 sm:p-4 rounded-2xl transition-all text-left border-2
-                      ${active 
-                        ? (isDark ? "bg-gradient-to-r from-blue-600/20 to-indigo-600/10 border-blue-500/30 text-white shadow-sm" : "bg-blue-50 border-blue-200 text-blue-800 shadow-sm") 
+                      ${active
+                        ? (isDark ? "bg-gradient-to-r from-blue-600/20 to-indigo-600/10 border-blue-500/30 text-white shadow-sm" : "bg-blue-50 border-blue-200 text-blue-800 shadow-sm")
                         : (isDark ? "border-transparent hover:bg-white/5" : "border-transparent hover:bg-slate-50")}`}
                   >
                     {/* Avatar */}
@@ -621,7 +621,7 @@ export function FuturisticChatInterface() {
       {/* FIX 1: Added min-h-0 here */}
       <div className={`flex-1 min-h-0 flex-col relative min-w-0 isolate bg-transparent
           ${!isMobileSidebarOpen ? 'flex' : 'hidden md:flex'}`}>
-        
+
         {/* Ambient background glow */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
           <div className={`absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full blur-[120px] opacity-10 mix-blend-screen transition-colors ${isDark ? 'bg-blue-600' : 'bg-blue-300'}`} />
@@ -634,7 +634,7 @@ export function FuturisticChatInterface() {
             <div className={`h-16 md:h-20 px-4 sm:px-6 md:px-8 flex items-center justify-between border-b shrink-0 z-20 backdrop-blur-md ${isDark ? "bg-slate-900/70 border-white/5" : "bg-white/80 border-slate-200"}`}>
               <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                 {/* Mobile Back Button */}
-                <button 
+                <button
                   onClick={() => setIsMobileSidebarOpen(true)}
                   className={`md:hidden p-2 -ml-2 rounded-xl transition-colors ${isDark ? "hover:bg-white/10 text-slate-300" : "hover:bg-slate-100 text-slate-600"}`}
                 >
@@ -658,13 +658,13 @@ export function FuturisticChatInterface() {
                   </div>
                 </div>
               </div>
-              
+
               {/* ✅ NEW: Clear Chat Button */}
-              <button 
+              <button
                 onClick={() => setClearChatModal(true)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all font-bold text-xs sm:text-sm border-2
-                  ${isDark 
-                    ? "border-red-500/20 text-red-400 hover:bg-red-500/10" 
+                  ${isDark
+                    ? "border-red-500/20 text-red-400 hover:bg-red-500/10"
                     : "border-red-100 text-red-600 hover:bg-red-50 hover:border-red-200"}`}
               >
                 <Trash2 className="w-4 h-4" />
@@ -694,11 +694,11 @@ export function FuturisticChatInterface() {
                     <div key={msg.id || i} className={`flex ${isMe ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
                       <div className={`max-w-[85%] sm:max-w-[75%] md:max-w-[65%] flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                         <div className={`px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl sm:rounded-[1.25rem] text-sm sm:text-base shadow-sm leading-relaxed
-                            ${isMe 
-                              ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-tr-sm sm:rounded-tr-md shadow-blue-900/20" 
-                              : isDark 
-                                ? "bg-slate-800 text-slate-100 rounded-tl-sm sm:rounded-tl-md border border-white/5" 
-                                : "bg-white text-slate-800 rounded-tl-sm sm:rounded-tl-md border border-slate-100 shadow-slate-200/50"}`}>
+                            ${isMe
+                            ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-tr-sm sm:rounded-tr-md shadow-blue-900/20"
+                            : isDark
+                              ? "bg-slate-800 text-slate-100 rounded-tl-sm sm:rounded-tl-md border border-white/5"
+                              : "bg-white text-slate-800 rounded-tl-sm sm:rounded-tl-md border border-slate-100 shadow-slate-200/50"}`}>
                           {msg.text}
                         </div>
                         <span className={`text-[10px] sm:text-xs font-medium mt-1.5 px-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>{msg.time}</span>
@@ -754,7 +754,7 @@ export function FuturisticChatInterface() {
               )}
               <div className={`flex items-center gap-2 p-1.5 sm:p-2 rounded-[2rem] border shadow-lg backdrop-blur-xl transition-all focus-within:ring-4
                 ${isDark ? "bg-slate-900/80 border-white/10 focus-within:border-blue-500/50 focus-within:ring-blue-500/20" : "bg-white/90 border-slate-200 focus-within:border-blue-400 focus-within:ring-blue-500/20"}`}>
-                
+
                 <button
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   className={`p-3 rounded-2xl transition-all shrink-0 hover:bg-white/10 ${showEmojiPicker ? 'text-blue-500' : 'text-slate-400'}`}
@@ -770,8 +770,8 @@ export function FuturisticChatInterface() {
                   className={`flex-1 bg-transparent px-2 sm:px-3 py-3 outline-none text-sm sm:text-base font-medium
                     ${isDark ? "text-white placeholder-slate-500" : "text-slate-900 placeholder-slate-400"}`}
                 />
-                <button 
-                  onClick={handleSendMessage} 
+                <button
+                  onClick={handleSendMessage}
                   disabled={!message.trim()}
                   className={`p-3 sm:p-4 rounded-2xl text-white transition-all shrink-0 active:scale-95 disabled:opacity-50 disabled:active:scale-100 shadow-md
                     ${isDark ? "bg-blue-600 hover:bg-blue-500 shadow-blue-900/40" : "bg-blue-600 hover:bg-blue-500 shadow-blue-200"}`}

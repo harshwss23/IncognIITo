@@ -3,7 +3,7 @@ import { Shield, AlertTriangle, User, Ban, Search, LogOut, Loader2, X } from 'lu
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { ApiError, clearAuthTokens, fetchJsonWithAuth } from '@/services/auth';
-import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
+import { useGlobalCleanUp } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from "./ThemeToggle";
 
 // Shape of each user returned by the backend
@@ -14,6 +14,7 @@ interface BackendUser {
   totalReports: number;
   rating: number;
   status: string;
+  verified: boolean;
 }
 
 // Shape of each report returned by the backend
@@ -157,15 +158,17 @@ export function AdminDashboard() {
   };
 
   // Map backend users into the col1/col2/col3 shape the table expects
-  const allUsers = users.map((u) => ({
-    id: u.id,
-    col1: u.userId,
-    col2: u.email,
-    col3: u.totalReports,
-    col4: u.rating,
-    status: u.status,
-    targetId: u.id,
-  }));
+  const allUsers = users
+    .filter((u) => u.verified === true)
+    .map((u) => ({
+      id: u.id,
+      col1: u.userId,
+      col2: u.email,
+      col3: u.totalReports,
+      col4: u.rating,
+      status: u.status,
+      targetId: u.id,
+    }));
 
   // Map backend reports into the col1/col2/col3 shape the table expects
   const allReports = reports.map((r) => ({
@@ -226,13 +229,13 @@ export function AdminDashboard() {
         </div>
 
         {/* Stats & Logout & Theme */}
-        <div className="flex items-center gap-4 sm:gap-6 self-end md:self-auto overflow-x-auto no-scrollbar w-full md:w-auto pb-1 md:pb-0">
-          
+        <div className="flex flex-wrap items-center gap-4 sm:gap-6 self-end md:self-auto w-full md:w-auto pb-1 md:pb-0 pt-2 pr-2">
+
           {/* ✅ THEME TOGGLE ADDED HERE */}
           <div className="shrink-0 flex items-center">
             <ThemeToggle />
           </div>
-          
+
           <div className={`w-px h-10 hidden sm:block ${isDark ? 'bg-white/10' : 'bg-slate-200'}`}></div>
 
           <div className="text-center shrink-0">
@@ -248,16 +251,16 @@ export function AdminDashboard() {
           </div>
 
           {/* LOGOUT BUTTON */}
-          <button 
-              onClick={() => {
-                  clearAuthTokens();
-                  window.location.href = '/';
-              }}
-              className={`ml-2 sm:ml-4 px-4 py-2.5 rounded-xl border flex items-center gap-2 font-bold text-xs sm:text-sm transition-all shrink-0 active:scale-95 shadow-sm
+          <button
+            onClick={() => {
+              clearAuthTokens();
+              window.location.href = '/';
+            }}
+            className={`ml-2 sm:ml-4 px-4 py-2.5 rounded-xl border flex items-center gap-2 font-bold text-xs sm:text-sm transition-all shrink-0 active:scale-95 shadow-sm
               ${isDark
-              ? 'border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30'
-              : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300'
-            }`}>
+                ? 'border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/30'
+                : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300'
+              }`}>
             <LogOut className="w-4 h-4" />
             <span className="hidden sm:inline">Logout</span>
           </button>
@@ -269,16 +272,16 @@ export function AdminDashboard() {
           ${isDark ? 'bg-slate-900/50 border-white/5' : 'bg-white/50 border-slate-200'}`}>
 
         {/* Tabs */}
-        <div className="flex gap-2 sm:gap-3 overflow-x-auto no-scrollbar pb-1 lg:pb-0 shrink-0 w-full lg:w-auto">
+        <div className="flex flex-wrap gap-2 sm:gap-3 py-2 pr-2 shrink-0 w-full lg:w-auto">
           <button
             onClick={() => setActiveTab('users')}
             className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all duration-300 flex items-center gap-2 shrink-0 border-2 active:scale-[0.98] ${activeTab === 'users'
-                ? (isDark
-                  ? 'bg-blue-600/20 border-blue-500/50 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
-                  : 'bg-white border-blue-500 text-blue-700 shadow-sm')
-                : (isDark
-                  ? 'bg-transparent border-transparent text-slate-400 hover:bg-white/5'
-                  : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900')
+              ? (isDark
+                ? 'bg-blue-600/20 border-blue-500/50 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                : 'bg-white border-blue-500 text-blue-700 shadow-sm')
+              : (isDark
+                ? 'bg-transparent border-transparent text-slate-400 hover:bg-white/5'
+                : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900')
               }`}
           >
             <User className="w-4 h-4" />
@@ -288,12 +291,12 @@ export function AdminDashboard() {
           <button
             onClick={() => setActiveTab('reports')}
             className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-sm transition-all duration-300 flex items-center gap-2 relative shrink-0 border-2 active:scale-[0.98] ${activeTab === 'reports'
-                ? (isDark
-                  ? 'bg-blue-600/20 border-blue-500/50 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
-                  : 'bg-white border-blue-500 text-blue-700 shadow-sm')
-                : (isDark
-                  ? 'bg-transparent border-transparent text-slate-400 hover:bg-white/5'
-                  : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900')
+              ? (isDark
+                ? 'bg-blue-600/20 border-blue-500/50 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.2)]'
+                : 'bg-white border-blue-500 text-blue-700 shadow-sm')
+              : (isDark
+                ? 'bg-transparent border-transparent text-slate-400 hover:bg-white/5'
+                : 'bg-transparent border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900')
               }`}
           >
             <AlertTriangle className="w-4 h-4" />
@@ -391,7 +394,7 @@ export function AdminDashboard() {
                     {/* Column 3: Reports / Reason */}
                     <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
                       {activeTab === 'users' ? (
-                        <span className={`font-black text-base px-3 py-1 rounded-lg ${item.col3 > 5 ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600') : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600')}`}>{item.col3}</span>
+                        <span className={`font-black text-base px-3 py-1 rounded-lg ${Number(item.col3) > 5 ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600') : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600')}`}>{item.col3}</span>
                       ) : (
                         <span className={`text-sm font-semibold italic ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>"{item.col3}"</span>
                       )}
@@ -434,8 +437,8 @@ export function AdminDashboard() {
                           <button
                             onClick={() => handleToggleBan(item.id, item.status)}
                             className={`px-4 py-2 rounded-xl bg-transparent border-2 text-xs font-black transition-all duration-300 active:scale-95 flex items-center gap-2 ${item.status === 'banned'
-                                ? (isDark ? 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300')
-                                : (isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500' : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300')
+                              ? (isDark ? 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300')
+                              : (isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500' : 'border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300')
                               }`}>
                             <Ban className="w-3.5 h-3.5" />
                             <span>{item.status === 'banned' ? 'Unban' : 'Ban'}</span>

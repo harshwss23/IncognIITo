@@ -5,8 +5,8 @@ import { useTheme } from '@/app/contexts/ThemeContext';
 import { ApiError, clearAuthTokens } from '@/services/auth';
 import { getUserProfile, updateUserProfile, uploadAvatar, removeAvatar, UserProfile as UserProfileModel } from '@/services/user';
 import { INTERESTS } from '@/app/constants/interests';
-import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
-import { ThemeToggle } from "./ThemeToggle"; 
+import { useGlobalCleanUp } from '../hooks/useGlobalCleanup';
+import { ThemeToggle } from "./ThemeToggle";
 
 export function UserProfile() {
   const { theme } = useTheme();
@@ -18,7 +18,7 @@ export function UserProfile() {
   const [interests, setInterests] = useState<string[]>([]);
   const [totalReports, setTotalReports] = useState(0);
   const [rating, setRating] = useState(0);
-  
+
   // UI States
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -28,7 +28,7 @@ export function UserProfile() {
   const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const MAX_INTERESTS = 10;
@@ -199,12 +199,12 @@ export function UserProfile() {
   const ratingFeedback = !hasRatings
     ? 'Not rated yet'
     : rating > 4.5
-    ? 'Excellent'
-    : rating >= 4
-    ? 'Good'
-    : rating >= 3
-    ? 'Average'
-    : 'Try to improve';
+      ? 'Excellent'
+      : rating >= 4
+        ? 'Good'
+        : rating >= 3
+          ? 'Average'
+          : 'Try to improve';
   const isHighReportRisk = totalReports > 10;
 
   if (loading) {
@@ -226,7 +226,7 @@ export function UserProfile() {
       {/* FIX 2: Added min-h-0 to allow the flex child to scroll its overflow on desktop */}
       <div className={`w-full lg:w-[380px] xl:w-[420px] flex flex-col shrink-0 border-b lg:border-b-0 lg:border-r shadow-sm z-20 lg:h-full lg:overflow-y-auto min-h-0 no-scrollbar
         ${isDark ? 'bg-[#0F172A] border-white/5' : 'bg-white border-slate-200'}`}>
-        
+
         {/* Cover & Avatar Area */}
         <div className="relative shrink-0">
           <input
@@ -238,13 +238,13 @@ export function UserProfile() {
           />
           {/* Responsive cover height */}
           <div className="h-[140px] sm:h-[188px] bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700" />
-          
+
           {/* Responsive avatar positioning */}
           <div className="absolute -bottom-14 sm:-bottom-16 w-full flex justify-center">
             <div className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full p-1.5 shadow-2xl relative ${isDark ? 'bg-[#0F172A]' : 'bg-white'}`}>
               <button
                 type="button"
-               onClick={() => {
+                onClick={() => {
                   avatarInputRef.current?.click();
                 }}
                 className={`w-full h-full rounded-full relative flex items-center justify-center group cursor-pointer overflow-hidden ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}
@@ -271,11 +271,10 @@ export function UserProfile() {
                   <button
                     type="button"
                     onClick={() => setAvatarMenuOpen((prev) => !prev)}
-                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border flex items-center justify-center transition-colors shadow-lg ${
-                      isDark
-                        ? 'bg-slate-800 border-white/20 text-slate-200 hover:bg-slate-700'
-                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
+                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full border flex items-center justify-center transition-colors shadow-lg ${isDark
+                      ? 'bg-slate-800 border-white/20 text-slate-200 hover:bg-slate-700'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
                     aria-label="Avatar menu"
                   >
                     <MoreVertical className="w-4 h-4" />
@@ -283,9 +282,8 @@ export function UserProfile() {
 
                   {avatarMenuOpen && (
                     <div
-                      className={`absolute right-0 mt-2 w-56 rounded-2xl border shadow-2xl z-[60] overflow-hidden backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200 ${
-                        isDark ? 'bg-slate-900/95 border-white/10' : 'bg-white/95 border-slate-200'
-                      }`}
+                      className={`absolute right-0 mt-2 w-56 rounded-2xl border shadow-2xl z-[60] overflow-hidden backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200 ${isDark ? 'bg-slate-900/95 border-white/10' : 'bg-white/95 border-slate-200'
+                        }`}
                     >
                       <button
                         type="button"
@@ -293,9 +291,8 @@ export function UserProfile() {
                           setAvatarViewerOpen(true);
                           setAvatarMenuOpen(false);
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 transition-colors ${
-                          isDark ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
-                        }`}
+                        className={`w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 transition-colors ${isDark ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
+                          }`}
                       >
                         <Eye className="w-4 h-4 text-blue-500" />
                         View profile picture
@@ -307,9 +304,8 @@ export function UserProfile() {
                           setAvatarMenuOpen(false);
                           avatarInputRef.current?.click();
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 transition-colors ${
-                          isDark ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
-                        }`}
+                        className={`w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 transition-colors ${isDark ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-slate-100 text-slate-700'
+                          }`}
                       >
                         <ImagePlus className="w-4 h-4 text-emerald-500" />
                         Change profile picture
@@ -318,9 +314,8 @@ export function UserProfile() {
                       <button
                         type="button"
                         onClick={handleRemoveAvatar}
-                        className={`w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 transition-colors border-t ${
-                          isDark ? 'hover:bg-red-500/10 text-red-400 border-white/5' : 'hover:bg-red-50 text-red-600 border-slate-100'
-                        }`}
+                        className={`w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 transition-colors border-t ${isDark ? 'hover:bg-red-500/10 text-red-400 border-white/5' : 'hover:bg-red-50 text-red-600 border-slate-100'
+                          }`}
                       >
                         <Trash2 className="w-4 h-4" />
                         Delete picture
@@ -345,9 +340,9 @@ export function UserProfile() {
               onChange={(e) => setDisplayName(e.target.value)}
               className={`w-full px-5 py-4 rounded-2xl text-base font-bold outline-none border-2 transition-all focus:ring-4
               ${isDark
-                ? 'bg-[#1E293B] border-slate-700 text-white focus:border-blue-500 focus:ring-blue-500/20'
-                : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 focus:ring-blue-500/20'
-              }`}
+                  ? 'bg-[#1E293B] border-slate-700 text-white focus:border-blue-500 focus:ring-blue-500/20'
+                  : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 focus:ring-blue-500/20'
+                }`}
               placeholder="Enter your anonymous name"
             />
           </div>
@@ -359,9 +354,9 @@ export function UserProfile() {
             onClick={() => navigate('/homepage')}
             className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 border-2 transition-all hover:scale-[1.02] active:scale-[0.98]
             ${isDark
-              ? 'border-blue-500/20 text-blue-400 hover:bg-blue-500/10'
-              : 'border-blue-100 text-blue-700 hover:bg-blue-50 hover:border-blue-200 bg-white'
-            }`}
+                ? 'border-blue-500/20 text-blue-400 hover:bg-blue-500/10'
+                : 'border-blue-100 text-blue-700 hover:bg-blue-50 hover:border-blue-200 bg-white'
+              }`}
           >
             Back to Home
           </button>
@@ -370,9 +365,9 @@ export function UserProfile() {
             onClick={handleLogout}
             className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 border-2 transition-all hover:scale-[1.02] active:scale-[0.98]
             ${isDark
-              ? 'border-red-500/20 text-red-400 hover:bg-red-500/10'
-              : 'border-red-100 text-red-600 hover:bg-red-50 hover:border-red-200 bg-white'
-            }`}
+                ? 'border-red-500/20 text-red-400 hover:bg-red-500/10'
+                : 'border-red-100 text-red-600 hover:bg-red-50 hover:border-red-200 bg-white'
+              }`}
           >
             <LogOut className="w-5 h-5" />
             Log Out
@@ -383,16 +378,16 @@ export function UserProfile() {
       {/* RIGHT PANEL - Content & Interests */}
       {/* FIX 3: Added min-h-0 here to ensure flex-1 doesn't scale infinitely */}
       <div className="flex-1 flex flex-col p-4 sm:p-6 lg:p-10 lg:overflow-y-auto min-h-0 relative z-10 no-scrollbar">
-        
-       {/* Header & Global Actions */}
+
+        {/* Header & Global Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8 lg:mb-10 shrink-0">
           <h1 className={`text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
             Profile Overview
           </h1>
-          
+
           <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
             <ThemeToggle />
-            
+
             <button
               onClick={handleSave}
               disabled={saving}
@@ -429,19 +424,18 @@ export function UserProfile() {
             <div className={`text-4xl sm:text-5xl font-black tracking-tight flex items-baseline ${isDark ? 'text-white' : 'text-slate-900'}`}>
               {rating.toFixed(1)}<span className="text-2xl sm:text-3xl text-yellow-500 ml-2 -translate-y-1">★</span>
             </div>
-            <p className={`mt-2 sm:mt-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${
-              !hasRatings
-                ? isDark
-                  ? 'text-slate-500'
-                  : 'text-slate-400'
-                : rating > 4.5
+            <p className={`mt-2 sm:mt-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${!hasRatings
+              ? isDark
+                ? 'text-slate-500'
+                : 'text-slate-400'
+              : rating > 4.5
                 ? 'text-emerald-500'
                 : rating >= 4
-                ? 'text-blue-500'
-                : rating >= 3
-                ? 'text-amber-500'
-                : 'text-red-500'
-            }`}>
+                  ? 'text-blue-500'
+                  : rating >= 3
+                    ? 'text-amber-500'
+                    : 'text-red-500'
+              }`}>
               {ratingFeedback}
             </p>
           </div>
@@ -466,7 +460,7 @@ export function UserProfile() {
 
         {/* Interests Section */}
         <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:gap-10 shrink-0 mb-8">
-          
+
           {/* Your Interests (Selected) */}
           <div className={`rounded-[2rem] border p-6 sm:p-8 flex flex-col ${isDark ? 'bg-slate-900/50 border-white/5 backdrop-blur-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
@@ -475,7 +469,7 @@ export function UserProfile() {
                 {interests.length} / {MAX_INTERESTS} Selected
               </span>
             </div>
-            
+
             {interests.length === 0 ? (
               <div className={`flex-1 flex flex-col items-center justify-center py-10 sm:py-16 border-2 border-dashed rounded-3xl ${isDark ? 'border-slate-800 text-slate-500' : 'border-slate-200 text-slate-400'}`}>
                 <p className="font-semibold text-sm sm:text-base">No interests added yet.</p>
@@ -488,8 +482,8 @@ export function UserProfile() {
                     key={interest}
                     onClick={() => toggleInterest(interest)}
                     className={`group flex items-center gap-2 pl-4 sm:pl-5 pr-2 py-2 sm:py-2.5 rounded-full border-2 transition-all hover:scale-[1.03] active:scale-[0.97]
-                      ${isDark ? 'bg-blue-600/10 border-blue-500/30 text-blue-300 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-400' 
-                               : 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-red-50 hover:border-red-200 hover:text-red-600'}`}
+                      ${isDark ? 'bg-blue-600/10 border-blue-500/30 text-blue-300 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-400'
+                        : 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-red-50 hover:border-red-200 hover:text-red-600'}`}
                   >
                     <span className="font-bold text-sm sm:text-base">{interest}</span>
                     <span className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center transition-colors
@@ -508,7 +502,7 @@ export function UserProfile() {
               <h3 className={`text-xl sm:text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 Discover Interests
               </h3>
-              
+
               {/* Search Bar */}
               <div className={`relative flex items-center w-full sm:w-64 lg:w-72 ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
                 <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-4" />
@@ -518,8 +512,8 @@ export function UserProfile() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={`w-full pl-11 pr-4 py-3 rounded-xl text-sm sm:text-base font-medium outline-none border-2 transition-all focus:ring-4
-                    ${isDark ? 'bg-[#0F172A] border-slate-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder:text-slate-500' 
-                             : 'bg-slate-50 border-slate-200 focus:border-blue-400 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 bg-white'}`}
+                    ${isDark ? 'bg-[#0F172A] border-slate-700 focus:border-blue-500 focus:ring-blue-500/20 text-white placeholder:text-slate-500'
+                      : 'bg-slate-50 border-slate-200 focus:border-blue-400 focus:ring-blue-500/20 text-slate-900 placeholder:text-slate-400 bg-white'}`}
                 />
               </div>
             </div>
@@ -541,8 +535,8 @@ export function UserProfile() {
                     onClick={() => toggleInterest(interest)}
                     disabled={reachedInterestLimit}
                     className={`group flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border transition-all hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100
-                      ${isDark ? 'bg-[#0F172A] border-slate-800 text-slate-300 hover:border-blue-500/50 hover:text-blue-300 hover:bg-blue-500/5' 
-                               : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50'}`}
+                      ${isDark ? 'bg-[#0F172A] border-slate-800 text-slate-300 hover:border-blue-500/50 hover:text-blue-300 hover:bg-blue-500/5'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50'}`}
                   >
                     <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 opacity-50 group-hover:opacity-100" />
                     <span className="font-semibold text-sm sm:text-base">{interest}</span>
