@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { buildApiUrl } from '@/services/config';
 
-export function useGlobalCleanup() {
+export function useGlobalCleanUp() {
   const hasCleanedUp = useRef(false);
   // Naya flag: By default cleanup on rahega
   const shouldCleanup = useRef(true); 
