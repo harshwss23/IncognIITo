@@ -218,8 +218,8 @@ export class MatchController {
     }
 
     const numericRating = Number(rating);
-    if (!Number.isFinite(numericRating) || numericRating < 1 || numericRating > 5) {
-      res.status(400).json({ success: false, message: 'rating must be between 1 and 5' });
+    if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+      res.status(400).json({ success: false, message: 'rating must be an integer between 1 and 5' });
       return;
     }
 

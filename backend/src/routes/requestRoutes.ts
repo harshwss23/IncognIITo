@@ -142,6 +142,11 @@ router.get(
          LEFT JOIN user_profiles sp ON sp.user_id = r.sender_id
          LEFT JOIN user_profiles rp ON rp.user_id = r.receiver_id
          WHERE r.receiver_id = $1 AND r.status = $2
+           AND NOT EXISTS (
+             SELECT 1 FROM user_blocks 
+             WHERE (blocker_id = r.sender_id AND blocked_id = $1)
+                OR (blocker_id = $1 AND blocked_id = r.sender_id)
+           )
          ORDER BY r.created_at DESC`,
         [userId, status]
       );
@@ -201,6 +206,11 @@ router.get(
              LIMIT 1
            ) m ON true
            WHERE (r.sender_id = $1 OR r.receiver_id = $1) AND r.status = $2
+             AND NOT EXISTS (
+               SELECT 1 FROM user_blocks 
+               WHERE (blocker_id = u.id AND blocked_id = $1)
+                  OR (blocker_id = $1 AND blocked_id = u.id)
+             )
            ORDER BY u.id, m.created_at DESC NULLS LAST, r.created_at DESC
          ) sub
          ORDER BY COALESCE(last_message_time, connection_created_at) DESC`,
@@ -235,6 +245,11 @@ router.get(
          FROM connection_requests r
          JOIN users u ON u.id = r.receiver_id
          WHERE r.sender_id = $1 AND r.status = $2
+           AND NOT EXISTS (
+             SELECT 1 FROM user_blocks 
+             WHERE (blocker_id = r.receiver_id AND blocked_id = $1)
+                OR (blocker_id = $1 AND blocked_id = r.receiver_id)
+           )
          ORDER BY r.created_at DESC`,
         [userId, status]
       );

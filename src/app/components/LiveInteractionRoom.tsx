@@ -8,7 +8,7 @@ import { useThemeColors } from '@/app/hooks/useThemeColors'
 import { useTheme } from '@/app/contexts/ThemeContext'
 import { getAccessToken } from '@/services/auth'
 import { buildApiUrl, apiBaseUrl } from '@/services/config'
-import { useGlobalCleanUp } from '../hooks/useGlobalCleanup'
+import { useGlobalCleanup } from '../hooks/useGlobalCleanup'
 import { ThemeToggle } from "./ThemeToggle"
 
 const SOCKET_SERVER_URL = apiBaseUrl;

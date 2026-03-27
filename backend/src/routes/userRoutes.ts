@@ -13,6 +13,12 @@ import { Request, Response } from 'express';
 import { INTERESTS } from '../constants/interests';
 import cloudinary from '../config/cloudinary';
 import { upload } from '../middleware/uploadMiddleware';
+import { ValidationUtils } from '../utils/validation';
+
+// @ts-ignore - Using require for ESM/CJS compatibility with v5
+const HttpsProxyAgent = require('https-proxy-agent');
+// Built-in node module to parse URLs
+import url from 'url';
 
 const router = Router();
 
@@ -148,8 +154,8 @@ router.get('/profile/:id', async (req: Request, res: Response) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    const dbdata=result.rows[0];
-    dbdata.email="hidden";
+    const dbdata = result.rows[0];
+    dbdata.email = "hidden";
     return res.status(200).json({
       success: true,
       data: { user: dbdata },
@@ -168,17 +174,20 @@ router.put('/profile', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
     const { displayName, interests, avatarUrl } = req.body;
-    const normalizedDisplayName = typeof displayName === 'string' ? displayName.trim() : '';
-    // Collapse internal whitespace to a single space for storage/consistency
-    const collapsedDisplayName = normalizedDisplayName.replace(/\s+/g, ' ');
-    if (!normalizedDisplayName) {
+    const trimmedDisplayName = typeof displayName === 'string' ? displayName.trim() : '';
+    if (!trimmedDisplayName) {
       res.status(400).json({ success: false, message: "Display name is required" });
+      return;
+    }
+
+    if (!ValidationUtils.isValidDisplayName(trimmedDisplayName)) {
+      res.status(400).json({ success: false, message: 'Display name must be letters, numbers, spaces, or # _ @ - and at most 25 characters' });
       return;
     }
     // Normalize and validate interests against the allowed list
     const allowedInterests = new Set(INTERESTS);
     const interestsProvided = Array.isArray(interests);
-    if(interestsProvided && interests.length > 10) {
+    if (interestsProvided && interests.length > 10) {
       return res.status(400).json({ success: false, message: 'You can select up to 10 interests' });
     }
     const sanitizedInterests = interestsProvided
@@ -200,13 +209,13 @@ router.put('/profile', async (req: Request, res: Response) => {
     );
 
     // Enforce unique display names (case-insensitive)
-    // For uniqueness, ignore whitespace differences ("JohnDoe" vs "John Doe" collide)
+    // Keep internal whitespace significant ("Krish" and "Kris h" are different)
     const existingName = await query(
       `SELECT id FROM users
-       WHERE regexp_replace(display_name, '\\s+', '', 'g') = regexp_replace($1, '\\s+', '', 'g')
+       WHERE lower(display_name) = lower($1)
          AND id <> $2
        LIMIT 1`,
-      [collapsedDisplayName, userId]
+      [trimmedDisplayName, userId]
     );
 
     if (existingName.rows.length > 0) {
@@ -217,7 +226,7 @@ router.put('/profile', async (req: Request, res: Response) => {
     // Update user table
     await query(
       'UPDATE users SET display_name = $1 WHERE id = $2',
-      [collapsedDisplayName, userId]
+      [trimmedDisplayName, userId]
     );
 
     // Update user_profiles table
@@ -320,7 +329,23 @@ router.post('/report', async (req: Request, res: Response) => {
       [targetId]
     );
 
-    res.status(200).json({ success: true, message: 'User reported successfully' });
+    // Automatically remove connection request and chat if they exist
+    await query(
+      `DELETE FROM connection_requests 
+       WHERE (sender_id = $1 AND receiver_id = $2) 
+          OR (sender_id = $2 AND receiver_id = $1)`,
+      [reporterId, targetId]
+    );
+
+    // Deleting chat will cascade to messages automatically
+    const a = Math.min(reporterId, targetId);
+    const b = Math.max(reporterId, targetId);
+    await query(
+      `DELETE FROM chats WHERE user1_id = $1 AND user2_id = $2`,
+      [a, b]
+    );
+
+    res.status(200).json({ success: true, message: 'User reported and blocked successfully' });
   } catch (error) {
     console.error('Report user error:', error);
     res.status(500).json({ success: false, message: 'Failed to report user' });
@@ -336,6 +361,17 @@ router.post('/avatar', upload.single('avatar'), async (req: Request, res: Respon
       res.status(400).json({ success: false, message: 'No file uploaded' });
       return;
     }
+    
+    // --- PROXY AGENT SETUP FOR V5 ---
+    const proxyUrl = process.env.IITK_PROXY_URL;
+    let proxyAgent: any; // FIX: Added `: any` here
+    
+    if (proxyUrl) {
+      const proxyOptions: any = url.parse(proxyUrl);
+      proxyOptions.rejectUnauthorized = false; // Bypass strict SSL checks
+      proxyAgent = new HttpsProxyAgent(proxyOptions);
+    }
+    // --------------------------------
 
     // Pipe the in-memory buffer to Cloudinary using upload_stream
     const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
@@ -348,6 +384,7 @@ router.post('/avatar', upload.single('avatar'), async (req: Request, res: Respon
             transformation: [
               { width: 400, height: 400, crop: 'fill', gravity: 'face' }, // Auto face-center crop
             ],
+            agent: proxyAgent
           },
           (error, result) => {
             if (error || !result) return reject(error ?? new Error('Cloudinary upload failed'));
