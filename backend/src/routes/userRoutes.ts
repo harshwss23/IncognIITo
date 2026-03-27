@@ -13,6 +13,7 @@ import { Request, Response } from 'express';
 import { INTERESTS } from '../constants/interests';
 import cloudinary from '../config/cloudinary';
 import { upload } from '../middleware/uploadMiddleware';
+import { ValidationUtils } from '../utils/validation';
 
 const router = Router();
 
@@ -156,11 +157,14 @@ router.put('/profile', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
     const { displayName, interests, avatarUrl } = req.body;
-    const normalizedDisplayName = typeof displayName === 'string' ? displayName.trim() : '';
-    // Collapse internal whitespace to a single space for storage/consistency
-    const collapsedDisplayName = normalizedDisplayName.replace(/\s+/g, ' ');
-    if (!normalizedDisplayName) {
+    const trimmedDisplayName = typeof displayName === 'string' ? displayName.trim() : '';
+    if (!trimmedDisplayName) {
       res.status(400).json({ success: false, message: "Display name is required" });
+      return;
+    }
+
+    if (!ValidationUtils.isValidDisplayName(trimmedDisplayName)) {
+      res.status(400).json({ success: false, message: 'Display name must be letters, numbers, spaces, or # _ @ - and at most 25 characters' });
       return;
     }
     // Normalize and validate interests against the allowed list
@@ -188,13 +192,13 @@ router.put('/profile', async (req: Request, res: Response) => {
     );
 
     // Enforce unique display names (case-insensitive)
-    // For uniqueness, ignore whitespace differences ("JohnDoe" vs "John Doe" collide)
+    // Keep internal whitespace significant ("Krish" and "Kris h" are different)
     const existingName = await query(
       `SELECT id FROM users
-       WHERE regexp_replace(display_name, '\\s+', '', 'g') = regexp_replace($1, '\\s+', '', 'g')
+       WHERE lower(display_name) = lower($1)
          AND id <> $2
        LIMIT 1`,
-      [collapsedDisplayName, userId]
+      [trimmedDisplayName, userId]
     );
 
     if (existingName.rows.length > 0) {
@@ -205,7 +209,7 @@ router.put('/profile', async (req: Request, res: Response) => {
     // Update user table
     await query(
       'UPDATE users SET display_name = $1 WHERE id = $2',
-      [collapsedDisplayName, userId]
+      [trimmedDisplayName, userId]
     );
 
     // Update user_profiles table

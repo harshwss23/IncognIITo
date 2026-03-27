@@ -32,6 +32,9 @@ export function UserProfile() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const MAX_INTERESTS = 10;
+  const MAX_DISPLAY_NAME = 25;
+  const DISPLAY_NAME_REGEX = /^[A-Za-z0-9#_@\- ]+$/;
+  const trimmedDisplayNameLength = displayName.trim().length;
 
   const handleAuthFailure = (status: number) => {
     if (status === 401) {
@@ -86,9 +89,27 @@ export function UserProfile() {
     setError('');
     setSuccess('');
 
+    const trimmedName = displayName.trim();
+    if (!trimmedName) {
+      setError('Display name is required.');
+      setSaving(false);
+      return;
+    }
+    if (trimmedName.length > MAX_DISPLAY_NAME) {
+      setError(`Display name must be ${MAX_DISPLAY_NAME} characters or fewer.`);
+      setSaving(false);
+      return;
+    }
+    if (!DISPLAY_NAME_REGEX.test(trimmedName)) {
+      setError('Use only letters, numbers, spaces, or # _ @ - in the display name.');
+      setSaving(false);
+      return;
+    }
+
     try {
-      await updateUserProfile({ displayName, interests });
-      setProfile((prev) => (prev ? { ...prev, displayName, interests } : prev));
+      await updateUserProfile({ displayName: trimmedName, interests });
+      setDisplayName(trimmedName);
+      setProfile((prev) => (prev ? { ...prev, displayName: trimmedName, interests } : prev));
       setSuccess('Profile updated successfully!');
       setTimeout(() => setSuccess(''), 3000); // Auto-hide success message
     } catch (err: unknown) {
@@ -338,6 +359,7 @@ export function UserProfile() {
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
+              maxLength={MAX_DISPLAY_NAME}
               className={`w-full px-5 py-4 rounded-2xl text-base font-bold outline-none border-2 transition-all focus:ring-4
               ${isDark
                   ? 'bg-[#1E293B] border-slate-700 text-white focus:border-blue-500 focus:ring-blue-500/20'
@@ -345,6 +367,9 @@ export function UserProfile() {
                 }`}
               placeholder="Enter your anonymous name"
             />
+            <p className={`text-[11px] font-medium ml-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+              {trimmedDisplayNameLength}/{MAX_DISPLAY_NAME} characters • Allowed: letters, numbers, spaces, # _ @ -
+            </p>
           </div>
         </div>
 
