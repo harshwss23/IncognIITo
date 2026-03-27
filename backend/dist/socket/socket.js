@@ -76,6 +76,12 @@ function registerSocketHandlers(io) {
                 console.error("❌ Socket Error:", err);
             }
         });
+        socket.on("typing", ({ chatId }) => {
+            socket.to(`chat:${chatId}`).emit("typing_status", { chatId, userId, isTyping: true });
+        });
+        socket.on("stop_typing", ({ chatId }) => {
+            socket.to(`chat:${chatId}`).emit("typing_status", { chatId, userId, isTyping: false });
+        });
         socket.on("disconnect", () => {
             console.log("❌ Socket disconnected:", socket.id, "user:", userId);
         });

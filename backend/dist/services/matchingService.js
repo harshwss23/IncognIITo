@@ -8,9 +8,9 @@ const database_1 = require("../config/database");
 // Threshold decays as user waits longer
 // WHY: Don't make users wait forever for a perfect match.
 function getThreshold(waitMs) {
-    if (waitMs < 5000)
+    if (waitMs < 3000)
         return 0.40; // 0-5s: Need 40% match
-    if (waitMs < 10000)
+    if (waitMs < 6000)
         return 0.20; // 5-10s: Need 20% match
     return 0.00; // 10s+: Accept anyone (force match)
 }

@@ -141,18 +141,6 @@ export function RegistrationScreen() {
             Join the exclusive, anonymous network for IIT Kanpur students. No logs. No traces.
           </p>
         </div>
-
-        <div className={`relative z-10 mt-8 lg:mt-0 hidden sm:flex flex-wrap justify-center lg:justify-start mx-auto lg:mx-0 gap-6 sm:gap-8 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all w-fit ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-slate-200'}`}>
-          <div className="flex items-center gap-4 min-w-0">
-            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
-              <Globe className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
-            <div className="text-left">
-              <div className={`text-xl sm:text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>IITK Only</div>
-              <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Verified Access</div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* --- RIGHT PANEL: REGISTRATION FORM --- */}

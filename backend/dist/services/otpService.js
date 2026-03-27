@@ -3,7 +3,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.otpService = exports.OTPService = void 0;
 const database_1 = require("../config/database");
-const emailService_1 = require("./emailService");
+const emailService_1 = require("./emailService"); // AppScript waala naya service
 const validation_1 = require("../utils/validation");
 class OTPService {
     constructor() {
@@ -25,6 +25,7 @@ class OTPService {
         }
         // Dynamic token type based on flow
         const tokenType = isPasswordReset ? 'password_reset' : 'email_verify';
+        // 1. Check Rate Limiting (Prevent Spam)
         const recentOTPs = await (0, database_1.query)(`SELECT COUNT(*) as count 
        FROM verification_tokens vt
        JOIN users u ON u.id = vt.user_id
@@ -34,22 +35,15 @@ class OTPService {
         if (parseInt(recentOTPs.rows[0].count) >= this.MAX_RESEND_ATTEMPTS) {
             throw new Error('Too many OTP requests. Please try again later.');
         }
-        const otp = this.generateOTP();
-        const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000);
-        await (0, database_1.query)(`UPDATE verification_tokens 
-       SET used = true 
-       WHERE user_id = (SELECT id FROM users WHERE email = $1) 
-       AND token_type = $2
-       AND used = false`, [email, tokenType]);
-        // Find or create user
+        // 2. Find or Create User FIRST (This prevents the subquery SQL error)
         let userResult = await (0, database_1.query)('SELECT id, verified FROM users WHERE email = $1', [email]);
         let userId;
         if (userResult.rows.length === 0) {
-            // Don't create a new account if they are just trying to reset password
+            // Don't create a new account if they are just trying to reset a password
             if (isPasswordReset) {
                 throw new Error('No account found with this email.');
             }
-            // Generate random default display name
+            // Generate random default Ghost display name
             const adjectives = ['Wild', 'Silent', 'Hidden', 'Phantom', 'Shadow', 'Mystic', 'Neon', 'Cosmic', 'Stealth'];
             const nouns = ['Tiger', 'Wolf', 'Dragon', 'Ninja', 'Phoenix', 'Rider', 'Ghost', 'Stalker', 'Lion'];
             const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
@@ -67,14 +61,22 @@ class OTPService {
                 throw new Error('Email already verified. Please login.');
             }
         }
-        // Store new OTP in database
+        // 3. Invalidate any previous un-used tokens securely using userId
+        await (0, database_1.query)(`UPDATE verification_tokens 
+       SET used = true 
+       WHERE user_id = $1 
+       AND token_type = $2
+       AND used = false`, [userId, tokenType]);
+        // 4. Generate and Store new OTP
+        const otp = this.generateOTP();
+        const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000);
         await (0, database_1.query)(`INSERT INTO verification_tokens (user_id, token, token_type, expires_at) 
        VALUES ($1, $2, $3, $4)`, [userId, otp, tokenType, expiresAt]);
-        // Send OTP via email
+        // 5. Send OTP via our new Email Service
         await emailService_1.emailService.sendOTP(email, otp);
         console.log(`OTP sent to ${email} (User ID: ${userId}, Type: ${tokenType})`);
     }
-    // Verify OTP and activate account
+    // Verify OTP and activate account / allow reset
     async verifyOTP(email, otp, isPasswordReset = false) {
         email = validation_1.ValidationUtils.sanitizeEmail(email);
         if (!validation_1.ValidationUtils.isValidOTP(otp)) {

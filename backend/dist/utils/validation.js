@@ -23,6 +23,13 @@ class ValidationUtils {
     static isValidOTP(otp) {
         return /^\d{6}$/.test(otp);
     }
+    // Validate display name: length <= 25, non-empty, allowed chars only
+    static isValidDisplayName(name) {
+        const trimmed = name.trim();
+        if (trimmed.length === 0 || trimmed.length > 25)
+            return false;
+        return /^[A-Za-z0-9#_@\- ]+$/.test(trimmed);
+    }
     // Sanitize email (lowercase and trim)
     static sanitizeEmail(email) {
         return email.toLowerCase().trim();

@@ -219,10 +219,6 @@ export function LandingAuthPortal() {
             }`}
           >
             By entering, you agree to our{' '}
-            <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>
-              Zero-Log Policy
-            </span>{' '}
-            and{' '}
             <a
               href="https://docs.google.com/document/d/1GTfUK6rBkNsNOjWbYPbw5hSy3CU404xmGlIoSdB4IEs/edit?tab=t.0"
               target="_blank"

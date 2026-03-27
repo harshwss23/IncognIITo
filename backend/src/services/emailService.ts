@@ -1,57 +1,77 @@
+// ============================================================================
 // FILE: src/services/emailService.ts
-// PURPOSE: Email sending service (like Shopio's EmailNotificationService)
-// WHAT IT DOES:
-// - Sends OTP verification emails
-// - Sends welcome emails after verification
-// - Uses HTML templates for professional emails
-// - Handles email sending errors via Google Apps Script (Bypasses IITK Proxy)
+// PURPOSE: Centralized Email Dispatcher. Routes outbound transactional emails 
+//          (OTPs, Welcomes, Resets) securely through a Google AppScript proxy proxy.
+// ============================================================================
 
 import axios from 'axios';
-// @ts-ignore
-const HttpsProxyAgent = require('https-proxy-agent');
 import dotenv from 'dotenv';
+import url from 'url';
+
+// @ts-ignore - Using require for ESM/CJS compatibility with v5
+const HttpsProxyAgent = require('https-proxy-agent');
 
 dotenv.config();
 
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbylDCf96lLIK7NPCrK6O8VmES0RnbvUr1NMYgG48cEKj9GlJLlYOcP1QYx2DcYn3_wG/exec";
 
 export class EmailService {
-  // Helper method to send email via AppScript
+  /**
+   * Internal mechanism to dispatch HTML emails through a remote Google AppScript endpoint.
+   * Dynamically injects proxy agents if running within restricted internal environments.
+   * 
+   * @private
+   * @param {string} to - The recipient's email address.
+   * @param {string} subject - The email subject line.
+   * @param {string} htmlBody - The deeply formatted HTML payload simulating structural layouts.
+   * @returns {Promise<void>} Resolves on successful remote proxy acknowledgement.
+   */
   private async sendViaAppScript(to: string, subject: string, htmlBody: string): Promise<void> {
     try {
       const proxyUrl = process.env.IITK_PROXY_URL;
       const axiosConfig: any = {
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        // Step-by-step: Explicitly disable the default internal Axios HTTP proxy resolver to
+        // securely enforce routing through our localized custom HttpsAgent construction instead.
+        proxy: false 
       };
 
-      // Add proxy agent if IITK_PROXY_URL is set in .env
+      // Ensure network traffic navigates corporate/institutional firewalls effectively
       if (proxyUrl) {
-        axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl, { rejectUnauthorized: false });
+        const proxyOptions: any = url.parse(proxyUrl);
+        proxyOptions.rejectUnauthorized = false; // Bypass strict SSL validation chains for the immediate proxy
+        axiosConfig.httpsAgent = new HttpsProxyAgent(proxyOptions);
       }
 
       const payload = {
         to: to,
         subject: subject,
-        body: htmlBody // AppScript expects 'body' field to contain the HTML
+        body: htmlBody 
       };
 
       const response = await axios.post(GOOGLE_SCRIPT_URL, payload, axiosConfig);
 
       if (response.data && response.data.success) {
-        console.log(`✅ Email successfully sent to ${to} via AppScript!`);
+        console.log(`✅ Email successfully sent to ${to} via AppScript endpoint.`);
       } else {
-        console.error('❌ AppScript returned an error:', response.data);
-        throw new Error('AppScript failed to send email');
+        console.error('❌ AppScript remote execution returned an error state:', response.data);
+        throw new Error('AppScript failed to authenticate or transmit the payload natively.');
       }
     } catch (error: any) {
-      console.error('❌ Failed to send email via AppScript:', error.message || error);
-      throw new Error('Failed to send email');
+      console.error('❌ Failed to establish communication with the AppScript endpoint:', error.message || error);
+      throw new Error('Failed to send email due to underlying network or proxy failure.');
     }
   }
 
-  // Send OTP email to user
+  /**
+   * Orchestrates the construction and delivery of verification OTP templates cleanly.
+   * 
+   * @param {string} email - Target validation candidate.
+   * @param {string} otp - Mathematically generated 6-digit confirmation key.
+   * @returns {Promise<void>}
+   */
   async sendOTP(email: string, otp: string): Promise<void> {
     const subject = 'Your OTP for Email Verification - IncognIITo';
     const html = `
@@ -87,7 +107,13 @@ export class EmailService {
     await this.sendViaAppScript(email, subject, html);
   }
 
-  // Send welcome email after successful verification
+  /**
+   * Dispatches a structured welcome email upon successful account activation cleanly without blocking.
+   * 
+   * @param {string} email - Registered and verified recipient logic.
+   * @param {string} [displayName=''] - Formatted public-facing identity context.
+   * @returns {Promise<void>}
+   */
   async sendWelcomeEmail(email: string, displayName: string = ''): Promise<void> {
     const subject = 'Welcome to IncognIITo!';
     const html = `
@@ -123,11 +149,16 @@ export class EmailService {
       await this.sendViaAppScript(email, subject, html);
     } catch (error) {
       console.error('Failed to send welcome email:', error);
-      // Don't throw error for welcome email - it's not critical
     }
   }
 
-  // Send password reset email
+  /**
+   * Distributes secure, ephemeral password restoration URLs wrapped inside structured email frames.
+   * 
+   * @param {string} email - Authorized identity cleanly mapping safely natively.
+   * @param {string} resetToken - Mathematically verifiable temporal payload seamlessly organically.
+   * @returns {Promise<void>}
+   */
   async sendPasswordResetEmail(email: string, resetToken: string): Promise<void> {
     const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
     const subject = 'Password Reset Request - IncognIITo';
