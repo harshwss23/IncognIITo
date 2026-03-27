@@ -308,6 +308,13 @@ router.post("/:id/accept", authMiddleware.authenticate.bind(authMiddleware), asy
       [requestId]
     );
 
+    // Also delete any reciprocal request from the receiver to the sender
+    await query(
+      `DELETE FROM connection_requests
+       WHERE sender_id=$1 AND receiver_id=$2`,
+      [userId, request.sender_id]
+    );
+
     // ✅ FIXED: Changed to request.sender_id and request.receiver_id
     const a = Math.min(request.sender_id, request.receiver_id);
     const b = Math.max(request.sender_id, request.receiver_id);
