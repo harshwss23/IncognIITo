@@ -5,6 +5,7 @@ import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { useGlobalCleanUp } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from './ThemeToggle';
+
 export function LandingAuthPortal() {
   const colors = useThemeColors();
   const { theme } = useTheme();
@@ -20,9 +21,11 @@ export function LandingAuthPortal() {
       <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
         <ThemeToggle />
       </div>
+      
       {/* --- LEFT PANEL: Branding & Visuals --- */}
       <div
-        className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
+        // ADDED: items-center text-center lg:items-start lg:text-left
+        className={`relative w-full lg:flex-1 flex flex-col items-center text-center lg:items-start lg:text-left justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
         px-6 py-12 sm:px-10 sm:py-16 md:px-12 lg:p-16 xl:p-20
         ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}
       >
@@ -48,7 +51,8 @@ export function LandingAuthPortal() {
         </div>
 
         {/* Brand Header */}
-        <div className="relative z-10 flex flex-col justify-center flex-1 lg:flex-none">
+        {/* ADDED: items-center lg:items-start */}
+        <div className="relative z-10 flex flex-col items-center lg:items-start justify-center flex-1 lg:flex-none">
           <div className="flex items-center gap-3 mb-5 sm:mb-6">
             <div className={`h-[2px] w-8 sm:w-12 rounded-full ${isDark ? 'bg-blue-500' : 'bg-blue-600'}`}></div>
             <span
@@ -70,8 +74,9 @@ export function LandingAuthPortal() {
             o
           </h1>
 
+          {/* ADDED: mx-auto lg:mx-0 */}
           <p
-            className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'
+            className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed mx-auto lg:mx-0 ${isDark ? 'text-slate-400' : 'text-slate-600'
               }`}
           >
             Connect anonymously. Share authentically. <br className="hidden sm:block" />
@@ -80,18 +85,19 @@ export function LandingAuthPortal() {
         </div>
 
         {/* Live Stats Ticker */}
+        {/* ADDED: justify-center lg:justify-start mx-auto lg:mx-0 inline-flex w-fit */}
         <div
-          className={`relative z-10 mt-10 lg:mt-0 flex flex-col sm:flex-row gap-4 sm:gap-6 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all
+          className={`relative z-10 mt-10 lg:mt-0 flex flex-col sm:flex-row justify-center lg:justify-start gap-4 sm:gap-6 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all inline-flex w-fit mx-auto lg:mx-0
             ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-slate-200'}`}
         >
-          <div className="flex items-center gap-4 min-w-0 flex-1">
+          <div className="flex items-center justify-center sm:justify-start gap-4 min-w-0 flex-1">
             <div
               className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
                 }`}
             >
               <Users className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
+            <div className="text-left">
               <div className={`text-2xl sm:text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 1,240+
               </div>
@@ -106,14 +112,14 @@ export function LandingAuthPortal() {
 
           <div className={`hidden sm:block w-px h-auto ${isDark ? 'bg-white/10' : 'bg-slate-200'}`}></div>
 
-          <div className="flex items-center gap-4 min-w-0 flex-1">
+          <div className="flex items-center justify-center sm:justify-start gap-4 min-w-0 flex-1">
             <div
               className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600'
                 }`}
             >
               <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
+            <div className="text-left">
               <div className={`text-2xl sm:text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 100%
               </div>
@@ -137,7 +143,7 @@ export function LandingAuthPortal() {
         <div className="flex-grow shrink-0"></div>
 
         {/* Fix: Replaced m-auto with mx-auto to prevent clipping */}
-        <div className="w-full max-w-sm lg:max-w-md mx-auto px-6 py-12 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
+        <div className="w-full max-w-sm lg:max-w-md mx-auto px-6 py-12 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10 text-center">
 
           {/* Header */}
           <div className="text-center space-y-3">

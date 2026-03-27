@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, Sparkles, ArrowRight, Check, ShieldCheck, Globe, UserPlus,Eye,EyeOff } from 'lucide-react';
+import { Mail, Lock, Sparkles, ArrowRight, Check, ShieldCheck, Globe, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
 import { useNavigate } from 'react-router-dom';
 import { useGlobalCleanup } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from './ThemeToggle';
-
 
 export function RegistrationScreen() {
   const colors = useThemeColors();
@@ -99,7 +98,6 @@ export function RegistrationScreen() {
 
   return (
     <div
-      // 🚀 FIXED MAIN CONTAINER: Takes full viewport height. Auto-scrolls on mobile, locks on desktop.
       className={`w-full h-[100dvh] overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row transition-colors duration-500 no-scrollbar ${
         isDark ? 'bg-[#020617]' : 'bg-slate-50'
       }`}
@@ -110,11 +108,12 @@ export function RegistrationScreen() {
 
       {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
       <div
-        className={`relative w-full lg:flex-1 flex flex-col justify-center overflow-hidden shrink-0 
-        px-6 pt-12 pb-16 sm:px-10 sm:py-16 md:px-12 lg:p-16 xl:p-20 lg:h-full
+        // FIX: Added min-h-[40dvh] sm:min-h-[50dvh] to ensure proper height on tablets before stacking
+        className={`relative w-full lg:flex-1 flex flex-col items-center text-center lg:items-start lg:text-left justify-center overflow-hidden shrink-0 
+        min-h-[40dvh] sm:min-h-[50dvh] lg:min-h-0 lg:h-full
+        px-6 pt-12 pb-16 sm:px-10 sm:py-16 md:px-12 lg:p-16 xl:p-20
         ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}
       >
-        {/* Grid Pattern */}
         <div
           className={`absolute inset-0 pointer-events-none ${isDark ? 'opacity-20' : 'opacity-40'}`}
           style={{
@@ -123,54 +122,32 @@ export function RegistrationScreen() {
           }}
         />
 
-        {/* Ambient Orbs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div
-            className={`absolute top-0 left-[-10%] sm:top-1/4 sm:left-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60
-              ${isDark ? 'bg-purple-600/20' : 'bg-purple-400/30'}`}
-          />
-          <div
-            className={`absolute bottom-0 right-[-10%] sm:bottom-1/4 sm:right-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60
-              ${isDark ? 'bg-blue-600/20' : 'bg-blue-400/30'}`}
-          />
+          <div className={`absolute top-0 left-[-10%] sm:top-1/4 sm:left-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60 ${isDark ? 'bg-purple-600/20' : 'bg-purple-400/30'}`} />
+          <div className={`absolute bottom-0 right-[-10%] sm:bottom-1/4 sm:right-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60 ${isDark ? 'bg-blue-600/20' : 'bg-blue-400/30'}`} />
         </div>
 
-        {/* Branding Content */}
-        <div className="relative z-10 flex flex-col justify-center flex-1 lg:flex-none">
-          <div
-            className={`w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-5 sm:mb-6 lg:mb-8 shadow-2xl
-            ${isDark ? 'bg-gradient-to-br from-blue-600 to-purple-600 shadow-blue-500/30' : 'bg-white shadow-blue-200'}`}
-          >
+        <div className="relative z-10 flex flex-col items-center lg:items-start justify-center flex-1 lg:flex-none">
+          <div className={`w-12 h-12 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-5 sm:mb-6 lg:mb-8 shadow-2xl ${isDark ? 'bg-gradient-to-br from-blue-600 to-purple-600 shadow-blue-500/30' : 'bg-white shadow-blue-200'}`}>
             <Sparkles className={`w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 ${isDark ? 'text-white' : 'text-blue-600'}`} />
           </div>
 
-          <h1
-            className={`text-4xl sm:text-6xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-4 sm:mb-6 ${
-              isDark ? 'text-white' : 'text-slate-900'
-            }`}
-          >
-            Create Your
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">
-              Ghost Identity.
-            </span>
+          <h1 className={`text-4xl sm:text-6xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-4 sm:mb-6 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            Create Your<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">Ghost Identity.</span>
           </h1>
 
-          <p className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+          <p className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed mx-auto lg:mx-0 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             Join the exclusive, anonymous network for IIT Kanpur students. No logs. No traces.
           </p>
         </div>
 
-        {/* Feature Highlights - Hidden on very small screens */}
-        <div
-          className={`relative z-10 mt-8 lg:mt-0 hidden sm:flex flex-wrap gap-6 sm:gap-8 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all w-fit
-            ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-slate-200'}`}
-        >
+        <div className={`relative z-10 mt-8 lg:mt-0 hidden sm:flex flex-wrap justify-center lg:justify-start mx-auto lg:mx-0 gap-6 sm:gap-8 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all w-fit ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-slate-200'}`}>
           <div className="flex items-center gap-4 min-w-0">
             <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
               <Globe className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
+            <div className="text-left">
               <div className={`text-xl sm:text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>IITK Only</div>
               <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Verified Access</div>
             </div>
@@ -180,20 +157,20 @@ export function RegistrationScreen() {
 
       {/* --- RIGHT PANEL: REGISTRATION FORM --- */}
       <div
-        className={`w-full lg:w-[480px] xl:w-[560px] flex flex-col shrink-0 lg:h-full lg:overflow-y-auto relative z-20 
+        // FIX: Added 'flex-1 lg:flex-none' so on tablets it stretches to fill the bottom half perfectly
+        className={`w-full flex-1 lg:flex-none lg:w-[480px] xl:w-[560px] flex flex-col shrink-0 lg:h-full lg:overflow-y-auto relative z-20 
         -mt-8 lg:mt-0 rounded-t-[2.5rem] lg:rounded-none border-t lg:border-t-0 lg:border-l shadow-[0_-10px_40px_rgba(0,0,0,0.1)] lg:shadow-none
         ${isDark ? 'bg-slate-900/95 border-white/10 backdrop-blur-xl' : 'bg-white border-slate-100'}`}
       >
-        {/* Mobile drag-handle indicator (visual only) */}
         <div className="w-full flex justify-center pt-4 pb-2 lg:hidden">
           <div className={`w-12 h-1.5 rounded-full ${isDark ? 'bg-white/20' : 'bg-slate-300'}`}></div>
         </div>
 
-        <div className="flex-grow shrink-0 hidden lg:block"></div>
+        {/* FIX: Removed 'hidden lg:block' from this spacer so it vertically centers the form on tablets too! */}
+        <div className="flex-grow shrink-0"></div>
 
         <div className="w-full max-w-sm sm:max-w-md lg:max-w-md mx-auto px-6 pb-12 pt-4 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
           
-          {/* Form Header */}
           <div className="space-y-2 text-center lg:text-left">
             <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Get Started
@@ -203,9 +180,7 @@ export function RegistrationScreen() {
             </p>
           </div>
 
-          {/* Inputs */}
           <div className="space-y-5 sm:space-y-6">
-            {/* Email Field */}
             <div className="space-y-2">
               <label className={`text-xs sm:text-sm font-bold uppercase tracking-wide ml-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 IITK Email Address
@@ -218,11 +193,7 @@ export function RegistrationScreen() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="username@iitk.ac.in"
                   className={`w-full pl-12 pr-12 py-3.5 sm:py-4 rounded-2xl border-2 font-medium transition-all outline-none text-sm sm:text-base focus:ring-4
-                    ${
-                      isDark
-                        ? 'bg-[#0B1120] border-slate-800 text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400'
-                    }`}
+                    ${isDark ? 'bg-[#0B1120] border-slate-800 text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400'}`}
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
                   {email.includes('@iitk.ac.in') && <Check className="w-5 h-5 text-green-500 animate-in zoom-in" />}
@@ -233,8 +204,6 @@ export function RegistrationScreen() {
               </p>
             </div>
 
-            {/* Password Field */}
-            {/* Password Field */}
             <div className="space-y-2">
               <label className={`text-xs sm:text-sm font-bold uppercase tracking-wide ml-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 Create Password
@@ -242,26 +211,18 @@ export function RegistrationScreen() {
               <div className="relative group">
                 <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${isDark ? 'text-slate-500 group-focus-within:text-blue-400' : 'text-slate-400 group-focus-within:text-blue-500'}`} />
                 <input
-                  // ✨ FIX: Dynamic type based on state
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min. 8 characters"
-                  // ✨ FIX: Changed pr-4 to pr-12 taaki text icon ke peeche na chhup jaye
                   className={`w-full pl-12 pr-12 py-3.5 sm:py-4 rounded-2xl border-2 font-medium transition-all outline-none text-sm sm:text-base focus:ring-4
-                    ${
-                      isDark
-                        ? 'bg-[#0B1120] border-slate-800 text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400'
-                    }`}
+                    ${isDark ? 'bg-[#0B1120] border-slate-800 text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400'}`}
                 />
                 
-                {/* ✨ NEW: Toggle Button */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
                     <EyeOff className={`w-5 h-5 transition-colors ${isDark ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-900'}`} />
@@ -272,40 +233,24 @@ export function RegistrationScreen() {
               </div>
             </div>
 
-            {/* Password Strength Meter */}
             <div className="space-y-2 pt-1">
               <div className="flex gap-2 h-1.5 sm:h-2">
                 {[1, 2, 3, 4].map((step) => (
                   <div
                     key={step}
                     className={`flex-1 rounded-full transition-all duration-500
-                      ${
-                        strength >= step
-                          ? strength < 2
-                            ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
-                            : strength < 4
-                            ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]'
-                            : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]'
-                          : isDark
-                          ? 'bg-slate-800'
-                          : 'bg-slate-200'
-                      }`}
+                      ${strength >= step ? strength < 2 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : strength < 4 ? 'bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]' : 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : isDark ? 'bg-slate-800' : 'bg-slate-200'}`}
                   />
                 ))}
               </div>
               <div className="flex justify-between text-[10px] sm:text-xs px-1 font-bold uppercase tracking-wide gap-4">
                 <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Strength</span>
-                <span
-                  className={`whitespace-nowrap transition-colors duration-300 ${
-                    strength < 2 ? 'text-red-500' : strength < 4 ? 'text-yellow-500' : 'text-green-500'
-                  }`}
-                >
+                <span className={`whitespace-nowrap transition-colors duration-300 ${strength < 2 ? 'text-red-500' : strength < 4 ? 'text-yellow-500' : 'text-green-500'}`}>
                   {strength === 0 ? 'Too Weak' : strength < 2 ? 'Weak' : strength < 4 ? 'Medium' : 'Strong'}
                 </span>
               </div>
             </div>
 
-            {/* OTP Input (Expands when OTP sent) */}
             {otpSent && (
               <div className="space-y-2 animate-in slide-in-from-top-4 fade-in duration-500">
                 <label className={`text-xs sm:text-sm font-bold uppercase tracking-wide ml-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -319,11 +264,7 @@ export function RegistrationScreen() {
                     onChange={(e) => setOtp(e.target.value)}
                     placeholder="6-digit code"
                     className={`w-full pl-12 pr-4 py-3.5 sm:py-4 rounded-2xl border-2 font-bold tracking-widest transition-all outline-none text-sm sm:text-base focus:ring-4
-                      ${
-                        isDark
-                          ? 'bg-[#0B1120] border-slate-800 text-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-600 placeholder:tracking-normal'
-                          : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-400 placeholder:tracking-normal'
-                      }`}
+                      ${isDark ? 'bg-[#0B1120] border-slate-800 text-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-600 placeholder:tracking-normal' : 'bg-slate-50 border-slate-200 text-slate-900 focus:bg-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-400 placeholder:tracking-normal'}`}
                   />
                 </div>
                 <p className={`text-[10px] sm:text-xs pl-1 font-medium ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -339,7 +280,6 @@ export function RegistrationScreen() {
             </div>
           )}
 
-          {/* Actions */}
           <div className="space-y-4 pt-2">
             <button
               type="button"
@@ -349,10 +289,7 @@ export function RegistrationScreen() {
                 ${isDark ? 'bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 shadow-blue-500/20 hover:shadow-blue-500/40' : 'bg-slate-900 shadow-slate-900/20 hover:shadow-slate-900/40'}
                 ${loading ? 'opacity-70 pointer-events-none' : ''}`}
             >
-              <div
-                className={`relative h-full w-full rounded-xl px-4 py-3.5 sm:py-4 flex items-center justify-center gap-2 transition-all
-                  ${isDark ? 'bg-slate-900 group-hover:bg-opacity-80' : 'bg-slate-900 text-white'}`}
-              >
+              <div className={`relative h-full w-full rounded-xl px-4 py-3.5 sm:py-4 flex items-center justify-center gap-2 transition-all ${isDark ? 'bg-slate-900 group-hover:bg-opacity-80' : 'bg-slate-900 text-white'}`}>
                 <span className="font-bold text-base sm:text-lg text-white">
                   {loading ? 'Sending...' : otpSent ? 'Resend Verification OTP' : 'Send Verification OTP'}
                 </span>
@@ -366,11 +303,8 @@ export function RegistrationScreen() {
                 onClick={handleVerifyOtp}
                 disabled={loading}
                 className={`w-full group relative overflow-hidden rounded-2xl px-5 py-4 sm:py-5 border-2 font-bold text-base sm:text-lg flex items-center justify-center gap-3 transition-all duration-300 shadow-lg
-                ${
-                  isDark
-                    ? 'bg-green-600/20 border-green-500/50 text-green-400 hover:bg-green-600 hover:text-white shadow-green-900/20'
-                    : 'bg-green-50 border-green-500 text-green-700 hover:bg-green-600 hover:text-white hover:border-green-600 shadow-green-100'
-                } ${loading ? 'opacity-70 pointer-events-none' : ''}`}
+                ${isDark ? 'bg-green-600/20 border-green-500/50 text-green-400 hover:bg-green-600 hover:text-white shadow-green-900/20' : 'bg-green-50 border-green-500 text-green-700 hover:bg-green-600 hover:text-white hover:border-green-600 shadow-green-100'} 
+                ${loading ? 'opacity-70 pointer-events-none' : ''}`}
               >
                 <span>{loading ? 'Verifying...' : 'Verify OTP & Register'}</span>
                 {!loading && <Check className="w-5 h-5 sm:w-6 sm:h-6 shrink-0 transition-transform group-hover:scale-110" />}
@@ -388,25 +322,21 @@ export function RegistrationScreen() {
             <button
               onClick={() => navigate('/login')}
               className={`w-full px-5 py-3.5 sm:py-5 rounded-2xl font-bold text-base sm:text-lg flex items-center justify-center gap-3 border-2 transition-all duration-300
-                ${
-                  isDark
-                    ? 'border-white/10 text-white hover:bg-white/10 hover:border-white/20'
-                    : 'border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'
-                }`}
+                ${isDark ? 'border-white/10 text-white hover:bg-white/10 hover:border-white/20' : 'border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'}`}
             >
               <UserPlus className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
               <span>Login to Account</span>
             </button>
           </div>
 
-          {/* Footer */}
           <p className={`text-center text-xs sm:text-sm leading-relaxed px-2 pt-2 pb-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             By registering, you accept our <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>Terms</span> &{' '}
             <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>Privacy Policy</span>.
           </p>
         </div>
 
-        <div className="flex-grow shrink-0 hidden lg:block"></div>
+        {/* FIX: Removed 'hidden lg:block' from this bottom spacer too */}
+        <div className="flex-grow shrink-0"></div>
       </div>
     </div>
   );

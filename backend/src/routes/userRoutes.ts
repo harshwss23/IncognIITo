@@ -13,7 +13,7 @@ import { Request, Response } from 'express';
 import { INTERESTS } from '../constants/interests';
 import cloudinary from '../config/cloudinary';
 import { upload } from '../middleware/uploadMiddleware';
-
+import { HttpsProxyAgent } from 'https-proxy-agent';
 const router = Router();
 
 // All user routes require authentication
@@ -340,7 +340,8 @@ router.post('/avatar', upload.single('avatar'), async (req: Request, res: Respon
       res.status(400).json({ success: false, message: 'No file uploaded' });
       return;
     }
-
+    const proxyUrl = process.env.IITK_PROXY_URL;
+    const proxyAgent = proxyUrl ? new HttpsProxyAgent(proxyUrl, { rejectUnauthorized: false }) : undefined;
     // Pipe the in-memory buffer to Cloudinary using upload_stream
     const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
       (resolve, reject) => {
@@ -352,6 +353,7 @@ router.post('/avatar', upload.single('avatar'), async (req: Request, res: Respon
             transformation: [
               { width: 400, height: 400, crop: 'fill', gravity: 'face' }, // Auto face-center crop
             ],
+            agent: proxyAgent
           },
           (error, result) => {
             if (error || !result) return reject(error ?? new Error('Cloudinary upload failed'));

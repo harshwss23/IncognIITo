@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from "react-router-dom";
-import { Lock, Mail, KeyRound, ArrowRight, Sparkles, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Lock, Mail, KeyRound, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
 import { setAuthTokens } from '@/services/auth';
-import { useGlobalCleanUp } from '../hooks/useGlobalCleanup';
 import { ThemeToggle } from './ThemeToggle';
+
 export function DedicatedLoginScreen() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -38,11 +38,7 @@ export function DedicatedLoginScreen() {
 
             if (res.ok) {
                 const refreshToken = data?.data?.refreshToken || data?.refreshToken || null;
-
-                const token =
-                    data?.data?.accessToken ||
-                    data?.token ||
-                    data?.data?.token;
+                const token = data?.data?.accessToken || data?.token || data?.data?.token;
 
                 if (!token) {
                     setError('Authentication token not received.');
@@ -69,18 +65,15 @@ export function DedicatedLoginScreen() {
 
     return (
         <div
-            // Fix 1: Changed `min-h` to `h-[100dvh]` and added `overflow-y-auto` 
-            // This ensures the whole page scrolls on mobile regardless of parent containers
-            className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${isDark ? 'bg-slate-950' : 'bg-white'
-                }`}
-
+            className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${isDark ? 'bg-slate-950' : 'bg-white'}`}
         >
             <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
                 <ThemeToggle />
             </div>
+
             {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
             <div
-                className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
+                className={`relative w-full lg:flex-1 flex flex-col items-center text-center lg:items-start lg:text-left justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
                 px-6 py-10 sm:px-10 sm:py-12 md:px-12 lg:p-16 xl:p-20
                 ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}
             >
@@ -95,18 +88,12 @@ export function DedicatedLoginScreen() {
 
                 {/* Ambient Orbs */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    <div
-                        className={`absolute top-0 left-[-10%] sm:top-1/4 sm:left-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60
-                        ${isDark ? 'bg-blue-600/20' : 'bg-blue-400/30'}`}
-                    />
-                    <div
-                        className={`absolute bottom-0 right-[-10%] sm:bottom-1/4 sm:right-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60
-                        ${isDark ? 'bg-purple-600/20' : 'bg-cyan-400/30'}`}
-                    />
+                    <div className={`absolute top-0 left-[-10%] sm:top-1/4 sm:left-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60 ${isDark ? 'bg-blue-600/20' : 'bg-blue-400/30'}`} />
+                    <div className={`absolute bottom-0 right-[-10%] sm:bottom-1/4 sm:right-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60 ${isDark ? 'bg-purple-600/20' : 'bg-cyan-400/30'}`} />
                 </div>
 
                 {/* Branding Content */}
-                <div className="relative z-10 flex flex-col justify-center flex-1 lg:flex-none">
+                <div className="relative z-10 flex flex-col items-center lg:items-start justify-center flex-1 lg:flex-none">
                     <div
                         className={`w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-5 sm:mb-6 lg:mb-8 shadow-2xl
                         ${isDark ? 'bg-gradient-to-br from-blue-600 to-purple-600 shadow-blue-500/30' : 'bg-white shadow-blue-200'}`}
@@ -114,10 +101,7 @@ export function DedicatedLoginScreen() {
                         <KeyRound className={`w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 ${isDark ? 'text-white' : 'text-blue-600'}`} />
                     </div>
 
-                    <h1
-                        className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${isDark ? 'text-white' : 'text-slate-900'
-                            }`}
-                    >
+                    <h1 className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                         Secure Access
                         <br />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">
@@ -125,14 +109,14 @@ export function DedicatedLoginScreen() {
                         </span>
                     </h1>
 
-                    <p className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <p className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed mx-auto lg:mx-0 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                         Enter the anonymous network designed exclusively for the IIT Kanpur community.
                     </p>
                 </div>
 
                 {/* Footer Stats */}
                 <div
-                    className={`relative z-10 mt-10 lg:mt-0 flex flex-wrap gap-8 sm:gap-10 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all inline-flex w-fit
+                    className={`relative z-10 mt-10 lg:mt-0 flex flex-wrap justify-center lg:justify-start gap-8 sm:gap-10 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all inline-flex w-fit mx-auto lg:mx-0
                     ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-slate-200'}`}
                 >
                     <div>
@@ -156,14 +140,12 @@ export function DedicatedLoginScreen() {
                 className={`w-full lg:w-[480px] xl:w-[560px] flex flex-col shrink-0 lg:h-full lg:overflow-y-auto relative z-20 border-t lg:border-t-0 lg:border-l
                 ${isDark ? 'bg-slate-900/95 border-white/5 backdrop-blur-xl' : 'bg-white border-slate-100 shadow-2xl'}`}
             >
-                {/* Fix 2: Safe top flex spacer for vertical centering */}
                 <div className="flex-grow shrink-0"></div>
 
-                {/* Fix 3: Replaced `m-auto` with `mx-auto` so it doesn't push overflow off the top of the screen */}
                 <div className="w-full max-w-sm lg:max-w-md mx-auto px-6 py-12 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
-
+                    
                     {/* Form Header */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 text-center lg:text-left">
                         <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                             Welcome Back
                         </h2>
@@ -284,7 +266,6 @@ export function DedicatedLoginScreen() {
                     </div>
                 </div>
 
-                {/* Fix 4: Safe bottom flex spacer for vertical centering */}
                 <div className="flex-grow shrink-0"></div>
             </div>
         </div>
