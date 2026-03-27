@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogIn, Mail, Fingerprint, Shield, Users, ArrowRight } from 'lucide-react';
+import { LogIn, Mail, Fingerprint, Shield, Users, ArrowRight, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeColors } from '@/app/hooks/useThemeColors';
 import { useTheme } from '@/app/contexts/ThemeContext';
@@ -10,6 +10,19 @@ export function LandingAuthPortal() {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === 'dark';
+
+  // const [userCount, setUserCount] = useState<number | null>(null);
+
+  // useEffect(() => {
+  //   fetch(buildApiUrl('/api/users/count'))
+  //     .then(res => res.json())
+  //     .then(data => {
+  //       if (data?.success) {
+  //         setUserCount(data.count);
+  //       }
+  //     })
+  //     .catch(() => { });
+  // }, []);
 
   return (
     <div
@@ -84,25 +97,32 @@ export function LandingAuthPortal() {
           className={`relative z-10 mt-10 lg:mt-0 flex flex-col sm:flex-row gap-4 sm:gap-6 lg:gap-12 p-5 sm:p-6 lg:p-8 rounded-3xl border backdrop-blur-md shadow-sm transition-all
             ${isDark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-slate-200'}`}
         >
-          <div className="flex items-center gap-4 min-w-0 flex-1">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          <div
+            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${
+              isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
+            }`}
+          >
+            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+          </div>
+
+          <div>
             <div
-              className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
-                }`}
+              className={`text-2xl sm:text-3xl font-black ${
+                isDark ? 'text-white' : 'text-slate-900'
+              }`}
             >
-              <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+              1,240+
             </div>
-            <div>
-              <div className={`text-2xl sm:text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                1,240+
-              </div>
-              <div
-                className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'
-                  }`}
-              >
-                Active Students
-              </div>
+            <div
+              className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mt-0.5 ${
+                isDark ? 'text-slate-400' : 'text-slate-500'
+              }`}
+            >
+              Active Students
             </div>
           </div>
+        </div>
 
           <div className={`hidden sm:block w-px h-auto ${isDark ? 'bg-white/10' : 'bg-slate-200'}`}></div>
 
@@ -196,8 +216,15 @@ export function LandingAuthPortal() {
               }`}
           >
             By entering, you agree to our{' '}
-            <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>Zero-Log Policy</span> and{' '}
-            <span className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'}`}>Community Guidelines</span>.
+            <a
+              href="https://docs.google.com/document/d/1GTfUK6rBkNsNOjWbYPbw5hSy3CU404xmGlIoSdB4IEs/edit?tab=t.0"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`underline cursor-pointer transition-colors ${isDark ? 'hover:text-blue-400' : 'hover:text-blue-600'
+                }`}
+            >
+              Community Guidelines
+            </a>.
           </p>
         </div>
 

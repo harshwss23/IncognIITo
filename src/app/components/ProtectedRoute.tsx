@@ -1,12 +1,27 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { getAccessToken, isTokenExpired } from "@/services/auth";
+import { getAccessToken, isTokenExpired, fetchJsonWithAuth } from "@/services/auth";
 import { socket } from "@/services/socket";
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = getAccessToken();
   const location = useLocation();
   const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null); // null = still checking
+
+  // Check admin status once on mount
+  useEffect(() => {
+    if (!token || isTokenExpired(token)) return;
+    let cancelled = false;
+    fetchJsonWithAuth<{ data?: { user?: { is_admin?: boolean } } }>("/api/auth/me")
+      .then((me) => {
+        if (!cancelled) setIsAdmin(Boolean(me?.data?.user?.is_admin));
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      });
+    return () => { cancelled = true; };
+  }, [token]);
 
   useEffect(() => {
     // Agar token valid hai, toh socket connect karo
@@ -49,6 +64,14 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   // Agar token hi nahi hai, toh login pe bhejo
   if (!token || isTokenExpired(token)) {
     return <Navigate to="/" state={{ from: location }} replace />;
+  }
+
+  // Still checking admin status — render nothing briefly
+  if (isAdmin === null) return null;
+
+  // Admin should never access regular user routes
+  if (isAdmin) {
+    return <Navigate to="/admin" replace />;
   }
 
   return <>{children}</>;

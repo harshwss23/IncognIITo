@@ -16,8 +16,20 @@ import { upload } from '../middleware/uploadMiddleware';
 
 const router = Router();
 
+// PUBLIC ROUTE — no auth needed (used on landing page)
+router.get('/count', async (_req: Request, res: Response) => {
+  try {
+    const result = await query(`SELECT COUNT(*) AS total FROM users WHERE verified = true`);
+    return res.status(200).json({ success: true, count: parseInt(result.rows[0].total, 10) });
+  } catch (error) {
+    console.error('User count error:', error);
+    return res.status(500).json({ success: false, count: 0 });
+  }
+});
+
 // All user routes require authentication
 router.use(authMiddleware.authenticate.bind(authMiddleware));
+
 
 // GET /api/users - Get all users (useful for user discovery/active users)
 router.get(

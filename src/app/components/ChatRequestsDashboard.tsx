@@ -257,7 +257,6 @@ export function ChatRequestsDashboard() {
   const navItems = [
     { id: "requests", label: "Connection Requests", icon: Users, count: requests.length || 0 },
     { id: "chats", label: "Active Chats", icon: MessageSquareText, count: 0 },
-    { id: "people", label: "Active Users", icon: Users, count: 0 },
     { id: "match", label: "Start Matching", icon: Video, count: 0 },
   ];
 
@@ -355,7 +354,6 @@ export function ChatRequestsDashboard() {
               key={item.id}
               onClick={() => {
                 if (window.innerWidth < 1024) setSidebarOpen(false);
-                if (item.id === "people") { navigate("/active-users"); return; }
                 if (item.id === "requests") { navigate("/requests"); return; }
                 if (item.id === "chats") { navigate("/chat"); return; }
                 if (item.id === "match") { navigate("/homepage"); return; }

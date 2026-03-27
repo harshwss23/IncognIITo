@@ -17,7 +17,19 @@ export function DedicatedLoginScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [userCount, setUserCount] = useState<number | null>(null);
     const isDark = theme === 'dark';
+
+    // useEffect(() => {
+    //     fetch(buildApiUrl('/api/users/count'))
+    //         .then(res => res.json())
+    //         .then(data => {
+    //             if (data?.success) {
+    //                 setUserCount(data.count);
+    //             }
+    //         })
+    //         .catch(() => {});
+    // }, []);
 
     const handleLogin = async (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -51,6 +63,13 @@ export function DedicatedLoginScreen() {
                 }
 
                 setAuthTokens({ accessToken: token, refreshToken });
+
+                // If admin, always go to /admin
+                const isAdmin = Boolean(data?.data?.user?.is_admin ?? data?.user?.is_admin);
+                if (isAdmin) {
+                  navigate('/admin', { replace: true });
+                  return;
+                }
 
                 const fromState = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
                 const nextFromQuery = new URLSearchParams(location.search).get('next');
@@ -143,9 +162,11 @@ export function DedicatedLoginScreen() {
                     </div>
                     <div className={`w-px h-auto ${isDark ? 'bg-white/10' : 'bg-slate-200'}`}></div>
                     <div>
-                        <div className={`text-2xl sm:text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>2.4k+</div>
+                        <div className={`text-2xl sm:text-3xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            {userCount !== null ? `${userCount}` : '1.2k+'}
+                        </div>
                         <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Active Users
+                            Verified Users
                         </div>
                     </div>
                 </div>

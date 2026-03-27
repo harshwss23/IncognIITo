@@ -25,7 +25,7 @@ import { PostSessionModal } from "../components/PostSessionModal";
 import { AdminDashboard } from "../components/AdminDashboard";
 import { ForgotPasswordScreen } from "../components/ForgptPassword";
 import { HomePageScreen } from "../components/Homepage";
-import { ActiveUsersScreen } from "../components/ActiveUsersScreen.jsx";
+
 import { MatchingBuffer } from "../components/MatchingBuffer";
 import { PublicUserProfile } from "../components/PublicUserProfile";
 import { useTheme } from "../contexts/ThemeContext";
@@ -219,7 +219,7 @@ export default function AppRoutes() {
         
         <Route path="/session/:roomid" element={<ProtectedRoute><PostSessionModal /></ProtectedRoute>} />
         <Route path="/homepage" element={<ProtectedRoute><HomePageScreen /></ProtectedRoute>} />
-        <Route path="/active-users" element={<ProtectedRoute><ActiveUsersScreen /></ProtectedRoute>} />
+
         <Route path="/user/:id" element={<ProtectedRoute><PublicUserProfile /></ProtectedRoute>} />
 
         {/* 👑 Admin Route */}

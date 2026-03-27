@@ -375,13 +375,13 @@ export function AdminDashboard() {
                     {/* Column 1: ID */}
                     <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm
+                        {/* <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm
                           ${isDark
                             ? 'bg-slate-800 text-slate-300 border border-white/5'
                             : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}>
                           {item.col1.slice(0, 2).toUpperCase()}
-                        </div>
+                        </div> */}
                         <span className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.col1}</span>
                       </div>
                     </td>
