@@ -6,6 +6,7 @@ import { buildApiUrl } from '@/services/config';
 import { setAuthTokens } from '@/services/auth';
 import { useGlobalCleanUp } from "../hooks/useGlobalCleanup";
 import { ThemeToggle } from "./ThemeToggle";
+
 export function ForgotPasswordScreen() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -116,20 +117,20 @@ export function ForgotPasswordScreen() {
 
   return (
     <div
-      // Fix 1: Explicit h-[100dvh] and overflow-y-auto to guarantee full-page scroll on mobile
-      className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${isDark ? "bg-slate-950" : "bg-white"
-        }`}
+      className={`w-full flex flex-col lg:flex-row h-[100dvh] overflow-y-auto lg:overflow-hidden transition-colors duration-500 no-scrollbar ${isDark ? "bg-slate-950" : "bg-white"}`}
     >
       <div className="absolute top-6 right-6 sm:top-8 sm:right-10 z-50">
         <ThemeToggle />
       </div>
+
       {/* --- LEFT PANEL: IMMERSIVE VISUALS --- */}
       <div
-        className={`relative w-full lg:flex-1 flex flex-col justify-center lg:justify-between overflow-hidden shrink-0 min-h-[50dvh] lg:h-full
-        px-6 py-10 sm:px-10 sm:py-12 md:px-12 lg:p-16 xl:p-20
+        // FIX: Centering for medium screens and height adjustments
+        className={`relative w-full lg:flex-1 flex flex-col items-center text-center lg:items-start lg:text-left justify-center overflow-hidden shrink-0 
+        min-h-[40dvh] sm:min-h-[50dvh] lg:min-h-0 lg:h-full
+        px-6 pt-12 pb-10 sm:px-10 sm:py-16 md:px-12 lg:p-16 xl:p-20
         ${isDark ? "bg-[#020617]" : "bg-slate-50"}`}
       >
-        {/* Grid Pattern */}
         <div
           className={`absolute inset-0 pointer-events-none ${isDark ? "opacity-20" : "opacity-40"}`}
           style={{
@@ -138,39 +139,24 @@ export function ForgotPasswordScreen() {
           }}
         />
 
-        {/* Ambient Orbs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div
-            className={`absolute top-0 left-[-10%] sm:top-1/4 sm:left-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60
-              ${isDark ? "bg-purple-600/20" : "bg-purple-400/30"}`}
-          />
-          <div
-            className={`absolute bottom-0 right-[-10%] sm:bottom-1/4 sm:right-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60
-              ${isDark ? "bg-blue-600/20" : "bg-blue-400/30"}`}
-          />
+          <div className={`absolute top-0 left-[-10%] sm:top-1/4 sm:left-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60 ${isDark ? "bg-purple-600/20" : "bg-purple-400/30"}`} />
+          <div className={`absolute bottom-0 right-[-10%] sm:bottom-1/4 sm:right-1/4 w-64 h-64 sm:w-80 sm:h-80 lg:w-[500px] lg:h-[500px] rounded-full blur-[80px] lg:blur-[120px] mix-blend-screen opacity-60 ${isDark ? "bg-blue-600/20" : "bg-blue-400/30"}`} />
         </div>
 
-        {/* Branding Content */}
-        <div className="relative z-10 flex flex-col justify-center flex-1 lg:flex-none">
-          <div
-            className={`w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-5 sm:mb-6 lg:mb-8 shadow-2xl
-            ${isDark ? "bg-gradient-to-br from-blue-600 to-purple-600 shadow-blue-500/30" : "bg-white shadow-blue-200"}`}
-          >
+        <div className="relative z-10 flex flex-col items-center lg:items-start justify-center flex-1 lg:flex-none">
+          <div className={`w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-5 sm:mb-6 lg:mb-8 shadow-2xl ${isDark ? "bg-gradient-to-br from-blue-600 to-purple-600 shadow-blue-500/30" : "bg-white shadow-blue-200"}`}>
             <Sparkles className={`w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 ${isDark ? "text-white" : "text-blue-600"}`} />
           </div>
 
-          <h1
-            className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${isDark ? "text-white" : "text-slate-900"
-              }`}
-          >
-            Reset Your
-            <br />
+          <h1 className={`text-5xl sm:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[1.05] mb-5 sm:mb-6 ${isDark ? "text-white" : "text-slate-900"}`}>
+            Reset Your<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-500">
               Password.
             </span>
           </h1>
 
-          <p className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+          <p className={`text-sm sm:text-base lg:text-lg xl:text-xl max-w-md lg:max-w-lg font-medium leading-relaxed mx-auto lg:mx-0 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
             {step === 1
               ? "Enter your registered IITK email to receive a secure 6-digit password reset code."
               : "We've sent a 6-digit verification code to your email. Enter it below to secure your account."}
@@ -180,17 +166,16 @@ export function ForgotPasswordScreen() {
 
       {/* --- RIGHT PANEL: FORM --- */}
       <div
-        className={`w-full lg:w-[480px] xl:w-[560px] flex flex-col shrink-0 lg:h-full lg:overflow-y-auto relative z-20 border-t lg:border-t-0 lg:border-l
+        // FIX: flex-1 lg:flex-none added here
+        className={`w-full flex-1 lg:flex-none lg:w-[480px] xl:w-[560px] flex flex-col shrink-0 lg:h-full lg:overflow-y-auto relative z-20 border-t lg:border-t-0 lg:border-l
         ${isDark ? "bg-slate-900/95 border-white/5 backdrop-blur-xl" : "bg-white border-slate-100 shadow-2xl"}`}
       >
-        {/* Fix 2: Safe top flex spacer for vertical centering */}
         <div className="flex-grow shrink-0"></div>
 
-        {/* Fix 3: Replaced m-auto with mx-auto to prevent clipping */}
         <div className="w-full max-w-sm lg:max-w-md mx-auto px-6 py-12 sm:px-12 sm:py-16 lg:p-12 xl:p-16 space-y-8 sm:space-y-10">
 
-          {/* Header */}
-          <div className="space-y-2">
+          {/* FIX: Header alignment */}
+          <div className="space-y-2 text-center lg:text-left">
             <h2 className={`text-3xl sm:text-4xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
               {step === 1 ? "Forgot Password" : "Verify & Reset"}
             </h2>
@@ -257,7 +242,6 @@ export function ForgotPasswordScreen() {
             {/* STEP 2: VERIFY & RESET */}
             {step === 2 && (
               <div className="space-y-5 sm:space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-                {/* OTP Input */}
                 <div className="space-y-2">
                   <label className={`text-xs sm:text-sm font-bold uppercase tracking-wide ml-1 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                     6-Digit OTP
@@ -290,7 +274,6 @@ export function ForgotPasswordScreen() {
                   </div>
                 </div>
 
-                {/* New Password */}
                 <div className="space-y-2">
                   <label className={`text-xs sm:text-sm font-bold uppercase tracking-wide ml-1 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
                     New Password
@@ -319,7 +302,6 @@ export function ForgotPasswordScreen() {
                   </div>
                 </div>
 
-                {/* Password Strength Meter */}
                 <div className="space-y-2 pt-1">
                   <div className="flex gap-2 h-1.5 sm:h-2">
                     {[1, 2, 3, 4].map((step) => (
@@ -350,7 +332,6 @@ export function ForgotPasswordScreen() {
                   </div>
                 </div>
 
-                {/* Reset Button */}
                 <button
                   onClick={handleResetPassword}
                   disabled={!otpValid || newPassword.length < 8 || loading}
@@ -390,7 +371,6 @@ export function ForgotPasswordScreen() {
           </div>
         </div>
 
-        {/* Fix 4: Safe bottom flex spacer for vertical centering */}
         <div className="flex-grow shrink-0"></div>
       </div>
     </div>
