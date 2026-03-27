@@ -13,7 +13,12 @@ import { Request, Response } from 'express';
 import { INTERESTS } from '../constants/interests';
 import cloudinary from '../config/cloudinary';
 import { upload } from '../middleware/uploadMiddleware';
-import { HttpsProxyAgent } from 'https-proxy-agent';
+
+// @ts-ignore - Using require for ESM/CJS compatibility with v5
+const HttpsProxyAgent = require('https-proxy-agent');
+// Built-in node module to parse URLs
+import url from 'url';
+
 const router = Router();
 
 // All user routes require authentication
@@ -136,8 +141,8 @@ router.get('/profile/:id', async (req: Request, res: Response) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    const dbdata=result.rows[0];
-    dbdata.email="hidden";
+    const dbdata = result.rows[0];
+    dbdata.email = "hidden";
     return res.status(200).json({
       success: true,
       data: { user: dbdata },
@@ -166,7 +171,7 @@ router.put('/profile', async (req: Request, res: Response) => {
     // Normalize and validate interests against the allowed list
     const allowedInterests = new Set(INTERESTS);
     const interestsProvided = Array.isArray(interests);
-    if(interestsProvided && interests.length > 10) {
+    if (interestsProvided && interests.length > 10) {
       return res.status(400).json({ success: false, message: 'You can select up to 10 interests' });
     }
     const sanitizedInterests = interestsProvided
@@ -340,8 +345,18 @@ router.post('/avatar', upload.single('avatar'), async (req: Request, res: Respon
       res.status(400).json({ success: false, message: 'No file uploaded' });
       return;
     }
+    
+    // --- PROXY AGENT SETUP FOR V5 ---
     const proxyUrl = process.env.IITK_PROXY_URL;
-    const proxyAgent = proxyUrl ? new HttpsProxyAgent(proxyUrl, { rejectUnauthorized: false }) : undefined;
+    let proxyAgent: any; // FIX: Added `: any` here
+    
+    if (proxyUrl) {
+      const proxyOptions: any = url.parse(proxyUrl);
+      proxyOptions.rejectUnauthorized = false; // Bypass strict SSL checks
+      proxyAgent = new HttpsProxyAgent(proxyOptions);
+    }
+    // --------------------------------
+
     // Pipe the in-memory buffer to Cloudinary using upload_stream
     const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
       (resolve, reject) => {

@@ -1,7 +1,7 @@
 // FILE: src/services/otpService.ts
 
 import { query } from '../config/database';
-import { emailService } from './emailService';
+import { emailService } from './emailService'; // AppScript waala naya service
 import { ValidationUtils } from '../utils/validation';
 
 export class OTPService {
@@ -28,6 +28,7 @@ export class OTPService {
     // Dynamic token type based on flow
     const tokenType = isPasswordReset ? 'password_reset' : 'email_verify';
 
+    // 1. Check Rate Limiting (Prevent Spam)
     const recentOTPs = await query(
       `SELECT COUNT(*) as count 
        FROM verification_tokens vt
@@ -42,31 +43,19 @@ export class OTPService {
       throw new Error('Too many OTP requests. Please try again later.');
     }
 
-    const otp = this.generateOTP();
-    const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000);
-
-    await query(
-      `UPDATE verification_tokens 
-       SET used = true 
-       WHERE user_id = (SELECT id FROM users WHERE email = $1) 
-       AND token_type = $2
-       AND used = false`,
-      [email, tokenType]
-    );
-
-    // Find or create user
+    // 2. Find or Create User FIRST (This prevents the subquery SQL error)
     let userResult = await query('SELECT id, verified FROM users WHERE email = $1', [email]);
     let userId: number;
 
     if (userResult.rows.length === 0) {
-      // Don't create a new account if they are just trying to reset password
+      // Don't create a new account if they are just trying to reset a password
       if (isPasswordReset) {
         throw new Error('No account found with this email.');
       }
 
-      // Generate random default display name
+      // Generate random default Ghost display name
       const adjectives = ['Wild', 'Silent', 'Hidden', 'Phantom', 'Shadow', 'Mystic', 'Neon', 'Cosmic', 'Stealth'];
-      const nouns = ['Tiger', 'Wolf', 'Dragon', 'Ninja', 'Phoenix', 'Rider', 'Ghost', 'Stalker','Lion'];
+      const nouns = ['Tiger', 'Wolf', 'Dragon', 'Ninja', 'Phoenix', 'Rider', 'Ghost', 'Stalker', 'Lion'];
       const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
       const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
       const randomNumber = Math.floor(1000 + Math.random() * 9000); // 4-digit number
@@ -87,20 +76,33 @@ export class OTPService {
       }
     }
 
-    // Store new OTP in database
+    // 3. Invalidate any previous un-used tokens securely using userId
+    await query(
+      `UPDATE verification_tokens 
+       SET used = true 
+       WHERE user_id = $1 
+       AND token_type = $2
+       AND used = false`,
+      [userId, tokenType]
+    );
+
+    // 4. Generate and Store new OTP
+    const otp = this.generateOTP();
+    const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000);
+
     await query(
       `INSERT INTO verification_tokens (user_id, token, token_type, expires_at) 
        VALUES ($1, $2, $3, $4)`,
       [userId, otp, tokenType, expiresAt]
     );
 
-    // Send OTP via email
+    // 5. Send OTP via our new Email Service
     await emailService.sendOTP(email, otp);
 
     console.log(`OTP sent to ${email} (User ID: ${userId}, Type: ${tokenType})`);
   }
 
-  // Verify OTP and activate account
+  // Verify OTP and activate account / allow reset
   async verifyOTP(email: string, otp: string, isPasswordReset: boolean = false): Promise<{ success: boolean; userId?: number; message: string }> {
     email = ValidationUtils.sanitizeEmail(email);
 

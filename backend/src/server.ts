@@ -6,8 +6,8 @@ import http from "http";
 import { Server as SocketIOServer } from "socket.io";
 
 import { pool } from "./config/database";
-import { transporter } from "./config/smtp";
 
+// Routes imports
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
 import chatRoutes from "./routes/chatRoutes";
@@ -172,24 +172,23 @@ class Server {
       const userId = socket.data.userId;
       console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId})`);
 
-      // ─── 🛡️ THE "OLDEST SURVIVES" CHECK (NEW ADDITION) ──────────────
+      // ─── 🛡️ THE "OLDEST SURVIVES" CHECK ──────────────
       const globalUserRoom = `user_global_${userId}`;
       const existingSockets = await this.io.in(globalUserRoom).fetchSockets();
 
       if (existingSockets.length > 0) {
         console.warn(`🚨 User ${userId} tried connecting from a new tab/device. Keeping oldest session, killing new one.`);
-
         socket.emit("multiple_tabs_error", "You already have an active session in another window or device.");
-
         socket.disconnect(true);
         return; // Halt completely! Do not register any other events for this socket.
-      }else{
+      } else {
         socket.emit("false_multiple_tabs_error", "You dont have an active session in another window or device.");
       }
 
       // ─── 🟢 FIRST / OLDEST CONNECTION ──────────────
       socket.join(globalUserRoom);
       console.log(`✅ User ${userId} claimed the primary session.`);
+      
       socket.on("force_takeover", async () => {
         console.log(`🔥 User ${userId} requested a FORCE TAKEOVER.`);
 
@@ -276,13 +275,9 @@ class Server {
           }
 
           socket.join(roomID);
-
           socket.data.hasSuccessfullyJoined = true;
-
           console.log(`🔓 User ${userId} securely joined room ${roomID}`);
-
           socket.emit("room_joined_success");
-
           socket.to(roomID).emit("user_joined", socket.id);
         } catch (error) {
           console.error(`Room validation failed for user ${userId}:`, error);
@@ -414,9 +409,9 @@ class Server {
 
       await pool.end();
       console.log("Database connections closed");
-      transporter.close();
-      console.log("SMTP connection closed");
-
+      
+      // Removed the transporter.close() and SMTP log since we are using AppScript now.
+      
       process.exit(0);
     } catch (error) {
       console.error("Error during shutdown:", error);
