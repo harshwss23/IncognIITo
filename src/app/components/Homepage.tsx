@@ -143,7 +143,7 @@ export function HomePageScreen() {
   const navItems = [
     { id: "requests", label: "Connection Requests", icon: Users, count: 0 },
     { id: "chats", label: "Active Chats", icon: MessageSquareText, count: 0 },
-    { id: "people", label: "Active Users", icon: Users, count: 0 },
+    // { id: "people", label: "Active Users", icon: Users, count: 0 },
     { id: "match", label: "Start Matching", icon: Video, count: 0 },
   ];
 
@@ -297,7 +297,6 @@ export function HomePageScreen() {
               key={item.id}
               onClick={() => {
                 if (window.innerWidth < 1024) setSidebarOpen(false);
-                if (item.id === "people") return navigate("/active-users");
                 if (item.id === "requests") return navigate("/requests");
                 if (item.id === "chats") return navigate("/chat");
                 setActiveTab(item.id);
@@ -643,12 +642,7 @@ export function HomePageScreen() {
                       Quick Actions
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3 mt-4 sm:mt-5">
-                      <QuickActionButton
-                        isDark={isDark}
-                        icon={Users}
-                        label="View Active Users"
-                        onClick={() => navigate("/active-users")}
-                      />
+
                       <QuickActionButton
                         isDark={isDark}
                         icon={MessageSquareText}
