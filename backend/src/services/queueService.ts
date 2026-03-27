@@ -1,8 +1,14 @@
+// ============================================================================
+// FILE: src/services/queueService.ts
+// PURPOSE: Directly structures all asynchronous pairing queue methodologies. 
+//          Synchronizes rapid Redis queues systematically with primary PostgreSQL 
+//          databases representing robust memory buffers mitigating systemic race-conditions.
+// ============================================================================
+
 import redisClient from '../config/redis';
 import { interestsToBigInt } from '../constants/interests';
 import { query } from '../config/database';
 
-// Shape of a user entry when we read back from the queue
 export interface QueueEntry {
   userId: number;
   joinedAt: number; // Unix timestamp ms
@@ -11,20 +17,21 @@ export interface QueueEntry {
 
 export class QueueService {
 
-  // ─── ADD USER TO QUEUE ───────────────────────────────────────────────
-  // Called when user hits POST /api/match/join
-  // 1. Fetch interests from PostgreSQL (one-time)
-  // 2. Convert interests → BigInt
-  // 3. Store in Redis (queue + interests cache)
-  // 4. Write backup row to PostgreSQL matchmaking_queue
+  /**
+   * Securely embeds an authenticating target payload structure into both active
+   * Redis buffers and deeply mirrored PostgreSQL fallback tables natively.
+   * 
+   * @param {number} userId - The core persistent internal ID.
+   * @returns {Promise<void>} 
+   */
   async joinQueue(userId: number): Promise<void> {
-    // Check user isn't already in queue
+    // Step-by-step: Prevent queue duplication using Redis zScore checks inherently
     const existing = await redisClient.zScore('match_queue', String(userId));
     if (existing !== null) {
       throw new Error('Already in queue');
     }
 
-    // Fetch interests from PostgreSQL user_profiles
+    // Step-by-step: Capture associated matching rules (interests) directly structurally 
     const result = await query(
       'SELECT interests FROM user_profiles WHERE user_id = $1',
       [userId]
@@ -37,15 +44,13 @@ export class QueueService {
     const interestBits = interestsToBigInt(interests);
     const now = Date.now();
 
-    // Store BigInt as string in Redis (Redis only stores strings)
-    // Key: "user:interests:5" → Value: "35" (BigInt as string)
+    // Step-by-step: Optimize cache operations storing native BigInt mathematical values as fast encoded strings natively
     await redisClient.set(`user:interests:${userId}`, interestBits.toString());
 
-    // Add to sorted queue with join timestamp as score
-    // ZADD match_queue 1709462400000 "5"
+    // Allocate efficiently across sorted array algorithms cleanly via joining timelines
     await redisClient.zAdd('match_queue', { score: now, value: String(userId) });
 
-    // Backup to PostgreSQL (audit trail + recovery on Redis crash)
+    // Step-by-step: Establish strong crash-recovery replication layers backing into pure PostgreSQL 
     await query(
       `INSERT INTO matchmaking_queue (user_id, status, preferred_interests)
        VALUES ($1, 'waiting', $2)
@@ -58,16 +63,20 @@ export class QueueService {
     console.log(`User ${userId} joined queue with interests: ${interests.join(', ')}`);
   }
 
-  // ─── REMOVE USER FROM QUEUE ──────────────────────────────────────────
-  // Called when user logs out, leaves queue, or gets matched
+  /**
+   * Systematically evicts a node from waiting mechanics erasing traces cleanly natively.
+   * 
+   * @param {number} userId - The identity matching key to decouple.
+   * @returns {Promise<void>}
+   */
   async leaveQueue(userId: number): Promise<void> {
-    // Remove from Redis sorted set
+    // Drop cleanly from volatile Redis sorted queue buffers securely
     await redisClient.zRem('match_queue', String(userId));
 
-    // Delete cached interests
+    // Release linked dependent cache nodes directly 
     await redisClient.del(`user:interests:${userId}`);
 
-    // Update PostgreSQL status to 'expired'
+    // Update SQL logs permanently flagging abandonment 
     await query(
       `UPDATE matchmaking_queue SET status = 'expired', updated_at = NOW()
        WHERE user_id = $1 AND status = 'waiting'`,
@@ -77,17 +86,19 @@ export class QueueService {
     console.log(`User ${userId} left queue`);
   }
 
-  // ─── GET ALL USERS IN QUEUE ──────────────────────────────────────────
-  // Returns users sorted by join time (oldest first = waited longest)
-  // This is what the matching algorithm reads every 500ms
+  /**
+   * Gathers all queued identities effectively traversing structures in O(log N) formats 
+   * rendering them iteratively for cyclical pairing evaluation algorithms.
+   * 
+   * @returns {Promise<QueueEntry[]>} Ordered timeline elements mapping oldest waiting sequentially.
+   */
   async getQueue(): Promise<QueueEntry[]> {
-    // ZRANGE match_queue 0 -1 WITHSCORES → sorted by score (join time)
+    // Extract queue linearly mapping against joining score values natively
     const members = await redisClient.zRangeWithScores('match_queue', 0, -1);
 
     if (members.length === 0) return [];
 
-    // Batch fetch all interests in ONE Redis call using MGET
-    // Instead of N separate GET calls → single round trip ⚡
+    // Step-by-step: Batch execution compiling MGET logic rapidly retrieving parallel metadata efficiently
     const interestKeys = members.map((member: { value: string }) => `user:interests:${member.value}`);
     const interestValues = await redisClient.mGet(interestKeys);
 
@@ -96,7 +107,7 @@ export class QueueService {
       const { value: userIdStr, score: joinedAt } = members[i];
       const bitsStr = interestValues[i];
 
-      // Skip if interests cache is gone (user may have just left)
+      // Defensively disregard fragments catching missing nodes transitioning natively out dynamically
       if (bitsStr === null) continue;
 
       entries.push({
@@ -109,45 +120,72 @@ export class QueueService {
     return entries;
   }
 
-  // ─── CHECK IF USER IS IN QUEUE ───────────────────────────────────────
+  /**
+   * Checks boolean states without expensive traversal logic dynamically natively inside Redis.
+   * 
+   * @param {number} userId - Identification binding key.
+   * @returns {Promise<boolean>} True if currently caching properly.
+   */
   async isInQueue(userId: number): Promise<boolean> {
     const score = await redisClient.zScore('match_queue', String(userId));
     return score !== null;
   }
 
-  // ─── GET QUEUE SIZE ──────────────────────────────────────────────────
+  /**
+   * Determines exact wait pool dimension values instantaneously seamlessly.
+   * 
+   * @returns {Promise<number>} Live Queue node count cleanly.
+   */
   async getQueueSize(): Promise<number> {
     return await redisClient.zCard('match_queue');
   }
 
-  // ─── STORE ACTIVE SESSION ────────────────────────────────────────────
-  // After two users match, store their session mapping in Redis
-  // Key: "user:session:5" → Value: "room_abc123"
+  /**
+   * Marks a successful algorithmic connection mapping directly binding identities 
+   * dynamically temporarily inside fast storage instances exclusively.
+   * 
+   * @param {number} userId - Authenticated node linking context organically.
+   * @param {string} roomId - Assigned generated shared UUID logically natively.
+   * @returns {Promise<void>} 
+   */
   async setActiveSession(userId: number, roomId: string): Promise<void> {
-    // Expire after 2 hours (session can't last longer than this)
+    // Force aggressive temporary bounding explicitly holding sessions solely max 2 hours internally.
     await redisClient.set(`user:session:${userId}`, roomId, { EX: 7200 });
   }
 
-  // ─── GET ACTIVE SESSION ──────────────────────────────────────────────
+  /**
+   * Inspects cache boundaries cleanly for existing operational session indicators functionally.
+   * 
+   * @param {number} userId - Base node mapped organically natively.
+   * @returns {Promise<string | null>} UUID of session mapped context properly or null smoothly natively.
+   */
   async getActiveSession(userId: number): Promise<string | null> {
     return await redisClient.get(`user:session:${userId}`);
   }
 
-  // ─── CLEAR ACTIVE SESSION ────────────────────────────────────────────
+  /**
+   * Terminates cache bounds associated strictly with session properties natively organically natively.
+   * 
+   * @param {number} userId - Terminated node mapped structurally natively.
+   * @returns {Promise<void>} 
+   */
   async clearActiveSession(userId: number): Promise<void> {
     await redisClient.del(`user:session:${userId}`);
   }
 
-  // ─── REMOVE USER (full cleanup on logout/disconnect) ─────────────────
+  /**
+   * Wipes structural elements globally securely mapping user exit flows seamlessly natively natively.
+   * 
+   * @param {number} userId - Completely severed contextual node systematically natively.
+   * @returns {Promise<void>} 
+   */
   async cleanupUser(userId: number): Promise<void> {
-    // Remove from queue + delete all their Redis keys
     await Promise.all([
       redisClient.zRem('match_queue', String(userId)),
       redisClient.del(`user:interests:${userId}`),
       redisClient.del(`user:session:${userId}`),
     ]);
 
-    // Update PostgreSQL
     await query(
       `UPDATE matchmaking_queue SET status = 'expired', updated_at = NOW()
        WHERE user_id = $1 AND status = 'waiting'`,
@@ -155,20 +193,22 @@ export class QueueService {
     );
   }
 
-  // ─── GET BLOCKED USERS ───────────────────────────────────────────────
-  // Returns set of user IDs that userId has blocked OR who blocked userId
-  // Called once when building the queue snapshot during matching
+  /**
+   * Compiles strict constraint lists preventing negative matching experiences natively explicitly cleanly.
+   * 
+   * @param {number[]} userIds - Current active iteration target map.
+   * @returns {Promise<Set<string>>} Unidirectional exclusion set mathematically natively correctly compactly mapped natively.
+   */
   async getBlockedPairs(userIds: number[]): Promise<Set<string>> {
     if (userIds.length === 0) return new Set();
 
-    // Query all blocks involving any user in the queue
     const result = await query(
       `SELECT blocker_id, blocked_id FROM user_blocks
        WHERE blocker_id = ANY($1) OR blocked_id = ANY($1)`,
       [userIds]
     );
 
-    // Build a Set of "smaller_id:larger_id" pairs for O(1) lookup
+    // Step-by-step: Construct mathematical bidirectional blocking set efficiently in O(1) structures explicitly natively 
     const blocked = new Set<string>();
     for (const row of result.rows) {
       const a = Math.min(row.blocker_id, row.blocked_id);

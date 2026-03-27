@@ -10,7 +10,7 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const http_1 = __importDefault(require("http"));
 const socket_io_1 = require("socket.io");
 const database_1 = require("./config/database");
-const smtp_1 = require("./config/smtp");
+// Routes imports
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const userRoutes_1 = __importDefault(require("./routes/userRoutes"));
 const chatRoutes_1 = __importDefault(require("./routes/chatRoutes"));
@@ -74,6 +74,7 @@ class Server {
                 methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
             },
         });
+        this.app.set("io", this.io);
         this.matchingService = new matchingService_1.MatchingService(this.io);
         this.initializeMiddlewares();
         this.initializeRoutes();
@@ -115,7 +116,7 @@ class Server {
     }
     // ─── WEBRTC SOCKET LOGIC (SECURED) ──────────────────
     initializeSockets() {
-        (0, socket_1.registerSocketHandlers)(this.io); // Puraane handlers
+        (0, socket_1.registerSocketHandlers)(this.io);
         // 1. SOCKET AUTHENTICATION MIDDLEWARE
         this.io.use(async (socket, next) => {
             try {
@@ -136,78 +137,72 @@ class Server {
             }
         });
         // 🔌 2. CONNECTION EVENT
-        this.io.on("connection", (socket) => {
+        this.io.on("connection", async (socket) => {
             const userId = socket.data.userId;
-            console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId})`);
-            // ─── SECURE JOIN ROOM ──────────────
+            const isTakeover = socket.handshake.auth.takeover;
+            // 🛑 BUG FIX: Agar userId missing hai, ignore it
+            if (!userId) {
+                console.warn(`🚨 Ignored socket ${socket.id} (No valid User ID)`);
+                socket.disconnect(true);
+                return;
+            }
+            console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId}, Takeover: ${isTakeover})`);
+            // ─── REGISTER EVENTS IMMEDIATELY ──────────────
             socket.on("join_room", async (roomID) => {
                 try {
                     const assignedRoomId = await queueService_1.queueService.getActiveSession(userId);
                     if (!assignedRoomId || assignedRoomId !== roomID) {
-                        console.warn(`🚨 Security: User ${userId} blocked from entering unauthorized Room ${roomID}`);
                         socket.emit("room_error", "You are not authorized to join this room.");
                         return;
                     }
                     const socketsInRoom = await this.io.in(roomID).fetchSockets();
                     const isUserAlreadyInRoom = socketsInRoom.some((s) => s.data.userId === userId);
                     if (isUserAlreadyInRoom) {
-                        console.warn(`⚠️ User ${userId} tried to join room ${roomID} multiple times (Multiple tabs).`);
                         socket.emit("room_error", "You are already connected to this session in another tab/window.");
                         return;
                     }
                     if (socketsInRoom.length >= 2) {
-                        console.warn(`⚠️ Room ${roomID} is already full.`);
                         socket.emit("room_error", "This room is already full.");
                         return;
                     }
                     socket.join(roomID);
                     socket.data.hasSuccessfullyJoined = true;
-                    console.log(`🔓 User ${userId} securely joined room ${roomID}`);
                     socket.emit("room_joined_success");
                     socket.to(roomID).emit("user_joined", socket.id);
                 }
                 catch (error) {
-                    console.error(`Room validation failed for user ${userId}:`, error);
                     socket.emit("room_error", "Server error verifying your room.");
                 }
             });
-            // ─── MANUAL END CALL ──────────────
             socket.on("leave_room", (roomID) => {
                 socket.leave(roomID);
                 socket.to(roomID).emit("session_ended", "Your partner has left the chat.");
-                console.log(`🚪 User ${userId} left room ${roomID}`);
             });
-            // ─── WEBRTC SIGNALING EVENTS (PURE RELAY) ──────────────
             socket.on("offer", (data) => socket.to(data.roomID).emit("receive_offer", data));
             socket.on("answer", (data) => socket.to(data.roomID).emit("receive_answer", data));
             socket.on("ice_candidate", (data) => socket.to(data.roomID).emit("receive_ice_candidate", data));
-            // ─── EXTRA DATA RELAY ──────────────
             socket.on("send_message", (data) => socket.to(data.roomID).emit("receive_message", data));
             socket.on("camera_status", (data) => socket.to(data.roomID).emit("receive_camera_status", data));
-            // ─── DISCONNECT ──────────────
             socket.on("disconnect", async () => {
                 console.log(`❌ Socket Disconnected: ${socket.id} (User: ${userId})`);
                 try {
+                    if (socket.data.killedByTakeover) {
+                        console.log(`⚠️ Skipped DB Cleanup for ${socket.id} (Killed by Force Takeover)`);
+                        return;
+                    }
                     if (!socket.data.hasSuccessfullyJoined) {
-                        console.log(`⚠️ Ignored session cleanup for ${socket.id} (Was denied access / Second tab)`);
                         await queueService_1.queueService.leaveQueue(userId).catch(() => { });
                         return;
                     }
                     const roomId = await queueService_1.queueService.getActiveSession(userId);
                     if (roomId) {
-                        socket
-                            .to(roomId)
-                            .emit("session_ended", "Your partner disconnected. Redirecting...");
-                        const sessionResult = await database_1.pool.query(`SELECT id, user1_id, user2_id FROM matchmaking_sessions 
-               WHERE room_id = $1 AND status = 'active'`, [roomId]);
+                        socket.to(roomId).emit("session_ended", "Your partner disconnected. Redirecting...");
+                        const sessionResult = await database_1.pool.query(`SELECT id, user1_id, user2_id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`, [roomId]);
                         if (sessionResult.rows.length > 0) {
                             const session = sessionResult.rows[0];
-                            await database_1.pool.query(`UPDATE matchmaking_sessions 
-                 SET status = 'completed', session_end = NOW() 
-                 WHERE id = $1`, [session.id]);
+                            await database_1.pool.query(`UPDATE matchmaking_sessions SET status = 'completed', session_end = NOW() WHERE id = $1`, [session.id]);
                             await queueService_1.queueService.clearActiveSession(session.user1_id);
                             await queueService_1.queueService.clearActiveSession(session.user2_id);
-                            console.log(`🧹 Cleaned up session ${roomId} due to disconnect.`);
                         }
                     }
                     else {
@@ -218,6 +213,59 @@ class Server {
                     console.error("Error handling forceful disconnect cleanup:", error);
                 }
             });
+            // ─── 🔥 THE "GHOST SOCKET" KILLER (500ms Delay) ──────────────
+            setTimeout(async () => {
+                // Agar in 500ms mein socket khud hi marr gaya, toh do nothing
+                if (socket.disconnected)
+                    return;
+                const globalUserRoom = `user_global_${userId}`;
+                const existingSockets = await this.io.in(globalUserRoom).fetchSockets();
+                // Apne aap ko list se bahar nikalo
+                const otherSockets = existingSockets.filter(s => s.id !== socket.id);
+                if (otherSockets.length > 0) {
+                    if (isTakeover) {
+                        console.log(`🔥 User ${userId} requested a FORCE TAKEOVER.`);
+                        // 1. Kill old sockets
+                        otherSockets.forEach((oldSocket) => {
+                            oldSocket.data.killedByTakeover = true;
+                            oldSocket.emit("multiple_tabs_error", "Session taken over by another device.");
+                            oldSocket.disconnect(true);
+                        });
+                        // 2. DB Cleanup
+                        try {
+                            await queueService_1.queueService.leaveQueue(userId).catch(() => { });
+                            const roomId = await queueService_1.queueService.getActiveSession(userId);
+                            if (roomId) {
+                                this.io.to(roomId).emit("session_ended", "Your partner disconnected (Session Taken Over).");
+                                const sessionResult = await database_1.pool.query(`SELECT id, user1_id, user2_id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`, [roomId]);
+                                if (sessionResult.rows.length > 0) {
+                                    const session = sessionResult.rows[0];
+                                    await database_1.pool.query(`UPDATE matchmaking_sessions SET status = 'completed', session_end = NOW() WHERE id = $1`, [session.id]);
+                                    await queueService_1.queueService.clearActiveSession(session.user1_id);
+                                    await queueService_1.queueService.clearActiveSession(session.user2_id);
+                                }
+                            }
+                        }
+                        catch (error) {
+                            console.error("Error clearing session:", error);
+                        }
+                        socket.join(globalUserRoom);
+                        socket.emit("takeover_success");
+                    }
+                    else {
+                        console.warn(`🚨 User ${userId} blocked. Genuine multiple tab detected.`);
+                        socket.emit("multiple_tabs_error", "You already have an active session in another window.");
+                        socket.disconnect(true);
+                    }
+                }
+                else {
+                    // ─── 🟢 FIRST / CLEAN CONNECTION ──────────────
+                    socket.join(globalUserRoom);
+                    console.log(`✅ User ${userId} claimed the primary session.`);
+                    // 🔥 NEW: Frontend ko batao ki sab theek hai, koi doosra tab nahi hai
+                    socket.emit("no_conflict");
+                }
+            }, 0);
         });
     }
     initializeErrorHandling() {
@@ -225,13 +273,7 @@ class Server {
     }
     start() {
         this.httpServer.listen(this.port, async () => {
-            console.log("🚀 IncognIITo Backend Server");
-            console.log("================================");
             console.log(`📡 Server running on port ${this.port}`);
-            console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-            console.log(`🔗 API Base URL: http://localhost:${this.port}/api`);
-            console.log(`🧩 Socket URL: http://localhost:${this.port}`);
-            console.log("================================");
             database_1.pool.query("SELECT NOW()", (err) => {
                 if (err)
                     console.error("❌ Database connection failed", err);
@@ -241,16 +283,13 @@ class Server {
             this.matchingService.start();
             await ensureAdminSchema();
             setInterval(() => {
-                tokenService_1.tokenService.cleanupExpiredSessions().catch((err) => {
-                    console.error("Session cleanup error:", err);
-                });
+                tokenService_1.tokenService.cleanupExpiredSessions().catch(() => { });
             }, 60 * 60 * 1000);
         });
         process.on("SIGTERM", this.shutdown.bind(this));
         process.on("SIGINT", this.shutdown.bind(this));
     }
     async shutdown() {
-        console.log("\nShutting down server...");
         try {
             this.matchingService.stop();
             this.io.close();
@@ -263,13 +302,9 @@ class Server {
                 });
             });
             await database_1.pool.end();
-            console.log("Database connections closed");
-            smtp_1.transporter.close();
-            console.log("SMTP connection closed");
             process.exit(0);
         }
         catch (error) {
-            console.error("Error during shutdown:", error);
             process.exit(1);
         }
     }

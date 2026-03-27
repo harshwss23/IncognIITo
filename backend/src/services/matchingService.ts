@@ -4,39 +4,67 @@ import { queueService, QueueEntry } from './queueService';
 import { jaccardScore } from '../constants/interests';
 import { query } from '../config/database';
 
-// Threshold decays as user waits longer
-// WHY: Don't make users wait forever for a perfect match.
+// --- Configuration Constants (Defensive Programming: Avoid Magic Numbers) ---
+const MATCHING_INTERVAL_MS = 1000;
+const WAIT_TIME_SHORT_MS = 3000;
+const WAIT_TIME_MEDIUM_MS = 6000;
+
+const THRESHOLD_HIGH = 0.40;
+const THRESHOLD_MEDIUM = 0.20;
+const THRESHOLD_LOW = 0.00;
+
+const SCORE_MULTIPLIER = 100;
+const MINIMUM_QUEUE_SIZE_FOR_MATCH = 2;
+
+/**
+ * Calculates the required matching threshold based on how long a user has waited.
+ * The threshold decays progressively to prioritize matching users over perfect matches.
+ *
+ * @param {number} waitMs - The duration the user has waited in milliseconds.
+ * @returns {number} The threshold percentage required for a match.
+ */
 function getThreshold(waitMs: number): number {
-  if (waitMs < 3000)  return 0.40; // 0-5s: Need 40% match
-  if (waitMs < 6000) return 0.20; // 5-10s: Need 20% match
-  return 0.00;                     // 10s+: Accept anyone (force match)
+  if (waitMs < WAIT_TIME_SHORT_MS) return THRESHOLD_HIGH;
+  if (waitMs < WAIT_TIME_MEDIUM_MS) return THRESHOLD_MEDIUM;
+  return THRESHOLD_LOW;
 }
 
-// Check if a pair is blocked using the prebuilt Set
-// Set stores "smaller_id:larger_id" strings for O(1) lookup
+/**
+ * Reconstructs the paired key to verify if the pair is blocked using O(1) matching.
+ *
+ * @param {number} a - The first user ID.
+ * @param {number} b - The second user ID.
+ * @param {Set<string>} blockedPairs - A predefined set of strings representing blocked ID pairs.
+ * @returns {boolean} Returns true if the two users are in the blocked set.
+ */
 function isBlocked(a: number, b: number, blockedPairs: Set<string>): boolean {
-  const key = `${Math.min(a, b)}:${Math.max(a, b)}`;
+  const minId = Math.min(a, b);
+  const maxId = Math.max(a, b);
+  const key = `${minId}:${maxId}`;
   return blockedPairs.has(key);
 }
 
 export class MatchingService {
   private io: SocketServer;
   private intervalId: ReturnType<typeof setInterval> | null = null;
-  private isRunning = false; // Prevent overlapping loops
+  private isRunning: boolean = false;
 
   constructor(io: SocketServer) {
     this.io = io;
   }
 
-  // ─── START MATCHING LOOP ─────────────────────────────────────────────
-  // Called once from server.ts when the server starts
+  /**
+   * Kicks off the continuous, non-overlapping matching loop at regular intervals.
+   */
   start(): void {
-    if (this.intervalId) return; // Already running
-    this.intervalId = setInterval(() => this.runMatchingCycle(), 1000);
-    console.log('✅ Matching loop started (every 1000ms)');
+    if (this.intervalId) return;
+    this.intervalId = setInterval(() => this.runMatchingCycle(), MATCHING_INTERVAL_MS);
+    console.log(`✅ Matching loop started (every ${MATCHING_INTERVAL_MS}ms)`);
   }
 
-  // ─── STOP MATCHING LOOP ──────────────────────────────────────────────
+  /**
+   * Halts the currently running matching loop.
+   */
   stop(): void {
     if (this.intervalId) {
       clearInterval(this.intervalId);
@@ -44,32 +72,32 @@ export class MatchingService {
     }
   }
 
-  // ─── ONE MATCHING CYCLE ──────────────────────────────────────────────
-  // This runs every 1000ms. Single thread, no overlap.
+  /**
+   * Executes a single O(N²) loop matching cycle to pair active users correctly.
+   * It skips processing if an existing matching cycle is still executing.
+   *
+   * @private
+   * @returns {Promise<void>}
+   */
   private async runMatchingCycle(): Promise<void> {
-    if (this.isRunning) return; // Previous cycle still running, skip
+    if (this.isRunning) return;
     this.isRunning = true;
 
     try {
-      // Step 1: Read queue (sorted by join time, oldest first)
       const queue = await queueService.getQueue();
 
-      if (queue.length < 2) return; // Need at least 2 to match
+      if (queue.length < MINIMUM_QUEUE_SIZE_FOR_MATCH) return;
 
-      // Step 2: Fetch blocked pairs from PostgreSQL (ONE query for all users)
       const userIds = queue.map(u => u.userId);
       const blockedPairs = await queueService.getBlockedPairs(userIds);
 
-      // Step 3: Track who got matched this cycle
       const matched = new Set<number>();
       const now = Date.now();
 
-      // Step 4: N² matching loop
-      // Outer loop: process oldest-waiting user first
       for (let i = 0; i < queue.length; i++) {
         const userA = queue[i];
 
-        if (matched.has(userA.userId)) continue; // Already matched this cycle
+        if (matched.has(userA.userId)) continue;
 
         const waitMs = now - userA.joinedAt;
         const threshold = getThreshold(waitMs);
@@ -77,60 +105,61 @@ export class MatchingService {
         let bestMatch: QueueEntry | null = null;
         let bestScore = -1;
 
-        // Inner loop: find best unmatched B for A
         for (let j = i + 1; j < queue.length; j++) {
           const userB = queue[j];
 
-          if (matched.has(userB.userId)) continue; // Already matched
-          if (isBlocked(userA.userId, userB.userId, blockedPairs)) continue; // Blocked
+          if (matched.has(userB.userId)) continue;
+          if (isBlocked(userA.userId, userB.userId, blockedPairs)) continue;
 
           const score = jaccardScore(userA.interestBits, userB.interestBits);
 
-          // Must be above threshold AND better than current best
           if (score >= threshold && score > bestScore) {
             bestScore = score;
             bestMatch = userB;
           }
         }
 
-        // Step 5: If best match found → create session immediately
         if (bestMatch) {
           await this.createMatch(userA, bestMatch, bestScore);
           matched.add(userA.userId);
           matched.add(bestMatch.userId);
         }
-        // If no match found: skip A for now, retry in next 500ms cycle
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Matching cycle error:', err);
     } finally {
       this.isRunning = false;
     }
   }
 
-  // ─── CREATE MATCH (called when two users are paired) ─────────────────
+  /**
+   * Creates an active WebRTC match/session and emits WebSocket alerts.
+   *
+   * @private
+   * @param {QueueEntry} userA - The first selected node queue user.
+   * @param {QueueEntry} userB - The second selected node queue user.
+   * @param {number} score - The matched Jaccard percentage similarity score.
+   * @returns {Promise<void>}
+   */
   private async createMatch(
     userA: QueueEntry,
     userB: QueueEntry,
     score: number
   ): Promise<void> {
-    const roomId = randomUUID(); // Unique room ID for WebRTC later
-    const matchScore = Math.round(score * 100);
+    const roomId = randomUUID();
+    const matchScore = Math.round(score * SCORE_MULTIPLIER);
 
     try {
-      // 1. Remove both from Redis queue + clear their interest cache
       await Promise.all([
         queueService.leaveQueue(userA.userId),
         queueService.leaveQueue(userB.userId),
       ]);
 
-      // 2. Store active session in Redis (used by frontend to know room_id)
       await Promise.all([
         queueService.setActiveSession(userA.userId, roomId),
         queueService.setActiveSession(userB.userId, roomId),
       ]);
 
-      // 3. Create permanent session record in PostgreSQL
       await query(
         `INSERT INTO matchmaking_sessions
            (user1_id, user2_id, match_score, room_id, status)
@@ -138,22 +167,21 @@ export class MatchingService {
         [userA.userId, userB.userId, matchScore, roomId]
       );
 
-      // 4. Emit socket event to BOTH users
-      // Frontend listens for "matched" event and redirects to video room
       const payload = {
         roomId,
         matchScore,
         event: 'matched',
       };
+      
       this.io.to(`user:${userA.userId}`).emit('matched', payload);
       this.io.to(`user:${userB.userId}`).emit('matched', payload);
 
       console.log(
         `✅ Matched user ${userA.userId} + user ${userB.userId} | score: ${matchScore}% | room: ${roomId}`
       );
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(`Failed to create match for ${userA.userId} and ${userB.userId}:`, err);
-      // Put them back in queue if session creation failed
+      
       await queueService.joinQueue(userA.userId).catch(() => {});
       await queueService.joinQueue(userB.userId).catch(() => {});
     }

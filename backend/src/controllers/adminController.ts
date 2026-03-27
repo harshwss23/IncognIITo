@@ -1,17 +1,27 @@
+// ============================================================================
 // FILE: src/controllers/adminController.ts
-// PURPOSE: Real DB-backed admin dashboard controllers (Phase 2)
+// PURPOSE: Real Database-backed administrative dashboard controllers. Handles 
+//          moderating reports, enforcing bans, fetching active metrics, and user logs.
+// ============================================================================
 
 import { Request, Response } from 'express';
 import { query } from '../config/database';
 
 export class AdminController {
 
-  // GET /api/admin/users?search=
-  // Response shape matches frontend: { id, userId, email, rating, status }
+  /**
+   * Fetches all registered users (excluding admins). Supports partial search filtering.
+   * 
+   * @param {Request} req - The Express request object containing the '?search=' query.
+   * @param {Response} res - The Express response object transmitting the JSON array constraint.
+   * @returns {Promise<void>}
+   */
   async getUsers(req: Request, res: Response): Promise<void> {
     try {
       const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
 
+      // Step-by-step: Construct dynamic parameterized query to retrieve flattened
+      // status details based on violation history and bans.
       let sql = `
         SELECT u.id,
                COALESCE(u.display_name, 'No Name') AS "userId",
@@ -30,6 +40,7 @@ export class AdminController {
       `;
       const params: any[] = [];
 
+      // Step-by-step: Concatenate ILIKE clause strictly through safe parameterized variables
       if (search) {
         sql += ` AND (u.display_name ILIKE $1 OR u.email ILIKE $1)`;
         params.push(`%${search}%`);
@@ -45,8 +56,13 @@ export class AdminController {
     }
   }
 
-  // GET /api/admin/reports?status=
-  // Response shape matches frontend: { id, reportId, targetUser, reason, status }
+  /**
+   * Fetches active user-submitted violation reports, allowing status filtration.
+   * 
+   * @param {Request} req - The Express request object.
+   * @param {Response} res - The Express response object.
+   * @returns {Promise<void>}
+   */
   async getReports(req: Request, res: Response): Promise<void> {
     try {
       const statusFilter = typeof req.query.status === 'string' ? req.query.status : '';
@@ -63,6 +79,7 @@ export class AdminController {
       `;
       const params: any[] = [];
 
+      // Step-by-step: Apply exact-match filtering safely via parameterization
       if (statusFilter) {
         sql += ` WHERE r.status = $1`;
         params.push(statusFilter);
@@ -78,17 +95,25 @@ export class AdminController {
     }
   }
 
-  // PATCH /api/admin/reports/:id  — resolve or dismiss a report
+  /**
+   * Resolves or dismisses an active user report based on administrator actions.
+   * 
+   * @param {Request} req - The Express request object containing the target report ID and payload.
+   * @param {Response} res - The Express response object reflecting status mutation.
+   * @returns {Promise<void>}
+   */
   async updateReport(req: Request, res: Response): Promise<void> {
     try {
       const reportId = Number(req.params.id);
       const { status, adminNote } = req.body as { status: string; adminNote?: string };
 
+      // Defense: Strict enumeration to prevent arbitrary status bindings
       if (!['Resolved', 'Dismissed'].includes(status)) {
         res.status(400).json({ success: false, message: 'Status must be Resolved or Dismissed' });
         return;
       }
 
+      // Step-by-step: Safely update report logs tying resolution identity mathematically to the admin
       const result = await query(
         `UPDATE reports
          SET status      = $1,
@@ -112,17 +137,25 @@ export class AdminController {
     }
   }
 
-  // POST /api/admin/users/:id/ban — ban a user + kill sessions
+  /**
+   * Instantly enacts a platform block marking the specified user as banned.
+   * Immediately disrupts underlying cached session tokens to drop current connections.
+   * 
+   * @param {Request} req - The Express request object containing the target offender ID.
+   * @param {Response} res - The Express response object.
+   * @returns {Promise<void>}
+   */
   async banUser(req: Request, res: Response): Promise<void> {
     try {
       const targetId = Number(req.params.id);
 
+      // Defense: Prevent catastrophic locking logic
       if (targetId === req.user!.userId) {
         res.status(400).json({ success: false, message: 'Cannot ban yourself' });
         return;
       }
 
-      // Upsert ban flag
+      // Step-by-step: Upsert query flags the target's underlying operational record as banned conclusively
       await query(
         `INSERT INTO user_profiles (user_id, is_banned)
          VALUES ($1, TRUE)
@@ -130,7 +163,7 @@ export class AdminController {
         [targetId]
       );
 
-      // Invalidate all sessions so ban takes effect immediately
+      // Step-by-step: Actively severe current authorized communication by stripping session tokens securely
       await query(`DELETE FROM sessions WHERE user_id = $1`, [targetId]);
 
       res.json({ success: true, message: 'User banned successfully' });
@@ -140,7 +173,13 @@ export class AdminController {
     }
   }
 
-  // POST /api/admin/users/:id/unban
+  /**
+   * Lifts an active ban off a user profile.
+   * 
+   * @param {Request} req - The Express request object encompassing the target ID.
+   * @param {Response} res - The Express response object.
+   * @returns {Promise<void>}
+   */
   async unbanUser(req: Request, res: Response): Promise<void> {
     try {
       const targetId = Number(req.params.id);
@@ -157,9 +196,16 @@ export class AdminController {
     }
   }
 
-  // GET /api/admin/stats — dashboard summary
+  /**
+   * Retrieves high-level numeric overviews for central administrative visualization.
+   * 
+   * @param {Request} req - The Express request object.
+   * @param {Response} res - The Express response object.
+   * @returns {Promise<void>}
+   */
   async getStats(_req: Request, res: Response): Promise<void> {
     try {
+      // Step-by-step: Efficiently multiplex analytical queries concurrently
       const [total, active, banned, pending] = await Promise.all([
         query(`SELECT COUNT(*) AS count FROM users`),
         query(`SELECT COUNT(*) AS count FROM users u LEFT JOIN user_profiles p ON u.id = p.user_id WHERE COALESCE(p.is_banned, FALSE) = FALSE`),

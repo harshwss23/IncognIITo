@@ -12,8 +12,10 @@ class AdminController {
             const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
             let sql = `
         SELECT u.id,
-               COALESCE(u.display_name, u.email) AS "userId",
+               COALESCE(u.display_name, 'No Name') AS "userId",
                u.email,
+               u.verified,
+               COALESCE(p.total_reports, 0)       AS "totalReports",
                COALESCE(p.rating, 0)              AS rating,
                CASE
                  WHEN p.is_banned = TRUE   THEN 'banned'
@@ -46,11 +48,12 @@ class AdminController {
             let sql = `
         SELECT r.id,
                ('R-' || r.id)                                       AS "reportId",
-               ('Reported: ' || COALESCE(t.display_name, t.email))  AS "targetUser",
+               (reporter.email || ' ➡️ ' || t.email) AS "targetUser",
                r.reason,
                r.status
         FROM reports r
         JOIN users t ON t.id = r.target_id
+        JOIN users reporter ON reporter.id = r.reporter_id
       `;
             const params = [];
             if (statusFilter) {

@@ -11,7 +11,6 @@ export const socket = io(socketUrl, {
 });
 
 // ─── 🛡️ GLOBAL SESSION ENFORCER ──────────────────────────────
-// Ye react render hone se pehle hi event catch kar lega
 socket.on("multiple_tabs_error", (message) => {
   console.warn("🚨 Session blocked by server:", message);
   
@@ -25,14 +24,15 @@ socket.on("multiple_tabs_error", (message) => {
 });
 // ────────────────────────────────────────────────────────────
 
-// Listener for matchmaking events
+// Listeners for matchmaking events
 socket.on("matched", (payload: { roomId: string; matchScore: number; event: string }) => {
   console.log("✅ Matched event received:", payload);
 });
+
 socket.on("connect", () => {
   console.log("🟢 Socket connected successfully");
 });
-// Listener for connection errors
+
 socket.on("disconnect", () => {
   console.warn("⚠️ Socket disconnected");
 });
@@ -47,3 +47,12 @@ socket.on("connect_error", (error) => {
     }
   }
 });
+
+// ─── 🔥 KILL GHOST SOCKETS ON REFRESH ──────────────────────────
+// Ye ensure karega ki refresh hone par server pe murda connections na bachein
+window.addEventListener("beforeunload", () => {
+  if (socket.connected) {
+    socket.disconnect();
+  }
+});
+// ────────────────────────────────────────────────────────────

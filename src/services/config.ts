@@ -1,4 +1,4 @@
-const defaultApiBaseUrl = "http://localhost:5050";
+const defaultApiBaseUrl = "https://172.27.16.252:5174/";
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, "");
 
