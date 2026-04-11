@@ -161,11 +161,19 @@ export class AdminController {
         return;
       }
 
+      const targetUser = await query(`SELECT id FROM users WHERE id = $1`, [targetId]);
+      if (targetUser.rows.length === 0) {
+        res.status(404).json({ success: false, message: 'User not found' });
+        return;
+      }
+
       // ==========================================
       // STEP 1: ENFORCE THE BAN (Mandatory)
       // ==========================================
       await query(
-        `UPDATE user_profiles SET is_banned = TRUE WHERE user_id = $1`,
+        `INSERT INTO user_profiles (user_id, is_banned)
+         VALUES ($1, TRUE)
+         ON CONFLICT (user_id) DO UPDATE SET is_banned = TRUE`,
         [targetId]
       );
 
@@ -199,6 +207,35 @@ export class AdminController {
       // STEP 4: 💥 THE ACTIVE STRIKE 💥
       // ==========================================
       try {
+        // Remove all social graph links so the banned user disappears from connected users lists.
+        const connectedUsersResult = await query(
+          `SELECT DISTINCT
+              CASE
+                WHEN sender_id = $1 THEN receiver_id
+                ELSE sender_id
+              END AS user_id
+           FROM connection_requests
+           WHERE status = 'ACCEPTED'
+             AND (sender_id = $1 OR receiver_id = $1)`,
+          [targetId]
+        );
+
+        const connectedUserIds = connectedUsersResult.rows
+          .map((row: any) => Number(row.user_id))
+          .filter((id: number) => !Number.isNaN(id));
+
+        await query(
+          `DELETE FROM connection_requests
+           WHERE sender_id = $1 OR receiver_id = $1`,
+          [targetId]
+        );
+
+        await query(
+          `DELETE FROM chats
+           WHERE user1_id = $1 OR user2_id = $1`,
+          [targetId]
+        );
+
         // 1. Violently rip them out of the Redis queue and active DB sessions
         await queueService.cleanupUser(targetId).catch(err => console.error("Failed to clean queue on ban:", err));
 
@@ -206,17 +243,35 @@ export class AdminController {
         const io = req.app.get("io"); 
         if (io) {
           const globalUserRoom = `user_global_${targetId}`;
+          const directUserRoom = `user:${targetId}`;
           
           // Tell their frontend to self-destruct immediately
           io.to(globalUserRoom).emit("banned_force_logout", { 
               message: "Your account has been permanently banned." 
           });
+          io.to(directUserRoom).emit("banned_force_logout", {
+              message: "Your account has been permanently banned."
+          });
+
+          connectedUserIds.forEach((connectedUserId: number) => {
+            io.to(`user_global_${connectedUserId}`).emit("connection_removed_due_to_ban", {
+              removedUserId: targetId,
+              message: "A connected user was removed due to policy action."
+            });
+
+            io.to(`user:${connectedUserId}`).emit("connection_removed_due_to_ban", {
+              removedUserId: targetId,
+              message: "A connected user was removed due to policy action."
+            });
+          });
 
           // Brutally sever all active TCP/WebSocket connections they currently have open
-          const existingSockets = await io.in(globalUserRoom).fetchSockets();
+          const existingSockets = await io.fetchSockets();
           existingSockets.forEach((socket: any) => {
-            console.log(`🧨 Snipping active socket ${socket.id} for freshly banned user ${targetId}`);
-            socket.disconnect(true);
+            if (Number(socket.data?.userId) === targetId) {
+              console.log(`🧨 Snipping active socket ${socket.id} for freshly banned user ${targetId}`);
+              socket.disconnect(true);
+            }
           });
         }
       } catch (strikeErr) {

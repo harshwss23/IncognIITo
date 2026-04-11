@@ -200,6 +200,7 @@ router.get(
              LIMIT 1
            ) m ON true
            WHERE (r.sender_id = $1 OR r.receiver_id = $1) AND r.status = $2
+             AND COALESCE(up.is_banned, FALSE) = FALSE
              AND NOT EXISTS (
                SELECT 1 FROM user_blocks 
                WHERE (blocker_id = u.id AND blocked_id = $1)
