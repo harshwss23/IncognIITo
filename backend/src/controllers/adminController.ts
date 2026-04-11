@@ -6,13 +6,13 @@
 
 import { Request, Response } from 'express';
 import { query } from '../config/database';
+import { queueService } from '../services/queueService'; // <-- IMPORT QUEUE SERVICE
 
 export class AdminController {
 
   /**
    * Fetches all registered users (excluding admins). Supports partial search filtering.
-   * 
-   * @param {Request} req - The Express request object containing the '?search=' query.
+   * * @param {Request} req - The Express request object containing the '?search=' query.
    * @param {Response} res - The Express response object transmitting the JSON array constraint.
    * @returns {Promise<void>}
    */
@@ -58,8 +58,7 @@ export class AdminController {
 
   /**
    * Fetches active user-submitted violation reports, allowing status filtration.
-   * 
-   * @param {Request} req - The Express request object.
+   * * @param {Request} req - The Express request object.
    * @param {Response} res - The Express response object.
    * @returns {Promise<void>}
    */
@@ -69,6 +68,7 @@ export class AdminController {
 
       let sql = `
         SELECT r.id,
+               r.target_id AS "targetId",  -- THIS WAS MISSING!
                ('R-' || r.id)                                       AS "reportId",
                (reporter.email || ' ➡️ ' || t.email) AS "targetUser",
                r.reason,
@@ -97,8 +97,7 @@ export class AdminController {
 
   /**
    * Resolves or dismisses an active user report based on administrator actions.
-   * 
-   * @param {Request} req - The Express request object containing the target report ID and payload.
+   * * @param {Request} req - The Express request object containing the target report ID and payload.
    * @param {Response} res - The Express response object reflecting status mutation.
    * @returns {Promise<void>}
    */
@@ -140,43 +139,102 @@ export class AdminController {
   /**
    * Instantly enacts a platform block marking the specified user as banned.
    * Immediately disrupts underlying cached session tokens to drop current connections.
-   * 
-   * @param {Request} req - The Express request object containing the target offender ID.
+   * * @param {Request} req - The Express request object containing the target offender ID.
    * @param {Response} res - The Express response object.
    * @returns {Promise<void>}
    */
-  async banUser(req: Request, res: Response): Promise<void> {
+  
+ async banUser(req: Request, res: Response): Promise<void> {
     try {
       const targetId = Number(req.params.id);
+      
+      // ADD THIS SAFETY CHECK:
+      if (isNaN(targetId)) {
+        res.status(400).json({ success: false, message: 'Invalid User ID provided by frontend' });
+        return;
+      }
+      
+      const adminId = (req as any).user?.userId || (req as any).user?.id || 1;
 
-      // Defense: Prevent catastrophic locking logic
-      if (targetId === req.user!.userId) {
+      if (targetId === adminId) {
         res.status(400).json({ success: false, message: 'Cannot ban yourself' });
         return;
       }
 
-      // Step-by-step: Upsert query flags the target's underlying operational record as banned conclusively
+      // ==========================================
+      // STEP 1: ENFORCE THE BAN (Mandatory)
+      // ==========================================
       await query(
-        `INSERT INTO user_profiles (user_id, is_banned)
-         VALUES ($1, TRUE)
-         ON CONFLICT (user_id) DO UPDATE SET is_banned = TRUE`,
+        `UPDATE user_profiles SET is_banned = TRUE WHERE user_id = $1`,
         [targetId]
       );
 
-      // Step-by-step: Actively severe current authorized communication by stripping session tokens securely
-      await query(`DELETE FROM sessions WHERE user_id = $1`, [targetId]);
+      // ==========================================
+      // STEP 2: RESOLVE REPORTS (Safe Zone)
+      // ==========================================
+      try {
+        await query(
+          `UPDATE reports 
+           SET status = 'Resolved', 
+               admin_note = 'User banned by admin', 
+               resolved_by = $1, 
+               updated_at = NOW() 
+           WHERE target_id = $2 AND status = 'Pending'`,
+          [adminId, targetId]
+        );
+      } catch (reportErr) {
+        console.error("Non-fatal error cleaning reports:", reportErr);
+      }
+
+      // ==========================================
+      // STEP 3: KILL SESSIONS (Safe Zone)
+      // ==========================================
+      try {
+        await query(`DELETE FROM sessions WHERE user_id = $1`, [targetId]);
+      } catch (sessionErr) {
+        console.error("Non-fatal error deleting sessions (table might not exist):", sessionErr);
+      }
+
+      // ==========================================
+      // STEP 4: 💥 THE ACTIVE STRIKE 💥
+      // ==========================================
+      try {
+        // 1. Violently rip them out of the Redis queue and active DB sessions
+        await queueService.cleanupUser(targetId).catch(err => console.error("Failed to clean queue on ban:", err));
+
+        // 2. Grab the global Socket.io instance
+        const io = req.app.get("io"); 
+        if (io) {
+          const globalUserRoom = `user_global_${targetId}`;
+          
+          // Tell their frontend to self-destruct immediately
+          io.to(globalUserRoom).emit("banned_force_logout", { 
+              message: "Your account has been permanently banned." 
+          });
+
+          // Brutally sever all active TCP/WebSocket connections they currently have open
+          const existingSockets = await io.in(globalUserRoom).fetchSockets();
+          existingSockets.forEach((socket: any) => {
+            console.log(`🧨 Snipping active socket ${socket.id} for freshly banned user ${targetId}`);
+            socket.disconnect(true);
+          });
+        }
+      } catch (strikeErr) {
+        console.error("Non-fatal error during Active Strike:", strikeErr);
+      }
+      // ==========================================
 
       res.json({ success: true, message: 'User banned successfully' });
-    } catch (error) {
-      console.error('Admin banUser error:', error);
-      res.status(500).json({ success: false, message: 'Failed to ban user' });
+
+    } catch (error: any) {
+      console.error('CRITICAL Admin banUser error:', error);
+      res.status(500).json({ success: false, message: `DB Error: ${error.message}` });
     }
   }
 
   /**
    * Lifts an active ban off a user profile.
-   * 
-   * @param {Request} req - The Express request object encompassing the target ID.
+   * * @param {Request} req - The Express request object encompassing the target ID.
    * @param {Response} res - The Express response object.
    * @returns {Promise<void>}
    */
@@ -198,8 +256,7 @@ export class AdminController {
 
   /**
    * Retrieves high-level numeric overviews for central administrative visualization.
-   * 
-   * @param {Request} req - The Express request object.
+   * * @param {Request} req - The Express request object.
    * @param {Response} res - The Express response object.
    * @returns {Promise<void>}
    */

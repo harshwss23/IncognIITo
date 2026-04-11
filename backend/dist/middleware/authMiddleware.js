@@ -9,9 +9,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authMiddleware = exports.AuthMiddleware = void 0;
 const tokenService_1 = require("../services/tokenService");
+const database_1 = require("../config/database"); // <-- IMPORT DATABASE QUERY
 class AuthMiddleware {
     // Verify JWT token (like Shopio's JwtAuthenticationFilter.doFilterInternal)
-    authenticate(req, res, next) {
+    async authenticate(req, res, next) {
         try {
             // Extract token from Authorization header
             const authHeader = req.headers.authorization;
@@ -32,6 +33,24 @@ class AuthMiddleware {
                 });
                 return;
             }
+            // 🧱 THE GLOBAL API ANVIL 🧱
+            try {
+                const banCheck = await (0, database_1.query)('SELECT COALESCE(is_banned, FALSE) as is_banned FROM user_profiles WHERE user_id = $1', [payload.userId]);
+                if (banCheck.rows.length > 0 && banCheck.rows[0].is_banned) {
+                    console.log(`🚨 GLOBAL BOUNCER INTERCEPTED REQUEST FROM BANNED USER: ${payload.userId} on route ${req.path}`);
+                    res.status(403).json({
+                        success: false,
+                        message: 'Your account is permanently banned. Access denied.'
+                    });
+                    return; // 🛑 Stops execution entirely, next() is never called
+                }
+            }
+            catch (dbError) {
+                console.error("Middleware DB Error:", dbError);
+                res.status(500).json({ success: false, message: 'Server error during security check' });
+                return;
+            }
+            // 🧱 ======================= 🧱
             // Attach user info to request
             req.user = {
                 userId: payload.userId,

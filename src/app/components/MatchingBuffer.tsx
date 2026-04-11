@@ -1,3 +1,9 @@
+// ============================================================================
+// FILE: src/components/MatchingBuffer.tsx
+// PURPOSE: Handles the waiting state for matchmaking, handles queue polling,
+//          and enforces ban-security redirects from the frontend using hard reloads.
+// ============================================================================
+
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Loader, AlertCircle } from 'lucide-react';
@@ -6,7 +12,8 @@ import { useTheme } from '@/app/contexts/ThemeContext';
 import { buildApiUrl } from '@/services/config';
 import { socket } from '@/services/socket';
 import { useGlobalCleanUp } from '../hooks/useGlobalCleanup';
-import { ThemeToggle } from "./ThemeToggle"; // Path verify kar lena
+import { ThemeToggle } from "./ThemeToggle";
+
 export function MatchingBuffer() {
   const { skipCleanup } = useGlobalCleanUp();
   const colors = useThemeColors();
@@ -20,7 +27,6 @@ export function MatchingBuffer() {
   const [error, setError] = useState<string | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  // Track if we are already in the process of joining to avoid race conditions
   const isJoinedRef = useRef(false);
 
   // --- 1. INITIALIZATION: Check status and Auto-Join if needed ---
@@ -37,6 +43,14 @@ export function MatchingBuffer() {
         const res = await fetch(buildApiUrl('/api/match/status'), {
           headers: { 'Authorization': `Bearer ${token}` }
         });
+
+        // 🧱 INITIALIZATION BOUNCER (NUCLEAR OPTION) 🧱
+        if (res.status === 403) {
+          localStorage.removeItem('token');
+          window.location.href = '/login'; // Hard redirect, bypasses React Router
+          return;
+        }
+
         const data = await res.json();
 
         if (!res.ok || !data.success) {
@@ -53,7 +67,7 @@ export function MatchingBuffer() {
           skipCleanup();
           navigate(`/live/${data.roomId}`);
         } else {
-          // Status is 'idle' or unknown -> Join the queue
+          // Status is 'idle' -> Join the queue
           const joinRes = await fetch(buildApiUrl('/api/match/join'), {
             method: 'POST',
             headers: {
@@ -61,10 +75,17 @@ export function MatchingBuffer() {
               'Content-Type': 'application/json'
             }
           });
+
+          // 🧱 JOIN BOUNCER (NUCLEAR OPTION) 🧱
+          if (joinRes.status === 403) {
+            localStorage.removeItem('token');
+            window.location.href = '/login'; 
+            return;
+          }
+
           const joinData = await joinRes.json();
 
           if (joinData.success) {
-            // Re-fetch status once to get correct queue numbers after joining
             const finalCheck = await fetch(buildApiUrl('/api/match/status'), {
               headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -103,6 +124,15 @@ export function MatchingBuffer() {
             'Content-Type': 'application/json'
           }
         });
+
+        // 🧱 POLLING KILL-SWITCH (NUCLEAR OPTION) 🧱
+        if (res.status === 403) {
+          console.warn("User banned mid-polling. Severing session.");
+          clearInterval(pollInterval);
+          localStorage.removeItem('token');
+          window.location.href = '/login'; // Instantly rips the page away
+          return;
+        }
 
         const data = await res.json();
 
@@ -164,7 +194,7 @@ export function MatchingBuffer() {
     }
   };
 
-  // Rendering logic
+  // Rendering logic for Loading State
   if (loading) {
     return (
       <div className={`w-full h-[100dvh] flex items-center justify-center p-4 transition-colors duration-500 overflow-y-auto no-scrollbar ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}>
@@ -181,6 +211,7 @@ export function MatchingBuffer() {
     );
   }
 
+  // Rendering logic for Error State
   if (error) {
     return (
       <div className={`w-full h-[100dvh] flex items-center justify-center p-4 transition-colors duration-500 overflow-y-auto no-scrollbar ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}>
@@ -204,10 +235,10 @@ export function MatchingBuffer() {
     );
   }
 
+  // Main Waiting State UI
   return (
     <div className={`w-full h-[100dvh] overflow-y-auto no-scrollbar flex flex-col p-4 sm:p-8 relative transition-colors duration-500 ${isDark ? 'bg-[#020617]' : 'bg-slate-50'}`}>
 
-      {/* ✅ YAHAN THEME TOGGLE ADD KIYA HAI */}
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-50">
         <ThemeToggle />
       </div>

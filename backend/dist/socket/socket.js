@@ -1,8 +1,20 @@
 "use strict";
+// ============================================================================
+// FILE: src/socket/socket.ts
+// PURPOSE: Primary WebSocket sub-controller focused purely on standard chatting 
+//          logic (real-time messages, typing indicators). Auth validation restricts 
+//          unverified connections.
+// ============================================================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerSocketHandlers = registerSocketHandlers;
 const tokenService_1 = require("../services/tokenService");
-const database_1 = require("../config/database"); // ✅ Added Database import
+const database_1 = require("../config/database");
+/**
+ * Parses and returns the JSON Web Token natively traversing WebSockets via headers or auth payloads.
+ *
+ * @param {Socket} socket - Connecting Socket client
+ * @returns {string | null} The raw token string or null if unauthenticated
+ */
 function getToken(socket) {
     const authToken = socket.handshake.auth?.token;
     if (authToken)
@@ -13,9 +25,14 @@ function getToken(socket) {
     }
     return null;
 }
-// ✅ IMPORTANT: Notice the "export" keyword here! This fixes your crash.
+/**
+ * Wires standard interaction and messaging chat events directly into the Socket.IO Server.
+ *
+ * @param {Server} io - Initialized Main Socket.io Server instance
+ */
 function registerSocketHandlers(io) {
-    // ✅ Auth middleware for sockets
+    // Step-by-step: Evaluate tokens directly inside connection lifecycle to sever 
+    // compromised connections instantly.
     io.use((socket, next) => {
         try {
             const token = getToken(socket);
@@ -24,11 +41,13 @@ function registerSocketHandlers(io) {
             const { payload, reason } = tokenService_1.tokenService.verifyTokenDetailed(token);
             if (!payload)
                 return next(new Error(reason === "expired" ? "TOKEN_EXPIRED" : "INVALID_TOKEN"));
+            // Inject parsed user constraints directly back onto the socket context 
             socket.user = {
                 userId: payload.userId,
                 email: payload.email,
                 verified: payload.verified,
             };
+            // Duplicate to core Socket Data architecture
             socket.data.userId = payload.userId;
             next();
         }
@@ -40,9 +59,9 @@ function registerSocketHandlers(io) {
         const s = socket;
         const userId = s.user.userId;
         console.log("✅ Socket connected:", socket.id, "user:", userId);
-        // Personal room (for notifications)
+        // Personal room allocation enabling direct notifications to single specific users
         socket.join(`user:${userId}`);
-        // Join a chat room
+        // Join a general Chat room
         socket.on("join_chat", ({ chatId }) => {
             socket.join(`chat:${chatId}`);
             console.log(`User ${userId} joined chat:${chatId}`);
@@ -51,31 +70,39 @@ function registerSocketHandlers(io) {
             socket.leave(`chat:${chatId}`);
             console.log(`User ${userId} left chat:${chatId}`);
         });
-        // ✅ REALTIME PERSISTENCE: Save to DB then emit
-        // ✅ Updated send_message handler in your Socket Controller
+        // ------------------------------------------------------------------------
+        // REALTIME PERSISTENCE LOGIC (Direct Database Bind)
+        // ------------------------------------------------------------------------
         socket.on("send_message", async ({ chatId, text, tempId }) => {
+            // Step-by-step: Fast-exit guards returning immediately if fundamental data is missing
             if (!chatId || !text?.trim())
                 return;
             try {
+                // Step-by-step: Write natively back to PostgreSQL to prevent message loss 
+                // even if frontend instances collapse right after sending.
                 const result = await (0, database_1.query)(`INSERT INTO messages (chat_id, sender_id, body)
-       VALUES ($1, $2, $3)
-       RETURNING id, chat_id, sender_id, body, created_at`, [chatId, userId, text.trim()]);
+           VALUES ($1, $2, $3)
+           RETURNING id, chat_id, sender_id, body, created_at`, [chatId, userId, text.trim()]);
                 const savedMessage = result.rows[0];
+                // Frame the payload into strict frontend contract parameters
                 const msgToEmit = {
-                    id: savedMessage.id, // The real Database ID
-                    tempId: tempId, // ✅ The frontend's temporary ID
+                    id: savedMessage.id, // Absolute server ID representation
+                    tempId: tempId, // Client's mapping reference to clear loading indicators
                     chatId: savedMessage.chat_id,
                     senderId: savedMessage.sender_id,
                     text: savedMessage.body,
                     time: new Date(savedMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 };
-                // Broadcast to the whole room (including sender)
+                // Broadcast exclusively back within the encapsulated chat boundaries
                 io.to(`chat:${chatId}`).emit("new_message", msgToEmit);
             }
             catch (err) {
                 console.error("❌ Socket Error:", err);
             }
         });
+        // ------------------------------------------------------------------------
+        // TRANSIENT INDICATORS
+        // ------------------------------------------------------------------------
         socket.on("typing", ({ chatId }) => {
             socket.to(`chat:${chatId}`).emit("typing_status", { chatId, userId, isTyping: true });
         });

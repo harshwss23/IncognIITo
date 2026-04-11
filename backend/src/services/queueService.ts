@@ -20,37 +20,43 @@ export class QueueService {
   /**
    * Securely embeds an authenticating target payload structure into both active
    * Redis buffers and deeply mirrored PostgreSQL fallback tables natively.
-   * 
-   * @param {number} userId - The core persistent internal ID.
+   * * @param {number} userId - The core persistent internal ID.
    * @returns {Promise<void>} 
    */
-  async joinQueue(userId: number): Promise<void> {
-    // Step-by-step: Prevent queue duplication using Redis zScore checks inherently
+ async joinQueue(userId: number): Promise<void> {
     const existing = await redisClient.zScore('match_queue', String(userId));
     if (existing !== null) {
       throw new Error('Already in queue');
     }
 
-    // Step-by-step: Capture associated matching rules (interests) directly structurally 
+    // 🧱 CORE MATCHMAKING FIREWALL 🧱
     const result = await query(
-      'SELECT interests FROM user_profiles WHERE user_id = $1',
+      'SELECT interests, COALESCE(is_banned, FALSE) as is_banned FROM user_profiles WHERE user_id = $1',
       [userId]
     );
-    if (!result.rows.length) {
+    
+    if (result.rows.length === 0) {
       throw new Error('User profile not found');
     }
 
-    const interests: string[] = result.rows[0].interests || [];
+    const userProfile = result.rows[0];
+    const isBanned = userProfile.is_banned === true || 
+                     String(userProfile.is_banned).toLowerCase() === 'true' || 
+                     userProfile.is_banned === 't';
+                     
+    if (isBanned) {
+        console.log(`🚨 CORE FIREWALL BLOCKED BANNED USER ${userId} FROM JOINING QUEUE`);
+        throw new Error('Your account is permanently banned.');
+    }
+    // 🧱 ================================= 🧱
+
+    const interests: string[] = userProfile.interests || [];
     const interestBits = interestsToBigInt(interests);
     const now = Date.now();
 
-    // Step-by-step: Optimize cache operations storing native BigInt mathematical values as fast encoded strings natively
     await redisClient.set(`user:interests:${userId}`, interestBits.toString());
-
-    // Allocate efficiently across sorted array algorithms cleanly via joining timelines
     await redisClient.zAdd('match_queue', { score: now, value: String(userId) });
 
-    // Step-by-step: Establish strong crash-recovery replication layers backing into pure PostgreSQL 
     await query(
       `INSERT INTO matchmaking_queue (user_id, status, preferred_interests)
        VALUES ($1, 'waiting', $2)
@@ -60,13 +66,12 @@ export class QueueService {
       [userId, interests]
     );
 
-    console.log(`User ${userId} joined queue with interests: ${interests.join(', ')}`);
+    console.log(`User ${userId} joined queue.`);
   }
 
   /**
    * Systematically evicts a node from waiting mechanics erasing traces cleanly natively.
-   * 
-   * @param {number} userId - The identity matching key to decouple.
+   * * @param {number} userId - The identity matching key to decouple.
    * @returns {Promise<void>}
    */
   async leaveQueue(userId: number): Promise<void> {
@@ -89,8 +94,7 @@ export class QueueService {
   /**
    * Gathers all queued identities effectively traversing structures in O(log N) formats 
    * rendering them iteratively for cyclical pairing evaluation algorithms.
-   * 
-   * @returns {Promise<QueueEntry[]>} Ordered timeline elements mapping oldest waiting sequentially.
+   * * @returns {Promise<QueueEntry[]>} Ordered timeline elements mapping oldest waiting sequentially.
    */
   async getQueue(): Promise<QueueEntry[]> {
     // Extract queue linearly mapping against joining score values natively
@@ -122,8 +126,7 @@ export class QueueService {
 
   /**
    * Checks boolean states without expensive traversal logic dynamically natively inside Redis.
-   * 
-   * @param {number} userId - Identification binding key.
+   * * @param {number} userId - Identification binding key.
    * @returns {Promise<boolean>} True if currently caching properly.
    */
   async isInQueue(userId: number): Promise<boolean> {
@@ -133,8 +136,7 @@ export class QueueService {
 
   /**
    * Determines exact wait pool dimension values instantaneously seamlessly.
-   * 
-   * @returns {Promise<number>} Live Queue node count cleanly.
+   * * @returns {Promise<number>} Live Queue node count cleanly.
    */
   async getQueueSize(): Promise<number> {
     return await redisClient.zCard('match_queue');
@@ -143,8 +145,7 @@ export class QueueService {
   /**
    * Marks a successful algorithmic connection mapping directly binding identities 
    * dynamically temporarily inside fast storage instances exclusively.
-   * 
-   * @param {number} userId - Authenticated node linking context organically.
+   * * @param {number} userId - Authenticated node linking context organically.
    * @param {string} roomId - Assigned generated shared UUID logically natively.
    * @returns {Promise<void>} 
    */
@@ -155,8 +156,7 @@ export class QueueService {
 
   /**
    * Inspects cache boundaries cleanly for existing operational session indicators functionally.
-   * 
-   * @param {number} userId - Base node mapped organically natively.
+   * * @param {number} userId - Base node mapped organically natively.
    * @returns {Promise<string | null>} UUID of session mapped context properly or null smoothly natively.
    */
   async getActiveSession(userId: number): Promise<string | null> {
@@ -165,8 +165,7 @@ export class QueueService {
 
   /**
    * Terminates cache bounds associated strictly with session properties natively organically natively.
-   * 
-   * @param {number} userId - Terminated node mapped structurally natively.
+   * * @param {number} userId - Terminated node mapped structurally natively.
    * @returns {Promise<void>} 
    */
   async clearActiveSession(userId: number): Promise<void> {
@@ -175,8 +174,7 @@ export class QueueService {
 
   /**
    * Wipes structural elements globally securely mapping user exit flows seamlessly natively natively.
-   * 
-   * @param {number} userId - Completely severed contextual node systematically natively.
+   * * @param {number} userId - Completely severed contextual node systematically natively.
    * @returns {Promise<void>} 
    */
   async cleanupUser(userId: number): Promise<void> {
@@ -195,8 +193,7 @@ export class QueueService {
 
   /**
    * Compiles strict constraint lists preventing negative matching experiences natively explicitly cleanly.
-   * 
-   * @param {number[]} userIds - Current active iteration target map.
+   * * @param {number[]} userIds - Current active iteration target map.
    * @returns {Promise<Set<string>>} Unidirectional exclusion set mathematically natively correctly compactly mapped natively.
    */
   async getBlockedPairs(userIds: number[]): Promise<Set<string>> {
