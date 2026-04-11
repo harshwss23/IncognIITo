@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const authMiddleware_1 = require("../middleware/authMiddleware");
 const database_1 = require("../config/database");
+const queueService_1 = require("../services/queueService"); // <-- IMPORT QUEUE SERVICE
 const router = (0, express_1.Router)();
 /**
  * POST /api/requests/send
@@ -136,13 +137,12 @@ router.get("/incoming", authMiddleware_1.authMiddleware.authenticate.bind(authMi
     }
 });
 // get lst of all mutual friends
+// get lst of all mutual friends
 router.get("/mutual", authMiddleware_1.authMiddleware.authenticate.bind(authMiddleware_1.authMiddleware), async (req, res) => {
     try {
         const userId = req.user.userId;
         const status = req.query.status || "ACCEPTED";
-        // ✅ FIXED: Now gets mutual friends whether you sent OR received the request.
-        // ✅ FIXED: Using DISTINCT ON to strictly prevent duplicates
-        // ✅ FIXED: Returning u.id as 'id' so React keys work correctly
+        console.log(`[DEBUG - MUTUAL] Fetching friends for User ${userId} with status '${status}'`);
         const result = await (0, database_1.query)(`SELECT * FROM (
            SELECT DISTINCT ON (u.id)
                   u.id, 
@@ -151,24 +151,18 @@ router.get("/mutual", authMiddleware_1.authMiddleware.authenticate.bind(authMidd
                   u.email as sender_email, 
                   u.display_name as sender_display_name,
                   up.avatar_url as sender_avatar_url,
+                  COALESCE(up.is_banned, FALSE) as is_banned,
                   m.body as last_message,
                   m.created_at as last_message_time,
                   r.created_at as connection_created_at
            FROM connection_requests r
            JOIN users u ON (u.id = r.sender_id OR u.id = r.receiver_id) AND u.id != $1
            LEFT JOIN user_profiles up ON up.user_id = u.id
-           JOIN chats c ON (c.user1_id = $1 AND c.user2_id = u.id) OR (c.user1_id = u.id AND c.user2_id = $1)
-           LEFT JOIN LATERAL (
+           LEFT JOIN chats c ON (c.user1_id = $1 AND c.user2_id = u.id) OR (c.user1_id = u.id AND c.user2_id = $1)
+         LEFT JOIN LATERAL (
              SELECT body, created_at
              FROM messages
              WHERE chat_id = c.id
-               AND created_at > COALESCE(
-                 CASE 
-                   WHEN c.user1_id = $1 THEN c.user1_cleared_at
-                   ELSE c.user2_cleared_at
-                 END, 
-                 '1970-01-01'
-               )
              ORDER BY created_at DESC
              LIMIT 1
            ) m ON true
@@ -181,13 +175,31 @@ router.get("/mutual", authMiddleware_1.authMiddleware.authenticate.bind(authMidd
            ORDER BY u.id, m.created_at DESC NULLS LAST, r.created_at DESC
          ) sub
          ORDER BY COALESCE(last_message_time, connection_created_at) DESC`, [userId, status]);
+        console.log(`[DEBUG - MUTUAL] SQL Query found ${result.rows.length} friends.`);
+        const friends = result.rows;
+        // ✅ BULLETPROOF LOOP: If Redis crashes, the route survives.
+        for (let friend of friends) {
+            try {
+                if (friend.is_banned) {
+                    friend.is_online = false;
+                }
+                else {
+                    const activeRoom = await queueService_1.queueService.getActiveSession(friend.other_user_id);
+                    friend.is_online = !!activeRoom;
+                }
+            }
+            catch (redisErr) {
+                console.error(`[DEBUG - MUTUAL] Redis check failed for user ${friend.other_user_id}. Defaulting to offline.`);
+                friend.is_online = false; // Failsafe
+            }
+        }
         return res.status(200).json({
             success: true,
-            data: { requests: result.rows },
+            data: { requests: friends },
         });
     }
     catch (error) {
-        console.error("Mutual friends error:", error);
+        console.error("[DEBUG - MUTUAL] MASSIVE FAILURE IN ROUTE:", error);
         return res.status(500).json({ success: false, message: "Failed to fetch mutual friends" });
     }
 });
@@ -224,10 +236,6 @@ router.get("/sent", authMiddleware_1.authMiddleware.authenticate.bind(authMiddle
  * POST /api/requests/:id/accept
  * Only receiver can accept a PENDING request
  */
-/**
- * POST /api/requests/:id/accept
- * Only receiver can accept a PENDING request
- */
 router.post("/:id/accept", authMiddleware_1.authMiddleware.authenticate.bind(authMiddleware_1.authMiddleware), async (req, res) => {
     try {
         const userId = req.user.userId;
@@ -242,7 +250,6 @@ router.post("/:id/accept", authMiddleware_1.authMiddleware.authenticate.bind(aut
             return res.status(404).json({ success: false, message: "Request not found" });
         }
         const request = requestRes.rows[0];
-        // ✅ FIXED: Changed request.to_user_id to request.receiver_id
         if (Number(request.receiver_id) !== Number(userId)) {
             await (0, database_1.query)("ROLLBACK");
             return res.status(403).json({ success: false, message: "Not authorized to accept this request" });
@@ -250,7 +257,8 @@ router.post("/:id/accept", authMiddleware_1.authMiddleware.authenticate.bind(aut
         await (0, database_1.query)(`UPDATE connection_requests
        SET status='ACCEPTED', responded_at=NOW()
        WHERE id=$1`, [requestId]);
-        // ✅ FIXED: Changed to request.sender_id and request.receiver_id
+        await (0, database_1.query)(`DELETE FROM connection_requests
+       WHERE sender_id=$1 AND receiver_id=$2`, [userId, request.sender_id]);
         const a = Math.min(request.sender_id, request.receiver_id);
         const b = Math.max(request.sender_id, request.receiver_id);
         const chatRes = await (0, database_1.query)(`INSERT INTO chats(user1_id, user2_id)

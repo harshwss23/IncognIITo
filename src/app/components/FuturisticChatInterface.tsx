@@ -22,8 +22,9 @@ import EmojiPicker, { Theme as EmojiTheme } from "emoji-picker-react";
 import { useTheme } from "@/app/contexts/ThemeContext";
 import { authFetch, ensureValidAccessToken } from "@/services/auth";
 import { useNavigate } from "react-router-dom";
-import { useGlobalCleanUp } from "../hooks/useGlobalCleanup";
+
 import { ThemeToggle } from "./ThemeToggle";
+
 type ChatMsg = {
   id: string | number;
   tempId?: string;
@@ -151,7 +152,7 @@ export function FuturisticChatInterface() {
 
   // Typing status
   const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({});
-  const typingTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const typingTimeoutRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Emoji Picker
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -216,9 +217,9 @@ export function FuturisticChatInterface() {
     };
   }, []);
 
-  // ── 2. Identity helper
+  // ── 2. Identity helper (Extracts Banned and Online status)
   const getFriendDetails = (f: any) => {
-    if (!f) return { name: "User", email: "", avatarUrl: "", userId: 0 };
+    if (!f) return { name: "User", email: "", avatarUrl: "", userId: 0, isBanned: false, isOnline: false };
     const amISender = safeStr(f.sender_id) === myId;
     const rawName = amISender ? f.receiver_display_name : f.sender_display_name;
     const email = amISender ? f.receiver_email : f.sender_email;
@@ -228,6 +229,8 @@ export function FuturisticChatInterface() {
       email: safeStr(email),
       avatarUrl: safeStr(avatarUrl),
       userId: f.other_user_id ?? f.id,
+      isBanned: f.is_banned === true,
+      isOnline: f.is_online === true,
     };
   };
   const activeInfo = useMemo(() => getFriendDetails(activeFriend), [activeFriend, myId]);
@@ -334,23 +337,18 @@ export function FuturisticChatInterface() {
 
   const handleEmojiClick = (emojiData: any) => {
     setMessage(prev => prev + emojiData.emoji);
-    // Focus back to input after choosing emoji if you want, but for now just append
   };
 
   const handleInputChange = (val: string) => {
     setMessage(val);
     if (!activeFriend?.chat_id) return;
 
-    // Send typing event
     socket.emit("typing", { chatId: activeFriend.chat_id });
-
-    // Clear existing timeout
     const cid = safeStr(activeFriend.chat_id);
     if (typingTimeoutRef.current[cid]) {
       clearTimeout(typingTimeoutRef.current[cid]);
     }
 
-    // Set new timeout to stop typing after 2 seconds of inactivity
     typingTimeoutRef.current[cid] = setTimeout(() => {
       socket.emit("stop_typing", { chatId: activeFriend.chat_id });
     }, 2000);
@@ -362,7 +360,7 @@ export function FuturisticChatInterface() {
   const openChat = (f: any) => {
     setActiveFriend(f);
     setMenuOpenFor(null);
-    setIsMobileSidebarOpen(false); // Hide sidebar on mobile when chat opens
+    setIsMobileSidebarOpen(false);
     const cid = safeStr(f.chat_id);
     if (cid) setUnreadCounts(prev => ({ ...prev, [cid]: 0 }));
   };
@@ -479,7 +477,6 @@ export function FuturisticChatInterface() {
   }
 
   return (
-    // MAIN WRAPPER: Scroll-safe locked height
     <div className={`flex h-[100dvh] w-full overflow-hidden transition-colors duration-500 no-scrollbar ${isDark ? "bg-[#0B1121] text-slate-200" : "bg-slate-50 text-slate-900"}`}>
       <ToastContainer toasts={toasts} isDark={isDark} />
 
@@ -495,10 +492,7 @@ export function FuturisticChatInterface() {
             </div>
             <h2 className={`text-lg md:text-xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>Connections</h2>
           </div>
-
-          {/* ✅ YAHAN THEME TOGGLE ADD KIYA HAI */}
           <ThemeToggle />
-
         </div>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-4 space-y-1.5 no-scrollbar">
@@ -527,7 +521,7 @@ export function FuturisticChatInterface() {
                         ? (isDark ? "bg-gradient-to-r from-blue-600/20 to-indigo-600/10 border-blue-500/30 text-white shadow-sm" : "bg-blue-50 border-blue-200 text-blue-800 shadow-sm")
                         : (isDark ? "border-transparent hover:bg-white/5" : "border-transparent hover:bg-slate-50")}`}
                   >
-                    {/* Avatar */}
+                    {/* Avatar with Dynamic Dot */}
                     <div className="relative shrink-0">
                       <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-[14px] overflow-hidden flex items-center justify-center font-bold text-lg shadow-sm
                         ${active ? "bg-blue-500 text-white" : isDark ? "bg-slate-800 text-slate-400" : "bg-slate-100 text-slate-500"}`}>
@@ -535,6 +529,12 @@ export function FuturisticChatInterface() {
                           ? <img src={info.avatarUrl} alt={info.name} className="w-full h-full object-cover" />
                           : info.name[0]}
                       </div>
+                      
+                      {/* DYNAMIC SIDEBAR DOT */}
+                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 rounded-full ${isDark ? 'border-[#0F172A]' : 'border-white'} 
+                        ${info.isBanned ? 'bg-red-500' : (info.isOnline ? 'bg-emerald-500' : 'bg-slate-400')}`}>
+                      </div>
+
                       {unread > 0 && !active && (
                         <div className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center shadow-md shadow-red-500/40 border-2 border-white dark:border-[#0F172A]">
                           {unread > 99 ? "99+" : unread}
@@ -618,7 +618,6 @@ export function FuturisticChatInterface() {
       </div>
 
       {/* ── Chat Area (Main View) ─────────────────────────────────── */}
-      {/* FIX 1: Added min-h-0 here */}
       <div className={`flex-1 min-h-0 flex-col relative min-w-0 isolate bg-transparent
           ${!isMobileSidebarOpen ? 'flex' : 'hidden md:flex'}`}>
 
@@ -641,6 +640,7 @@ export function FuturisticChatInterface() {
                   <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7" />
                 </button>
 
+                {/* Avatar with Dynamic Dot in Main Header */}
                 <div className="relative shrink-0">
                   <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white font-bold overflow-hidden shadow-sm
                     ${isDark ? 'bg-gradient-to-br from-blue-600 to-indigo-600' : 'bg-gradient-to-br from-blue-500 to-indigo-500'}`}>
@@ -648,7 +648,12 @@ export function FuturisticChatInterface() {
                       ? <img src={activeInfo.avatarUrl} alt={activeInfo.name} className="w-full h-full object-cover" />
                       : activeInfo.name[0]}
                   </div>
-                  <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-[#0F172A] rounded-full"></div>
+                  
+                  {/* DYNAMIC HEADER DOT */}
+                  <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 rounded-full ${isDark ? 'border-[#0F172A]' : 'border-white'} 
+                    ${activeInfo.isBanned ? 'bg-red-500' : (activeInfo.isOnline ? 'bg-emerald-500' : 'bg-slate-400')}`}>
+                  </div>
+
                 </div>
                 <div className="min-w-0 pr-4">
                   <h3 className={`font-black text-base sm:text-lg truncate tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>{activeInfo.name}</h3>
@@ -659,7 +664,7 @@ export function FuturisticChatInterface() {
                 </div>
               </div>
 
-              {/* ✅ NEW: Clear Chat Button */}
+              {/* Clear Chat Button */}
               <button
                 onClick={() => setClearChatModal(true)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all font-bold text-xs sm:text-sm border-2
@@ -670,11 +675,9 @@ export function FuturisticChatInterface() {
                 <Trash2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Clear Chat</span>
               </button>
-
             </div>
 
             {/* Messages Area */}
-            {/* FIX 2: Added min-h-0 here */}
             <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-5 sm:space-y-6 z-10 no-scrollbar">
               {messagesWithDateSeparators.length > 0 ? (
                 messagesWithDateSeparators.map((item, i) => {
@@ -693,14 +696,17 @@ export function FuturisticChatInterface() {
                   return (
                     <div key={msg.id || i} className={`flex ${isMe ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
                       <div className={`max-w-[85%] sm:max-w-[75%] md:max-w-[65%] flex flex-col ${isMe ? "items-end" : "items-start"}`}>
-                        <div className={`px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl sm:rounded-[1.25rem] text-sm sm:text-base shadow-sm leading-relaxed
-                            ${isMe
+                        
+                        {/* 👇 ADDED break-all HERE 👇 */}
+                        <div className={`px-4 py-2.5 sm:px-5 sm:py-3 rounded-2xl sm:rounded-[1.25rem] text-sm sm:text-base shadow-sm leading-relaxed break-words break-all whitespace-pre-wrap
+                          ${isMe
                             ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-tr-sm sm:rounded-tr-md shadow-blue-900/20"
                             : isDark
                               ? "bg-slate-800 text-slate-100 rounded-tl-sm sm:rounded-tl-md border border-white/5"
                               : "bg-white text-slate-800 rounded-tl-sm sm:rounded-tl-md border border-slate-100 shadow-slate-200/50"}`}>
                           {msg.text}
                         </div>
+
                         <span className={`text-[10px] sm:text-xs font-medium mt-1.5 px-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>{msg.time}</span>
                       </div>
                     </div>
