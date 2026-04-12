@@ -40,6 +40,7 @@ router.get("/", authMiddleware.authenticate.bind(authMiddleware), async (req: Re
          LIMIT 1
        ) m ON true
        WHERE (c.user1_id = $1 OR c.user2_id = $1)
+         AND COALESCE(p.is_banned, FALSE) = FALSE
          AND NOT EXISTS (
            SELECT 1 FROM user_blocks 
            WHERE (blocker_id = u.id AND blocked_id = $1)

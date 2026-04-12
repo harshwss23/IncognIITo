@@ -1,4 +1,10 @@
 "use strict";
+// ============================================================================
+// FILE: src/server.ts
+// PURPOSE: Primary Application Entrypoint. Configures the Express HTTP server, 
+//          initializes database checks, binds REST API routes, and seamlessly 
+//          attaches the Socket.IO WebRTC and Messaging layers.
+// ============================================================================
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -22,7 +28,7 @@ const tokenService_1 = require("./services/tokenService");
 const matchingService_1 = require("./services/matchingService");
 const queueService_1 = require("./services/queueService");
 const socket_1 = require("./socket/socket");
-// Load environment variables
+// Load environment variables dynamically
 dotenv_1.default.config();
 async function ensureAdminSchema() {
     try {
@@ -114,21 +120,24 @@ class Server {
         this.app.use("/api/admin", adminRoutes_1.default);
         this.app.use(errorHandler_1.errorHandler.notFound.bind(errorHandler_1.errorHandler));
     }
-    // ─── WEBRTC SOCKET LOGIC (SECURED) ──────────────────
     initializeSockets() {
         (0, socket_1.registerSocketHandlers)(this.io);
-        // 1. SOCKET AUTHENTICATION MIDDLEWARE
+        // 🧱 FRONT GATE: Blocks connection handshake if banned
         this.io.use(async (socket, next) => {
             try {
                 const token = socket.handshake.auth.token;
-                if (!token) {
+                if (!token)
                     return next(new Error("Token is missing"));
-                }
                 const decoded = (await tokenService_1.tokenService.verifyToken(token));
-                socket.data.userId = decoded.userId || decoded.id;
-                if (!socket.data.userId) {
+                const userId = decoded.userId || decoded.id;
+                if (!userId)
                     return next(new Error("Invalid token payload"));
+                const banCheck = await database_1.pool.query('SELECT is_banned FROM user_profiles WHERE user_id = $1', [userId]);
+                if (banCheck.rows[0]?.is_banned) {
+                    console.warn(`⛔ Socket Connection Denied: Banned User ${userId}`);
+                    return next(new Error("BANNED"));
                 }
+                socket.data.userId = userId;
                 next();
             }
             catch (error) {
@@ -136,18 +145,39 @@ class Server {
                 next(new Error("Invalid or expired token"));
             }
         });
-        // 🔌 2. CONNECTION EVENT
         this.io.on("connection", async (socket) => {
             const userId = socket.data.userId;
             const isTakeover = socket.handshake.auth.takeover;
-            // 🛑 BUG FIX: Agar userId missing hai, ignore it
             if (!userId) {
-                console.warn(`🚨 Ignored socket ${socket.id} (No valid User ID)`);
                 socket.disconnect(true);
                 return;
             }
-            console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId}, Takeover: ${isTakeover})`);
-            // ─── REGISTER EVENTS IMMEDIATELY ──────────────
+            // 🧱 INNER DOOR BOUNCER: Intercepts all events mid-session
+            // 🧱 INNER DOOR BOUNCER: Intercepts all events mid-session
+            socket.use(async ([event, ...args], next) => {
+                // Block them at ANY point they try to interact with the queue OR join a room
+                if (event === 'join_queue' || event === 'find_match' || event === 'join_room') {
+                    try {
+                        const banCheck = await database_1.pool.query('SELECT COALESCE(is_banned, FALSE) as is_banned FROM user_profiles WHERE user_id = $1', [userId]);
+                        if (banCheck.rows.length > 0 && banCheck.rows[0].is_banned) {
+                            console.log(`🚨 KICKED BANNED USER ${userId} OUT ON EVENT: ${event}`);
+                            // Tell frontend to kick them to the curb
+                            socket.emit('banned_force_logout', { message: 'Your account is banned.' });
+                            // Brutally sever the connection
+                            socket.disconnect(true);
+                            return next(new Error("User banned mid-session"));
+                        }
+                    }
+                    catch (err) {
+                        console.error("Event bouncer error:", err);
+                    }
+                }
+                next();
+            });
+            // JOIN GLOBAL ROOM FOR INSTANT ADMIN TARGETING
+            const globalUserRoom = `user_global_${userId}`;
+            socket.join(globalUserRoom);
+            console.log(`🔌 Socket Connected: ${socket.id} (User ID: ${userId})`);
             socket.on("join_room", async (roomID) => {
                 try {
                     const assignedRoomId = await queueService_1.queueService.getActiveSession(userId);
@@ -158,7 +188,7 @@ class Server {
                     const socketsInRoom = await this.io.in(roomID).fetchSockets();
                     const isUserAlreadyInRoom = socketsInRoom.some((s) => s.data.userId === userId);
                     if (isUserAlreadyInRoom) {
-                        socket.emit("room_error", "You are already connected to this session in another tab/window.");
+                        socket.emit("room_error", "You are already connected in another tab.");
                         return;
                     }
                     if (socketsInRoom.length >= 2) {
@@ -186,17 +216,15 @@ class Server {
             socket.on("disconnect", async () => {
                 console.log(`❌ Socket Disconnected: ${socket.id} (User: ${userId})`);
                 try {
-                    if (socket.data.killedByTakeover) {
-                        console.log(`⚠️ Skipped DB Cleanup for ${socket.id} (Killed by Force Takeover)`);
+                    if (socket.data.killedByTakeover)
                         return;
-                    }
                     if (!socket.data.hasSuccessfullyJoined) {
                         await queueService_1.queueService.leaveQueue(userId).catch(() => { });
                         return;
                     }
                     const roomId = await queueService_1.queueService.getActiveSession(userId);
                     if (roomId) {
-                        socket.to(roomId).emit("session_ended", "Your partner disconnected. Redirecting...");
+                        socket.to(roomId).emit("session_ended", "Your partner disconnected.");
                         const sessionResult = await database_1.pool.query(`SELECT id, user1_id, user2_id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`, [roomId]);
                         if (sessionResult.rows.length > 0) {
                             const session = sessionResult.rows[0];
@@ -210,59 +238,42 @@ class Server {
                     }
                 }
                 catch (error) {
-                    console.error("Error handling forceful disconnect cleanup:", error);
+                    console.error("Disconnect cleanup error:", error);
                 }
             });
-            // ─── 🔥 THE "GHOST SOCKET" KILLER (500ms Delay) ──────────────
             setTimeout(async () => {
-                // Agar in 500ms mein socket khud hi marr gaya, toh do nothing
                 if (socket.disconnected)
                     return;
-                const globalUserRoom = `user_global_${userId}`;
                 const existingSockets = await this.io.in(globalUserRoom).fetchSockets();
-                // Apne aap ko list se bahar nikalo
                 const otherSockets = existingSockets.filter(s => s.id !== socket.id);
                 if (otherSockets.length > 0) {
                     if (isTakeover) {
-                        console.log(`🔥 User ${userId} requested a FORCE TAKEOVER.`);
-                        // 1. Kill old sockets
                         otherSockets.forEach((oldSocket) => {
                             oldSocket.data.killedByTakeover = true;
-                            oldSocket.emit("multiple_tabs_error", "Session taken over by another device.");
+                            oldSocket.emit("multiple_tabs_error", "Session taken over.");
                             oldSocket.disconnect(true);
                         });
-                        // 2. DB Cleanup
                         try {
                             await queueService_1.queueService.leaveQueue(userId).catch(() => { });
                             const roomId = await queueService_1.queueService.getActiveSession(userId);
                             if (roomId) {
-                                this.io.to(roomId).emit("session_ended", "Your partner disconnected (Session Taken Over).");
-                                const sessionResult = await database_1.pool.query(`SELECT id, user1_id, user2_id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`, [roomId]);
+                                this.io.to(roomId).emit("session_ended", "Partner took over session.");
+                                const sessionResult = await database_1.pool.query(`SELECT id FROM matchmaking_sessions WHERE room_id = $1 AND status = 'active'`, [roomId]);
                                 if (sessionResult.rows.length > 0) {
-                                    const session = sessionResult.rows[0];
-                                    await database_1.pool.query(`UPDATE matchmaking_sessions SET status = 'completed', session_end = NOW() WHERE id = $1`, [session.id]);
-                                    await queueService_1.queueService.clearActiveSession(session.user1_id);
-                                    await queueService_1.queueService.clearActiveSession(session.user2_id);
+                                    await database_1.pool.query(`UPDATE matchmaking_sessions SET status = 'completed', session_end = NOW() WHERE id = $1`, [sessionResult.rows[0].id]);
+                                    await queueService_1.queueService.clearActiveSession(userId);
                                 }
                             }
                         }
-                        catch (error) {
-                            console.error("Error clearing session:", error);
-                        }
-                        socket.join(globalUserRoom);
+                        catch (e) { }
                         socket.emit("takeover_success");
                     }
                     else {
-                        console.warn(`🚨 User ${userId} blocked. Genuine multiple tab detected.`);
-                        socket.emit("multiple_tabs_error", "You already have an active session in another window.");
+                        socket.emit("multiple_tabs_error", "Active session exists.");
                         socket.disconnect(true);
                     }
                 }
                 else {
-                    // ─── 🟢 FIRST / CLEAN CONNECTION ──────────────
-                    socket.join(globalUserRoom);
-                    console.log(`✅ User ${userId} claimed the primary session.`);
-                    // 🔥 NEW: Frontend ko batao ki sab theek hai, koi doosra tab nahi hai
                     socket.emit("no_conflict");
                 }
             }, 0);

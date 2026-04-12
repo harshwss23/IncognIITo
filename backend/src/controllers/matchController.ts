@@ -12,14 +12,29 @@ export class MatchController {
 
   /**
    * Submits the authenticated user into the live matchmaking queue waiting list.
-   * 
-   * @param {Request} req - The client HTTPS request wrapping the execution context.
+   * * @param {Request} req - The client HTTPS request wrapping the execution context.
    * @param {Response} res - The server HTTP dispatch object.
    * @returns {Promise<void>}
    */
   async joinQueue(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user!.userId;
+
+      // 🧱 API MATCHMAKING BOUNCER 🧱
+      const banCheck = await query(
+          'SELECT COALESCE(is_banned, FALSE) as is_banned FROM user_profiles WHERE user_id = $1',
+          [userId]
+      );
+
+      if (banCheck.rows.length > 0 && banCheck.rows[0].is_banned) {
+          console.log(`🚨 BLOCKED API QUEUE JOIN FOR BANNED USER: ${userId}`);
+          res.status(403).json({ 
+              success: false, 
+              message: 'Your account is permanently banned. You cannot join matchmaking.' 
+          });
+          return;
+      }
+      // 🧱 ========================== 🧱
 
       // Step-by-step: Ensure they are not already actively interacting before caching into queue again
       const activeSession = await queueService.getActiveSession(userId);
@@ -54,8 +69,7 @@ export class MatchController {
 
   /**
    * Preemptively extracts a user from the active algorithmic search pool.
-   * 
-   * @param {Request} req - The HTTPS Request node.
+   * * @param {Request} req - The HTTPS Request node.
    * @param {Response} res - The HTTPS Response node.
    * @returns {Promise<void>}
    */
@@ -74,14 +88,34 @@ export class MatchController {
   /**
    * Checks the user's volatile matching status across the Redis and persistent DB strata.
    * Typically continuously queried by the frontend clients traversing state workflows.
-   * 
-   * @param {Request} req - The HTTPS Request node.
+   * * @param {Request} req - The HTTPS Request node.
    * @param {Response} res - The HTTPS Response node reflecting an idle, waiting, or matched state.
    * @returns {Promise<void>}
    */
   async getStatus(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user!.userId;
+
+      // 🧱 THE ACTIVE QUEUE BOUNCER 🧱
+      const banCheck = await query(
+        'SELECT COALESCE(is_banned, FALSE) as is_banned FROM user_profiles WHERE user_id = $1',
+        [userId]
+      );
+
+      if (banCheck.rows.length > 0 && banCheck.rows[0].is_banned) {
+        console.log(`🚨 KICKING BANNED USER ${userId} OUT OF ACTIVE QUEUE (Polling Intercepted)`);
+        
+        // Vigorously scrub them from Redis and the DB queue
+        await queueService.cleanupUser(userId).catch(() => {});
+        
+        res.status(403).json({ 
+          success: false, 
+          status: 'banned',
+          message: 'Your account has been permanently banned.' 
+        });
+        return;
+      }
+      // 🧱 ============================ 🧱
 
       // Step-by-step: Validate initial cached session markers targeting the fast volatile memory (Redis)
       const roomId = await queueService.getActiveSession(userId);
@@ -129,8 +163,7 @@ export class MatchController {
 
   /**
    * Forcibly destroys the authenticated agent's active session, allowing queues to reset cleanly.
-   * 
-   * @param {Request} req - The HTTPS Request node.
+   * * @param {Request} req - The HTTPS Request node.
    * @param {Response} res - The HTTPS Response node.
    * @returns {Promise<void>}
    */
@@ -179,8 +212,7 @@ export class MatchController {
 
   /**
    * Accumulates foundational identity statistics matching contextual IDs cleanly.
-   * 
-   * @param {Request} req - The HTTPS Request containing the associated Room lookup ID parameter.
+   * * @param {Request} req - The HTTPS Request containing the associated Room lookup ID parameter.
    * @param {Response} res - The HTTPS Response defining identity objects logically.
    * @returns {Promise<void>}
    */
@@ -231,8 +263,7 @@ export class MatchController {
 
   /**
    * Applies cumulative moving-average profile scores seamlessly at session exit, recording inputs dynamically.
-   * 
-   * @param {Request} req - The HTTPS Request supplying numerical rating points for an existing room.
+   * * @param {Request} req - The HTTPS Request supplying numerical rating points for an existing room.
    * @param {Response} res - The HTTPS Response acknowledging score placement.
    * @returns {Promise<void>}
    */
@@ -321,8 +352,7 @@ export class MatchController {
   /**
    * Supplies composite relationship structural metadata extracting "me" & "them" formats directly.
    * Leveraged principally during internal active chat contexts dynamically parsing interests.
-   * 
-   * @param {Request} req - The HTTPS Request payload targeting the specific active interaction.
+   * * @param {Request} req - The HTTPS Request payload targeting the specific active interaction.
    * @param {Response} res - The payload holding dynamically computed interest structures.
    * @returns {Promise<void>}
    */
@@ -382,8 +412,7 @@ export class MatchController {
   /**
    * Explicitly evicts underlying structural hooks associated with inactive 'ghost' sessions. 
    * Executes socket kills implicitly allowing safe reconnection instances globally. 
-   * 
-   * @param {Request} req - Target node calling the cleanup sequence payload safely. 
+   * * @param {Request} req - Target node calling the cleanup sequence payload safely. 
    * @param {Response} res - Response dictating execution success metrics properly.
    * @returns {Promise<void>}
    */

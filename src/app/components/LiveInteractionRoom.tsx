@@ -606,17 +606,17 @@ export function LiveInteractionRoom() {
             <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 scroll-smooth">
               {chatMessages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                  <div className={`px-4 py-2.5 rounded-2xl text-sm max-w-[85%] break-words shadow-sm leading-relaxed
-                    ${msg.sender === 'me'
-                      ? 'bg-blue-600 text-white rounded-br-sm'
-                      : isDark
-                        ? 'bg-slate-800 text-slate-200 rounded-bl-sm border border-white/5'
-                        : 'bg-slate-100 text-slate-900 rounded-bl-sm border border-slate-200'}`}>
-                    {msg.text}
-                    <div className={`text-[10px] mt-1 text-right opacity-60 ${msg.sender === 'me' ? 'text-blue-100' : 'text-slate-400'}`}>
-                      {msg.time}
-                    </div>
-                  </div>
+                  <div className={`px-4 py-2.5 rounded-2xl text-sm max-w-[85%] break-words whitespace-pre-wrap shadow-sm leading-relaxed
+    ${msg.sender === 'me'
+      ? 'bg-blue-600 text-white rounded-br-sm'
+      : isDark
+        ? 'bg-slate-800 text-slate-200 rounded-bl-sm border border-white/5'
+        : 'bg-slate-100 text-slate-900 rounded-bl-sm border border-slate-200'}`}>
+  {msg.text}
+  <div className={`text-[10px] mt-1 text-right opacity-60 ${msg.sender === 'me' ? 'text-blue-100' : 'text-slate-400'}`}>
+    {msg.time}
+  </div>
+</div>
                 </div>
               ))}
               <div ref={messagesEndRef} />

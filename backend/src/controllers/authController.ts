@@ -304,99 +304,79 @@ export class AuthController {
    * @param {Response} res - The Express response object.
    * @returns {Promise<void>}
    */
-  async forgotPasswordOTP(req: Request, res: Response): Promise<void> {
-    try {
-      const { email } = req.body;
+ async forgotPasswordOTP(req: any, res: any) {
+        try {
+            const { email } = req.body;
+            if (!email) return res.status(400).json({ success: false, message: 'Email required' });
+            
+            const sanitizedEmail = email.toLowerCase().trim();
 
-      if (!email || typeof email !== 'string') {
-        res.status(HTTP_STATUS_BAD_REQUEST).json({ success: false, message: 'Email is required and must be a string' });
-        return;
-      }
+            const userResult = await query(`
+                SELECT u.id, COALESCE(p.is_banned, FALSE) AS is_banned 
+                FROM users u 
+                LEFT JOIN user_profiles p ON u.id = p.user_id 
+                WHERE LOWER(u.email) = $1
+            `, [sanitizedEmail]);
 
-      const sanitizedEmail = ValidationUtils.sanitizeEmail(email);
+            if (userResult.rows.length === 0) {
+                return res.status(404).json({ success: false, message: 'Email not found' });
+            }
 
-      const userResult = await query('SELECT id FROM users WHERE email = $1', [sanitizedEmail]);
-      
-      if (userResult.rows.length === 0) {
-        res.status(HTTP_STATUS_NOT_FOUND).json({ success: false, message: 'No account found with this email.' });
-        return;
-      }
+            const user = userResult.rows[0];
+            
+            // 🛑 THE CEMENT WALL 🛑
+            const isBanned = user.is_banned === true || String(user.is_banned).toLowerCase() === 'true' || user.is_banned === 't';
+            if (isBanned) {
+                console.log(`🚨 KILLED OTP REQUEST FOR BANNED USER: ${sanitizedEmail}`);
+                return res.status(403).json({ success: false, message: 'Your account is permanently banned. Access denied.' });
+            }
 
-      try {
-        await otpService.sendOTP(sanitizedEmail, true);
-      } catch (otpError: unknown) {
-        throw otpError;
-      }
-
-      res.status(HTTP_STATUS_OK).json({
-        success: true,
-        message: 'Password reset OTP sent to your email.',
-      });
-    } catch (error: unknown) {
-      console.error('Forgot Password OTP error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to send OTP';
-      res.status(HTTP_STATUS_BAD_REQUEST).json({ success: false, message });
+            await otpService.sendOTP(sanitizedEmail, true);
+            res.status(200).json({ success: true, message: 'OTP sent' });
+        } catch (error) {
+            res.status(400).json({ success: false, message: 'Failed to send OTP' });
+        }
     }
-  }
-
   /**
    * Verifies the OTP and resets the user's password.
    * @param {Request} req - The Express request object.
    * @param {Response} res - The Express response object.
    * @returns {Promise<void>}
    */
-  async resetPassword(req: Request, res: Response): Promise<void> {
-    try {
-      const { email, otp, password } = req.body;
+async resetPassword(req: any, res: any) {
+        try {
+            const { email, otp, password } = req.body;
+            const sanitizedEmail = email.toLowerCase().trim();
 
-      if (!email || !otp || !password) {
-        res.status(HTTP_STATUS_BAD_REQUEST).json({ success: false, message: 'Email, OTP, and new password are required' });
-        return;
-      }
+            const verificationResult = await otpService.verifyOTP(sanitizedEmail, otp, true);
+            if (!verificationResult.success) return res.status(400).json({ success: false, message: verificationResult.message });
 
-      if (!ValidationUtils.isValidPassword(password)) {
-        res.status(HTTP_STATUS_BAD_REQUEST).json({ success: false, message: 'Password must be at least 8 characters with letters and numbers' });
-        return;
-      }
+            const userCheck = await query(`
+                SELECT u.id, u.verified, COALESCE(p.is_banned, FALSE) AS is_banned 
+                FROM users u 
+                LEFT JOIN user_profiles p ON u.id = p.user_id 
+                WHERE LOWER(u.email) = $1
+            `, [sanitizedEmail]);
 
-      const verificationResult = await otpService.verifyOTP(String(email), String(otp), true);
+            const user = userCheck.rows[0];
+            if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-      if (!verificationResult.success) {
-        res.status(HTTP_STATUS_BAD_REQUEST).json({ success: false, message: verificationResult.message });
-        return;
-      }
+            // 🛑 THE SECOND CEMENT WALL 🛑
+            const isBanned = user.is_banned === true || String(user.is_banned).toLowerCase() === 'true' || user.is_banned === 't';
+            if (isBanned) {
+                console.log(`🚨 KILLED RESET PASSWORD FOR BANNED USER: ${sanitizedEmail}`);
+                return res.status(403).json({ success: false, message: 'Your account is permanently banned.' });
+            }
 
-      const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
-
-      await query(
-        'UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING id, verified',
-        [passwordHash, email]
-      );
-
-      const userResult = await query('SELECT id, email, verified FROM users WHERE email = $1', [email]);
-      const user = userResult.rows[0];
-
-      const { accessToken, refreshToken } = await tokenService.generateTokenPair(
-        user.id,
-        user.email,
-        user.verified
-      );
-
-      res.status(HTTP_STATUS_OK).json({
-        success: true,
-        message: 'Password has been reset successfully!',
-        data: {
-          user: { id: user.id, email: user.email, verified: user.verified },
-          accessToken,
-          refreshToken,
-        },
-      });
-    } catch (error: unknown) {
-      console.error('Reset Password error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to reset password';
-      res.status(HTTP_STATUS_INTERNAL_SERVER_ERROR).json({ success: false, message });
+            const passwordHash = await bcrypt.hash(password, 10);
+            await query('UPDATE users SET password_hash = $1 WHERE LOWER(email) = $2', [passwordHash, sanitizedEmail]);
+            
+            const { accessToken, refreshToken } = await tokenService.generateTokenPair(user.id, sanitizedEmail, user.verified);
+            res.status(200).json({ success: true, data: { accessToken, refreshToken } });
+        } catch (error) {
+            res.status(500).json({ success: false, message: 'Reset failed' });
+        }
     }
-  }
 
   /**
    * Resends an OTP with a cooldown check.

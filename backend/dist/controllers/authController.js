@@ -1,13 +1,6 @@
 "use strict";
 // FILE: src/controllers/authController.ts
-// PURPOSE: Authentication controller (like Shopio's AuthController and UserController)
-// WHAT IT DOES:
-// - POST /auth/request-otp - Send OTP to IITK email
-// - POST /auth/verify-otp - Verify OTP and set password
-// - POST /auth/login - Login with email and password
-// - POST /auth/logout - Invalidate session
-// - POST /auth/refresh - Refresh access token
-// - POST /auth/resend-otp - Resend OTP
+// PURPOSE: Authentication controller handles user registration, login, and token management.
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -18,70 +11,83 @@ const otpService_1 = require("../services/otpService");
 const tokenService_1 = require("../services/tokenService");
 const database_1 = require("../config/database");
 const validation_1 = require("../utils/validation");
+// --- Configuration Constants (Defensive Programming: Avoid Magic Numbers) ---
+const HTTP_STATUS_OK = 200;
+const HTTP_STATUS_BAD_REQUEST = 400;
+const HTTP_STATUS_UNAUTHORIZED = 401;
+const HTTP_STATUS_FORBIDDEN = 403;
+const HTTP_STATUS_NOT_FOUND = 404;
+const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
+const BCRYPT_SALT_ROUNDS = 10;
 class AuthController {
-    // Step 1: Request OTP (like Shopio's register endpoint)
+    /**
+     * Requests an OTP to be sent to the user's email.
+     * @param {Request} req - The Express request object containing the email.
+     * @param {Response} res - The Express response object.
+     * @returns {Promise<void>}
+     */
     async requestOTP(req, res) {
         try {
             const { email } = req.body;
-            if (!email) {
-                res.status(400).json({
+            if (!email || typeof email !== 'string') {
+                res.status(HTTP_STATUS_BAD_REQUEST).json({
                     success: false,
-                    message: 'Email is required'
+                    message: 'Email is required and must be a string'
                 });
                 return;
             }
-            // Send OTP
             await otpService_1.otpService.sendOTP(email);
-            res.status(200).json({
+            res.status(HTTP_STATUS_OK).json({
                 success: true,
                 message: 'OTP sent to your email. Please check your inbox.',
             });
         }
         catch (error) {
             console.error('Request OTP error:', error);
-            res.status(400).json({
+            const message = error instanceof Error ? error.message : 'Failed to send OTP';
+            res.status(HTTP_STATUS_BAD_REQUEST).json({
                 success: false,
-                message: error.message || 'Failed to send OTP',
+                message,
             });
         }
     }
-    // Step 2: Verify OTP and set password (like Shopio's verifyOtp endpoint)
+    /**
+     * Verifies the provided OTP and sets the user's password.
+     * @param {Request} req - The Express request object.
+     * @param {Response} res - The Express response object.
+     * @returns {Promise<void>}
+     */
     async verifyOTPAndSetPassword(req, res) {
         try {
             const { email, otp, password } = req.body;
             if (!email || !otp || !password) {
-                res.status(400).json({
+                res.status(HTTP_STATUS_BAD_REQUEST).json({
                     success: false,
                     message: 'Email, OTP, and password are required',
                 });
                 return;
             }
-            // Validate password strength
             if (!validation_1.ValidationUtils.isValidPassword(password)) {
-                res.status(400).json({
+                res.status(HTTP_STATUS_BAD_REQUEST).json({
                     success: false,
                     message: 'Password must be at least 8 characters with letters and numbers',
                 });
                 return;
             }
-            // Verify OTP
-            const verificationResult = await otpService_1.otpService.verifyOTP(email, otp);
+            const verificationResult = await otpService_1.otpService.verifyOTP(email, String(otp));
             if (!verificationResult.success) {
-                res.status(400).json({
+                res.status(HTTP_STATUS_BAD_REQUEST).json({
                     success: false,
                     message: verificationResult.message,
                 });
                 return;
             }
-            // Hash password
-            const passwordHash = await bcrypt_1.default.hash(password, 10);
-            // Update user password
+            const passwordHash = await bcrypt_1.default.hash(password, BCRYPT_SALT_ROUNDS);
             await (0, database_1.query)('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, verificationResult.userId]);
-            // Generate tokens (like Shopio's login response)
             const userResult = await (0, database_1.query)('SELECT id, email, verified FROM users WHERE id = $1', [verificationResult.userId]);
             const user = userResult.rows[0];
             const { accessToken, refreshToken } = await tokenService_1.tokenService.generateTokenPair(user.id, user.email, user.verified);
-            res.status(200).json({
+            res.status(HTTP_STATUS_OK).json({
                 success: true,
                 message: 'Email verified and account created successfully',
                 data: {
@@ -97,66 +103,67 @@ class AuthController {
         }
         catch (error) {
             console.error('Verify OTP error:', error);
-            res.status(500).json({
+            const message = error instanceof Error ? error.message : 'Verification failed';
+            res.status(HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
                 success: false,
-                message: error.message || 'Verification failed',
+                message,
             });
         }
     }
-    // Step 3: Login with email and password (like Shopio's login endpoint)
+    /**
+     * Authenticates a user with email and password.
+     * @param {Request} req - The Express request object.
+     * @param {Response} res - The Express response object.
+     * @returns {Promise<void>}
+     */
     async login(req, res) {
         try {
             const { email, password } = req.body;
-            if (!email || !password) {
-                res.status(400).json({
+            if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+                res.status(HTTP_STATUS_BAD_REQUEST).json({
                     success: false,
-                    message: 'Email and password are required',
+                    message: 'Email and password are required and must be strings',
                 });
                 return;
             }
             const sanitizedEmail = validation_1.ValidationUtils.sanitizeEmail(email);
-            // Find user
             const userResult = await (0, database_1.query)(`SELECT u.id, u.email, u.password_hash, u.verified, u.display_name,
                 COALESCE(p.is_banned, FALSE) AS is_banned
          FROM users u
          LEFT JOIN user_profiles p ON u.id = p.user_id
          WHERE u.email = $1`, [sanitizedEmail]);
             if (userResult.rows.length === 0) {
-                res.status(401).json({
+                res.status(HTTP_STATUS_UNAUTHORIZED).json({
                     success: false,
                     message: 'Invalid email or password',
                 });
                 return;
             }
             const user = userResult.rows[0];
-            // Check if banned
             if (user.is_banned) {
-                res.status(403).json({
+                res.status(HTTP_STATUS_FORBIDDEN).json({
                     success: false,
                     message: 'Your account has been banned. Contact admin for support.',
                 });
                 return;
             }
-            // Check if verified (from Shopio's logic)
             if (!user.verified) {
-                res.status(403).json({
+                res.status(HTTP_STATUS_FORBIDDEN).json({
                     success: false,
                     message: 'Email not verified. Please verify your email first.',
                 });
                 return;
             }
-            // Check password
             const isPasswordValid = await bcrypt_1.default.compare(password, user.password_hash);
             if (!isPasswordValid) {
-                res.status(401).json({
+                res.status(HTTP_STATUS_UNAUTHORIZED).json({
                     success: false,
                     message: 'Invalid email or password',
                 });
                 return;
             }
-            // Generate tokens
             const { accessToken, refreshToken } = await tokenService_1.tokenService.generateTokenPair(user.id, user.email, user.verified);
-            res.status(200).json({
+            res.status(HTTP_STATUS_OK).json({
                 success: true,
                 message: 'Login successful',
                 data: {
@@ -173,38 +180,48 @@ class AuthController {
         }
         catch (error) {
             console.error('Login error:', error);
-            res.status(500).json({
+            res.status(HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
                 success: false,
                 message: 'Login failed',
             });
         }
     }
-    // Logout (invalidate session)
+    /**
+     * Logs out the user by invalidating their refresh token.
+     * @param {Request} req - The Express request object.
+     * @param {Response} res - The Express response object.
+     * @returns {Promise<void>}
+     */
     async logout(req, res) {
         try {
-            const refreshToken = req.body.refreshToken || req.cookies.refreshToken;
+            const refreshToken = req.body.refreshToken || req.cookies?.refreshToken;
             if (refreshToken) {
                 await tokenService_1.tokenService.invalidateSession(refreshToken);
             }
-            res.status(200).json({
+            res.status(HTTP_STATUS_OK).json({
                 success: true,
                 message: 'Logged out successfully',
             });
         }
         catch (error) {
             console.error('Logout error:', error);
-            res.status(500).json({
+            res.status(HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
                 success: false,
                 message: 'Logout failed',
             });
         }
     }
-    // Refresh access token
+    /**
+     * Refreshes the user's access token using a valid refresh token.
+     * @param {Request} req - The Express request object.
+     * @param {Response} res - The Express response object.
+     * @returns {Promise<void>}
+     */
     async refreshToken(req, res) {
         try {
-            const refreshToken = req.body.refreshToken || req.cookies.refreshToken;
+            const refreshToken = req.body.refreshToken || req.cookies?.refreshToken;
             if (!refreshToken) {
-                res.status(401).json({
+                res.status(HTTP_STATUS_UNAUTHORIZED).json({
                     success: false,
                     message: 'Refresh token required',
                 });
@@ -212,13 +229,13 @@ class AuthController {
             }
             const newAccessToken = await tokenService_1.tokenService.refreshAccessToken(refreshToken);
             if (!newAccessToken) {
-                res.status(401).json({
+                res.status(HTTP_STATUS_UNAUTHORIZED).json({
                     success: false,
                     message: 'Invalid or expired refresh token',
                 });
                 return;
             }
-            res.status(200).json({
+            res.status(HTTP_STATUS_OK).json({
                 success: true,
                 data: {
                     accessToken: newAccessToken,
@@ -227,7 +244,7 @@ class AuthController {
         }
         catch (error) {
             console.error('Refresh token error:', error);
-            res.status(500).json({
+            res.status(HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
                 success: false,
                 message: 'Token refresh failed',
             });
@@ -236,127 +253,140 @@ class AuthController {
     // ==========================================
     // FORGOT PASSWORD FLOW
     // ==========================================
-    // Step 1: Request OTP for Forgot Password
+    /**
+     * Requests an OTP for password reset.
+     * @param {Request} req - The Express request object.
+     * @param {Response} res - The Express response object.
+     * @returns {Promise<void>}
+     */
     async forgotPasswordOTP(req, res) {
         try {
             const { email } = req.body;
-            if (!email) {
-                res.status(400).json({ success: false, message: 'Email is required' });
-                return;
-            }
-            const sanitizedEmail = validation_1.ValidationUtils.sanitizeEmail(email);
-            // Check if user exists FIRST
-            const userResult = await (0, database_1.query)('SELECT id FROM users WHERE email = $1', [sanitizedEmail]);
+            if (!email)
+                return res.status(400).json({ success: false, message: 'Email required' });
+            const sanitizedEmail = email.toLowerCase().trim();
+            const userResult = await (0, database_1.query)(`
+                SELECT u.id, COALESCE(p.is_banned, FALSE) AS is_banned 
+                FROM users u 
+                LEFT JOIN user_profiles p ON u.id = p.user_id 
+                WHERE LOWER(u.email) = $1
+            `, [sanitizedEmail]);
             if (userResult.rows.length === 0) {
-                res.status(404).json({ success: false, message: 'No account found with this email.' });
-                return;
+                return res.status(404).json({ success: false, message: 'Email not found' });
             }
-            // Generate and send OTP (passing true for isPasswordReset)
-            try {
-                await otpService_1.otpService.sendOTP(sanitizedEmail, true); // 🔥 FIX APPLIED HERE
+            const user = userResult.rows[0];
+            // 🛑 THE CEMENT WALL 🛑
+            const isBanned = user.is_banned === true || String(user.is_banned).toLowerCase() === 'true' || user.is_banned === 't';
+            if (isBanned) {
+                console.log(`🚨 KILLED OTP REQUEST FOR BANNED USER: ${sanitizedEmail}`);
+                return res.status(403).json({ success: false, message: 'Your account is permanently banned. Access denied.' });
             }
-            catch (otpError) {
-                throw otpError;
-            }
-            res.status(200).json({
-                success: true,
-                message: 'Password reset OTP sent to your email.',
-            });
+            await otpService_1.otpService.sendOTP(sanitizedEmail, true);
+            res.status(200).json({ success: true, message: 'OTP sent' });
         }
         catch (error) {
-            console.error('Forgot Password OTP error:', error);
-            res.status(400).json({ success: false, message: error.message || 'Failed to send OTP' });
+            res.status(400).json({ success: false, message: 'Failed to send OTP' });
         }
     }
-    // Step 2: Verify OTP and Reset Password
+    /**
+     * Verifies the OTP and resets the user's password.
+     * @param {Request} req - The Express request object.
+     * @param {Response} res - The Express response object.
+     * @returns {Promise<void>}
+     */
     async resetPassword(req, res) {
         try {
             const { email, otp, password } = req.body;
-            if (!email || !otp || !password) {
-                res.status(400).json({ success: false, message: 'Email, OTP, and new password are required' });
-                return;
+            const sanitizedEmail = email.toLowerCase().trim();
+            const verificationResult = await otpService_1.otpService.verifyOTP(sanitizedEmail, otp, true);
+            if (!verificationResult.success)
+                return res.status(400).json({ success: false, message: verificationResult.message });
+            const userCheck = await (0, database_1.query)(`
+                SELECT u.id, u.verified, COALESCE(p.is_banned, FALSE) AS is_banned 
+                FROM users u 
+                LEFT JOIN user_profiles p ON u.id = p.user_id 
+                WHERE LOWER(u.email) = $1
+            `, [sanitizedEmail]);
+            const user = userCheck.rows[0];
+            if (!user)
+                return res.status(404).json({ success: false, message: 'User not found' });
+            // 🛑 THE SECOND CEMENT WALL 🛑
+            const isBanned = user.is_banned === true || String(user.is_banned).toLowerCase() === 'true' || user.is_banned === 't';
+            if (isBanned) {
+                console.log(`🚨 KILLED RESET PASSWORD FOR BANNED USER: ${sanitizedEmail}`);
+                return res.status(403).json({ success: false, message: 'Your account is permanently banned.' });
             }
-            if (!validation_1.ValidationUtils.isValidPassword(password)) {
-                res.status(400).json({ success: false, message: 'Password must be at least 8 characters with letters and numbers' });
-                return;
-            }
-            // Verify the OTP (passing true for isPasswordReset)
-            const verificationResult = await otpService_1.otpService.verifyOTP(email, otp, true); // 🔥 FIX ALREADY APPLIED HERE
-            if (!verificationResult.success) {
-                res.status(400).json({ success: false, message: verificationResult.message });
-                return;
-            }
-            // Hash the NEW password
             const passwordHash = await bcrypt_1.default.hash(password, 10);
-            // Update user password in Database
-            await (0, database_1.query)('UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING id, verified', [passwordHash, email]);
-            // Find user to generate login tokens
-            const userResult = await (0, database_1.query)('SELECT id, email, verified FROM users WHERE email = $1', [email]);
-            const user = userResult.rows[0];
-            // Generate tokens so user is instantly logged in after reset
-            const { accessToken, refreshToken } = await tokenService_1.tokenService.generateTokenPair(user.id, user.email, user.verified);
-            res.status(200).json({
-                success: true,
-                message: 'Password has been reset successfully!',
-                data: {
-                    user: { id: user.id, email: user.email, verified: user.verified },
-                    accessToken,
-                    refreshToken,
-                },
-            });
+            await (0, database_1.query)('UPDATE users SET password_hash = $1 WHERE LOWER(email) = $2', [passwordHash, sanitizedEmail]);
+            const { accessToken, refreshToken } = await tokenService_1.tokenService.generateTokenPair(user.id, sanitizedEmail, user.verified);
+            res.status(200).json({ success: true, data: { accessToken, refreshToken } });
         }
         catch (error) {
-            console.error('Reset Password error:', error);
-            res.status(500).json({ success: false, message: error.message || 'Failed to reset password' });
+            res.status(500).json({ success: false, message: 'Reset failed' });
         }
     }
-    // Resend OTP (with cooldown)
+    /**
+     * Resends an OTP with a cooldown check.
+     * @param {Request} req - The Express request object.
+     * @param {Response} res - The Express response object.
+     * @returns {Promise<void>}
+     */
     async resendOTP(req, res) {
         try {
             const { email } = req.body;
-            // Determine if this is a resend for password reset or normal registration
-            // You can pass an optional flag from the frontend if needed, but for now 
-            // we'll default to standard resend to avoid breaking your current frontend setup.
             const isPasswordReset = req.body.isPasswordReset || false;
-            if (!email) {
-                res.status(400).json({
+            if (!email || typeof email !== 'string') {
+                res.status(HTTP_STATUS_BAD_REQUEST).json({
                     success: false,
-                    message: 'Email is required',
+                    message: 'Email is required and must be a string',
                 });
                 return;
             }
             await otpService_1.otpService.resendOTP(email, isPasswordReset);
-            res.status(200).json({
+            res.status(HTTP_STATUS_OK).json({
                 success: true,
                 message: 'OTP resent successfully',
             });
         }
         catch (error) {
             console.error('Resend OTP error:', error);
-            res.status(400).json({
+            const message = error instanceof Error ? error.message : 'Failed to resend OTP';
+            res.status(HTTP_STATUS_BAD_REQUEST).json({
                 success: false,
-                message: error.message || 'Failed to resend OTP',
+                message,
             });
         }
     }
-    // Get current user info (protected route)
+    /**
+     * Retrieves the current authenticated user's profile information.
+     * @param {Request} req - The Express request object.
+     * @param {Response} res - The Express response object.
+     * @returns {Promise<void>}
+     */
     async getCurrentUser(req, res) {
         try {
             // @ts-ignore - user is attached by authMiddleware
-            const userId = req.user.userId;
+            const userId = req.user?.userId;
+            if (!userId) {
+                res.status(HTTP_STATUS_UNAUTHORIZED).json({
+                    success: false,
+                    message: 'User authentication failed',
+                });
+                return;
+            }
             const userResult = await (0, database_1.query)(`SELECT u.id, u.email, u.display_name, u.verified, u.is_admin,
                 p.interests, p.avatar_url, p.total_chats, p.total_reports, p.rating, p.is_banned
          FROM users u
          LEFT JOIN user_profiles p ON u.id = p.user_id
          WHERE u.id = $1`, [userId]);
             if (userResult.rows.length === 0) {
-                res.status(404).json({
+                res.status(HTTP_STATUS_NOT_FOUND).json({
                     success: false,
                     message: 'User not found',
                 });
                 return;
             }
-            res.status(200).json({
+            res.status(HTTP_STATUS_OK).json({
                 success: true,
                 data: {
                     user: userResult.rows[0],
@@ -365,7 +395,7 @@ class AuthController {
         }
         catch (error) {
             console.error('Get current user error:', error);
-            res.status(500).json({
+            res.status(HTTP_STATUS_INTERNAL_SERVER_ERROR).json({
                 success: false,
                 message: 'Failed to get user info',
             });

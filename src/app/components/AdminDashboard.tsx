@@ -24,7 +24,7 @@ interface BackendReport {
   targetUser: string;
   reason: string;
   status: string;
-  target_id: number;
+  targetId: number;
 }
 
 interface AdminUsersResponse extends Array<BackendUser> { }
@@ -55,18 +55,13 @@ export function AdminDashboard() {
   const [error, setError] = useState('');
 
   const handleAuthFailure = (status: number) => {
-    // Admin endpoints return 403 for authenticated non-admin users.
-    if (status !== 401 && status !== 403) {
-      return;
-    }
+    if (status !== 401 && status !== 403) return;
     clearAuthTokens();
     window.location.assign('/');
   };
 
-  // Fetch users + reports from backend on mount
   useEffect(() => {
     setLoading(true);
-
     Promise.all([
       fetchJsonWithAuth<AdminUsersResponse>('/api/admin/users'),
       fetchJsonWithAuth<AdminReportsResponse>('/api/admin/reports'),
@@ -78,7 +73,6 @@ export function AdminDashboard() {
       })
       .catch((err: unknown) => {
         console.error('Failed to load data:', err);
-
         if (err instanceof ApiError) {
           handleAuthFailure(err.status);
           setError(err.message || 'Failed to load data');
@@ -89,21 +83,17 @@ export function AdminDashboard() {
       });
   }, []);
 
-  // Ban or unban a user
   const handlePerformToggleBan = async (userId: number, currentStatus: string) => {
     const action = currentStatus === 'banned' ? 'unban' : 'ban';
     try {
       await fetchJsonWithAuth(`/api/admin/users/${userId}/${action}`, {
         method: 'POST',
       });
-
-      // Update local state immediately
       setUsers((prev) =>
         prev.map((u) => u.id === userId ? { ...u, status: action === 'ban' ? 'banned' : 'active' } : u)
       );
     } catch (err: unknown) {
       console.error(`${action} error:`, err);
-
       if (err instanceof ApiError) {
         handleAuthFailure(err.status);
         setError(err.message || `Failed to ${action} user`);
@@ -128,7 +118,6 @@ export function AdminDashboard() {
     });
   };
 
-  // Dismiss a report without banning
   const handlePerformReportDismiss = async (reportId: number) => {
     try {
       await fetchJsonWithAuth(`/api/admin/reports/${reportId}`, {
@@ -147,7 +136,7 @@ export function AdminDashboard() {
     setConfirmModal({
       isOpen: true,
       title: 'Ignore Report',
-      message: 'Are you sure you want to ignore this report? It will be removed from the pending list and marked as dismissed.',
+      message: 'Are you sure you want to ignore this report?',
       actionLabel: 'Ignore Report',
       isDanger: false,
       onConfirm: () => {
@@ -157,7 +146,6 @@ export function AdminDashboard() {
     });
   };
 
-  // Map backend users into the col1/col2/col3 shape the table expects
   const allUsers = users
     .filter((u) => u.verified === true)
     .map((u) => ({
@@ -170,7 +158,6 @@ export function AdminDashboard() {
       targetId: u.id,
     }));
 
-  // Map backend reports into the col1/col2/col3 shape the table expects
   const allReports = reports.map((r) => ({
     id: r.id,
     col1: r.reportId,
@@ -178,10 +165,10 @@ export function AdminDashboard() {
     col3: r.reason,
     col4: '',
     status: r.status,
-    targetId: r.target_id,
+    // 🛡️ GOD-MODE FALLBACK: Catches it no matter how the database formats the ID
+    targetId: r.targetId || (r as any).target_id || (r as any).targetUserId,
   }));
 
-  // Filter based on search
   const filteredUsers = allUsers.filter(
     (u) =>
       u.col1.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -203,7 +190,6 @@ export function AdminDashboard() {
   const pendingCount = allReports.filter((r) => r.status === 'Pending').length;
 
   return (
-    // FIXED: Full viewport height, flex-col, hidden overall overflow for scroll-safety
     <div className={`w-full h-[100dvh] flex flex-col transition-colors duration-500 overflow-hidden relative
         ${isDark ? 'bg-[#0B1121]' : 'bg-slate-50'}`}>
 
@@ -231,7 +217,6 @@ export function AdminDashboard() {
         {/* Stats & Logout & Theme */}
         <div className="flex flex-wrap items-center gap-4 sm:gap-6 self-end md:self-auto w-full md:w-auto pb-1 md:pb-0 pt-2 pr-2">
 
-          {/* ✅ THEME TOGGLE ADDED HERE */}
           <div className="shrink-0 flex items-center">
             <ThemeToggle />
           </div>
@@ -250,7 +235,6 @@ export function AdminDashboard() {
             <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Active</div>
           </div>
 
-          {/* LOGOUT BUTTON */}
           <button
             onClick={() => {
               clearAuthTokens();
@@ -328,7 +312,6 @@ export function AdminDashboard() {
       </div>
 
       {/* --- TABLE CONTENT --- */}
-      {/* FIXED: The flex-1 min-h-0 wrapper forces the internal container to scroll its own contents instead of overflowing the page */}
       <div className="flex-1 min-h-0 overflow-auto relative z-10 no-scrollbar">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[300px] gap-4">
@@ -355,7 +338,6 @@ export function AdminDashboard() {
             </div>
           </div>
         ) : (
-          /* FIXED: Min-width ensures table columns never squish, triggering horizontal scroll on mobile */
           <div className="min-w-[900px] w-full">
             <table className="w-full text-left border-collapse">
               <thead className={`sticky top-0 z-20 backdrop-blur-xl ${isDark ? 'bg-slate-900/90 border-b border-white/10' : 'bg-white/90 border-b border-slate-200 shadow-sm'}`}>
@@ -372,26 +354,16 @@ export function AdminDashboard() {
                 {currentData.map((item, idx) => (
                   <tr key={idx} className={`group transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}>
 
-                    {/* Column 1: ID */}
                     <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
                       <div className="flex items-center gap-3">
-                        {/* <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm
-                          ${isDark
-                            ? 'bg-slate-800 text-slate-300 border border-white/5'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}>
-                          {item.col1.slice(0, 2).toUpperCase()}
-                        </div> */}
                         <span className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.col1}</span>
                       </div>
                     </td>
 
-                    {/* Column 2: Email / Reported User */}
                     <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
                       <span className={`font-semibold text-sm ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{item.col2}</span>
                     </td>
 
-                    {/* Column 3: Reports / Reason */}
                     <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
                       {activeTab === 'users' ? (
                         <span className={`font-black text-base px-3 py-1 rounded-lg ${Number(item.col3) > 5 ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600') : (isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600')}`}>{item.col3}</span>
@@ -400,7 +372,6 @@ export function AdminDashboard() {
                       )}
                     </td>
 
-                    {/* Column 4: Rating (only for users) */}
                     {activeTab === 'users' ? (
                       <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
                         <div className="flex items-center gap-1.5 bg-slate-900/40 dark:bg-black/20 w-fit px-2 py-1 rounded-lg border border-transparent dark:border-white/5">
@@ -412,7 +383,6 @@ export function AdminDashboard() {
                       <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5"></td>
                     )}
 
-                    {/* Column 5: Status */}
                     <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
                       <span
                         className={`inline-flex items-center px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider border shadow-sm
@@ -430,7 +400,6 @@ export function AdminDashboard() {
                       </span>
                     </td>
 
-                    {/* Column 6: Action */}
                     <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
                       <div className="flex items-center justify-start gap-2 sm:gap-3">
                         {activeTab === 'users' ? (
@@ -456,6 +425,13 @@ export function AdminDashboard() {
                                     isDanger: true,
                                     onConfirm: async () => {
                                       setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                                      
+                                      // 🚨 THE ULTIMATE TRAP 🚨
+                                      if (!item.targetId) {
+                                        alert("🚨 BACKEND RESTART REQUIRED 🚨\nThe React frontend code is now perfect, but your Node backend is STILL sending data without the target ID! \n\n1. Go to your backend terminal.\n2. Press Ctrl+C.\n3. Restart it with 'npm run dev' to force the new SQL code to load.");
+                                        return;
+                                      }
+
                                       await handlePerformToggleBan(item.targetId, 'active');
                                       try {
                                         await fetchJsonWithAuth(`/api/admin/reports/${item.id}`, { method: 'PATCH', headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: 'Resolved' }) });
@@ -495,11 +471,9 @@ export function AdminDashboard() {
       {/* CONFIRMATION MODAL */}
       {confirmModal.isOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          {/* Backdrop */}
           <div className={`absolute inset-0 backdrop-blur-sm transition-opacity ${isDark ? 'bg-slate-950/80' : 'bg-slate-900/40'}`}
             onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}></div>
 
-          {/* Modal */}
           <div className={`relative w-full max-w-md p-6 sm:p-8 rounded-[2rem] shadow-2xl animate-in zoom-in-95 duration-300
                 ${isDark ? 'bg-[#0F172A] border border-white/10 shadow-black/50' : 'bg-white border border-slate-200 shadow-xl'}`}>
 
